@@ -24,7 +24,7 @@ const Navbar = ({ navOpen }) => {
 
     useEffect(initActiveBox, []);
 
-    const activeCurrentLink = (event) => {
+    const activeCurrentLink = (event) => { //for some reason this doesn't work yet.
         lastActiveLink.current?.classList.remove('active');
         event.target.classList.add('active');
         lastActiveLink.current = event.target;
