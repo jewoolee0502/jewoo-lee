@@ -25,9 +25,10 @@ const About = () => {
 
         <div className="">
           <p className="">
-            Welcome! I&apos;m Henry, a professional web developer with a knack for crafting visually stunning and 
-            highly functional websites. Combining creativity and technical expertise. I transform your vision into 
-            digital masterpiece that excels in both appearance and performance.
+            Hi! I&apos;m Jewoo (Jay), a passionate and detail-oriented Computer Engineering student at McGill University with a strong interest 
+            in software development, AI, and full-stack web technologies. I thrive on solving real-world problems through code and have experience 
+            building dynamic applications using modern frameworks. This website showcases my projects, technical skills, and experiences as I 
+            continue growing as a developer and aspiring engineer.
           </p>
         </div>
 
