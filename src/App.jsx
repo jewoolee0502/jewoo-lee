@@ -1,6 +1,6 @@
 /**
  * @copyright 2025 Jewoo Lee
- * @license <Apache-2 className="0"></Apache-2>
+ * @license Apache-2.0
  */
 
 
@@ -9,6 +9,7 @@
  */
 import Header from "./components/Header";
 import Hero from "./components/Hero";
+import About from "./components/About";
 
 
 const App = () => {
@@ -18,6 +19,7 @@ const App = () => {
       <Header />
       <main>
         <Hero />
+        <About />
       </main>
     </>
   )

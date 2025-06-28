@@ -1,6 +1,6 @@
 /**
  * @copyright 2025 Jewoo Lee
- * @license <Apache-2 className="0"></Apache-2>
+ * @license Apache-2.0
  */
 
 /**
