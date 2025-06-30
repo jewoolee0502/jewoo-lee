@@ -3,6 +3,11 @@
  * @license Apache-2.0
  */
 
+/**
+ * Components
+ */
+import ProjectCard from "./ProjectCard";
+
 const works = [
   {
     imgSrc: '/images/project-1.jpg',
@@ -56,7 +61,13 @@ const Work = () => {
 
         <div className="">
           {works.map(({ imgSrc, title, tags, projectLink }, key) => (
-            'ProjectCard'
+            <ProjectCard 
+              key={key}
+              imgSrc={imgSrc}
+              title={title}
+              tags={tags}
+              projectLink={projectLink}
+            />
           ))}
         </div>
 
