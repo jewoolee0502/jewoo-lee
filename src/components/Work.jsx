@@ -50,9 +50,15 @@ const Work = () => {
     >
       <div className="container">
 
-        <h2 className="headline-2">
+        <h2 className="headline-2 mb-8">
           My portfolio highlights
         </h2>
+
+        <div className="">
+          {works.map(({ imgSrc, title, tags, projectLink }, key) => (
+            'ProjectCard'
+          ))}
+        </div>
 
       </div>
     </section>
