@@ -3,6 +3,11 @@
  * @license Apache-2.0
  */
 
+/**
+ * Components
+ */
+import ReviewCard from "./ReviewCard";
+
 
 const reviews = [
   {
@@ -58,7 +63,7 @@ const Review = () => {
 
         <div className="">
           {reviews.map(({ content, name, imgSrc, company }, key => (
-            'ReviewCard'
+            <ReviewCard />
           )))}
         </div>
 
