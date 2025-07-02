@@ -46,7 +46,24 @@ const reviews = [
 
 const Review = () => {
   return (
-    <div>Review</div>
+    <section
+      id="reviews"
+      className="section"
+    >
+      <div className="container">
+
+        <h2 className="headline-2">
+          What our customers say
+        </h2>
+
+        <div className="">
+          {reviews.map(({ content, name, imgSrc, company }, key => (
+            'ReviewCard'
+          )))}
+        </div>
+
+      </div>
+    </section>
   )
 }
 
