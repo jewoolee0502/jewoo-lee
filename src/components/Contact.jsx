@@ -42,11 +42,11 @@ const Contact = () => {
       id="contact"
       className="section"
     >
-      <div className="container">
+      <div className="container lg:grid lg:grid-cols-2 lg:items-stretch">
 
-        <div className="">
+        <div className="mb-12 lg:mb-0 lg:flex lg:flex-col">
 
-          <h2 className="headline-2">
+          <h2 className="headline-2 lg:max-w-[12ch]">
              Contact me for collaboration
           </h2>
 
@@ -129,10 +129,15 @@ const Contact = () => {
               placeholder="Hi!"
               required
               className="text-field"
-            >
-
-            </textarea>
+            ></textarea>
           </div>
+
+          <button
+            type="submit"
+            className="btn btn-primary"
+          >
+            Submit
+          </button>
 
         </form>
 
