@@ -38,7 +38,106 @@ const socialLinks = [
 
 const Contact = () => {
   return (
-    <div>Contact</div>
+    <section
+      id="contact"
+      className="section"
+    >
+      <div className="container">
+
+        <div className="">
+
+          <h2 className="headline-2">
+             Contact me for collaboration
+          </h2>
+
+          <p className="">
+            Reach out today to discuss your project needs and start collaborating on something amazing!
+          </p>
+
+          <div className="">
+            {socialLinks.map(({ href, icon }, key) => (
+              <a
+                key={key}
+                href={href}
+                target="_blank"
+                className=""
+              >
+                {icon}
+              </a>
+            ))}
+          </div>
+
+        </div>
+
+        <form
+          action=""
+          method="POST"
+          className=""
+        >
+
+          <div className="">
+            <div className="">
+              <label
+                htmlFor="name"
+                className="label"
+              >
+                Name
+              </label>
+
+              <input
+                type="text"
+                name="name"
+                id="name"
+                autoComplete="name"
+                required
+                placeholder="Jewoo Lee"
+                className="text-field"
+              />
+            </div>
+
+            <div className="">
+              <label
+                htmlFor="email"
+                className="label"
+              >
+                Email
+              </label>
+
+              <input
+                type="email"
+                name="email"
+                id="email"
+                autoComplete="email"
+                required
+                placeholder="jewoo.lee@mail.mcgill.ca"
+                className="text-field"
+              />
+            </div>
+          </div>
+
+          <div className="">
+            <label 
+              htmlFor="message" 
+              className="label"
+            >
+              Message
+            </label>
+
+            <textarea 
+              name="message" 
+              id="message"
+              placeholder="Hi!"
+              required
+              className="text-field"
+            >
+
+            </textarea>
+          </div>
+
+        </form>
+
+      </div>
+      </section>
   )
 }
 
