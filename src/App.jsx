@@ -30,6 +30,7 @@ const App = () => {
         <Review />
         <Contact />
       </main>
+      <Footer />
     </>
   )
 
