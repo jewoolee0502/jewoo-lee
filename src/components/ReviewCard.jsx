@@ -12,8 +12,6 @@ ratings.fill({
   style: { fontvariationSettings: '"FILL" 1'}
 });
 
-console.log(ratings);
-
 const ReviewCard = ({
   content,
   imgSrc,
