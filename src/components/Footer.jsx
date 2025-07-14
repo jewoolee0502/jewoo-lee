@@ -60,10 +60,10 @@ const Footer = () => {
     <footer className="section">
       <div className="container">
 
-        <div className="">
+        <div className="lg:grid lg:grid-cols-2">
 
-          <div className="">
-            <h2 className="headline-1">
+          <div className="mb-10">
+            <h2 className="headline-1 mb-8 lg:max-w-[12ch]">
               Let&apos;s work togetehr today!
             </h2>
 
@@ -74,17 +74,17 @@ const Footer = () => {
             />
           </div>
 
-          <div className="">
+          <div className="grid grid-cols-2 gap-4 lg:pl-20">
 
             <div>
-              <p className="">Sitemap</p>
+              <p className="mb-2">Sitemap</p>
 
               <ul>
                 {sitemap.map(({ label, href }, key) => (
                   <li key={key}>
                     <a
                       href={href}
-                      className=""
+                      className="block text-sm text-zinc-400 py-1 transition-colors hover:text-zinc-200"
                     >
                       {label}
                     </a>
@@ -94,7 +94,7 @@ const Footer = () => {
             </div>
 
             <div>
-              <p className="">Socials</p>
+              <p className="mb-2">Socials</p>
 
               <ul>
                 {socials.map(({ label, href }, key) => (
@@ -102,7 +102,7 @@ const Footer = () => {
                     <a
                       href={href}
                       target="_blank"
-                      className=""
+                      className="block text-sm text-zinc-400 py-1 transition-colors hover:text-zinc-200"
                     >
                       {label}
                     </a>
@@ -115,7 +115,7 @@ const Footer = () => {
 
         </div>
 
-        <div className="">
+        <div className="flex items-center justify-between pt-10">
           <a
             href=""
             className=""
