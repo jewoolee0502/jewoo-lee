@@ -34,23 +34,15 @@ const sitemap = [
 const socials = [
   {
     label: 'GitHub',
-    href: 'https://www.github.com/codewithsadee-org'
+    href: 'https://github.com/jewoolee0502'
   },
   {
     label: 'LinkedIn',
-    href: 'https://www.linkedin.com/in/codewithsadee'
-  },
-  {
-    label: 'Twitter X',
-    href: 'https://x.com/codewithsadee_'
+    href: 'https://www.linkedin.com/in/jewoo-lee/'
   },
   {
     label: 'Instagram',
-    href: 'https://www.instagram.com/codewithsadee'
-  },
-  {
-    label: 'CodePen',
-    href: 'https://codepen.io/codewithsadee'
+    href: 'https://www.instagram.com/jwuu_lee/'
   }
 ];
 
