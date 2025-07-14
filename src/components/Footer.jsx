@@ -115,7 +115,7 @@ const Footer = () => {
 
         </div>
 
-        <div className="flex items-center justify-between pt-10">
+        <div className="flex items-center justify-between pt-10 mb-8">
           <a
             href=""
             className=""
@@ -128,8 +128,8 @@ const Footer = () => {
             />
           </a>
 
-          <p className="">
-            &copy; 2024 <span className="">Jewoo Lee</span>
+          <p className="text-zinc-500 text-sm">
+            &copy; 2025 <span className="text-zinc-200">Jewoo Lee</span>
           </p>
         </div>
 
