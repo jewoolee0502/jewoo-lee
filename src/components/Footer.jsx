@@ -56,7 +56,7 @@ const Footer = () => {
 
           <div className="mb-10">
             <h2 className="headline-1 mb-8 lg:max-w-[12ch]">
-              Let&apos;s work togetehr today!
+              Let&apos;s work together today!
             </h2>
 
             <ButtonPrimary 
