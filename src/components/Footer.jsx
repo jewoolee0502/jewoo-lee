@@ -80,12 +80,57 @@ const Footer = () => {
               <p className="">Sitemap</p>
 
               <ul>
-                {sitemap}
+                {sitemap.map(({ label, href }, key) => (
+                  <li key={key}>
+                    <a
+                      href={href}
+                      className=""
+                    >
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <p className="">Socials</p>
+
+              <ul>
+                {socials.map(({ label, href }, key) => (
+                  <li key={key}>
+                    <a
+                      href={href}
+                      target="_blank"
+                      className=""
+                    >
+                      {label}
+                    </a>
+                  </li>
+                ))}
               </ul>
             </div>
 
           </div>
 
+        </div>
+
+        <div className="">
+          <a
+            href=""
+            className=""
+          >
+            <img
+              src="/images/logo.svg"
+              width={40}
+              height={40}
+              alt="Logo"
+            />
+          </a>
+
+          <p className="">
+            &copy; 2024 <span className="">Jewoo Lee</span>
+          </p>
         </div>
 
       </div>
