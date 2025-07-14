@@ -9,7 +9,7 @@ import PropTypes from 'prop-types'
 const ratings = new Array(5);
 ratings.fill({
   icon: 'star',
-  style: { fontvariationSettings: '"FILL" 1'}
+  style: { fontVariationSettings: '"FILL" 1'}
 });
 
 const ReviewCard = ({
