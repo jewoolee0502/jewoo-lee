@@ -3,6 +3,11 @@
  * @license Apache-2.0
  */
 
+/**
+ * Components
+ */
+import { ButtonPrimary } from "./Button";
+
 const sitemap = [
   {
     label: 'Home',
@@ -52,7 +57,39 @@ const socials = [
 
 const Footer = () => {
   return (
-    <div>Footer</div>
+    <footer className="section">
+      <div className="container">
+
+        <div className="">
+
+          <div className="">
+            <h2 className="headline-1">
+              Let&apos;s work togetehr today!
+            </h2>
+
+            <ButtonPrimary 
+              href="mailto:jewoo.lee@mail.mcgill.ca"
+              label="Start Project"
+              icon="chevron_right"
+            />
+          </div>
+
+          <div className="">
+
+            <div>
+              <p className="">Sitemap</p>
+
+              <ul>
+                {sitemap}
+              </ul>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </footer>
   )
 }
 
