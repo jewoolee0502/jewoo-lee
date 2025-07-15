@@ -45,6 +45,7 @@ const Hero = () => {
             <ButtonPrimary
               href="/files/JEWOOLEE_CV.pdf"
               target="_blank"
+              rel="noopener noreferrer"
               label="Download CV"
               icon="download"
             />
