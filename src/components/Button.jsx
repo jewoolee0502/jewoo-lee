@@ -21,10 +21,13 @@ const ButtonPrimary = ({
   classes
 }) => {
   if (href) {
+    const relValue = target === '_blank' ? 'noopener noreferrer' : undefined;
+
     return (
       <a
         href={href}
         target={target}
+        relValue={relValue}
         className={"btn btn-primary " + classes}
       >
         {label}
@@ -80,10 +83,13 @@ const ButtonOutline = ({
   classes
 }) => {
   if (href) {
+    const relValue = target === '_blank' ? 'noopener noreferrer' : undefined;
+
     return (
       <a
         href={href}
         target={target}
+        rel={relValue}
         className={"btn btn-outline " + classes}
       >
         {label}
