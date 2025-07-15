@@ -42,7 +42,9 @@ const Hero = () => {
           </h2>
 
           <div className="flex items-center gap-3">
-            <ButtonPrimary 
+            <ButtonPrimary
+              href="/files/JEWOOLEE_CV.pdf"
+              target="_blank"
               label="Download CV"
               icon="download"
             />
