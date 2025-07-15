@@ -18,15 +18,15 @@ const sitemap = [
     href: '#about'
   },
   {
-    label: 'Work',
+    label: 'Projects',
     href: '#work'
   },
+  // {
+  //   label: 'Reviews',
+  //   href: '#reviews'
+  // },
   {
-    label: 'Reviews',
-    href: '#reviews'
-  },
-  {
-    label: 'Contact me',
+    label: 'Contact Me',
     href: '#contact'
   }
 ];
@@ -56,7 +56,7 @@ const Footer = () => {
 
           <div className="mb-10">
             <h2 className="headline-1 mb-8 lg:max-w-[12ch] reveal-up">
-              Let&apos;s work together today!
+              Let&apos;s collaborate!
             </h2>
 
             <ButtonPrimary 
