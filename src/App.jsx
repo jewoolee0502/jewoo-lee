@@ -27,6 +27,7 @@ import Hero from "./components/Hero";
 import About from "./components/About";
 import Skill from "./components/Skill";
 import Project from "./components/Project";
+import Experience from './components/Experience';
 import Contact from "./components/Contact";
 import Footer from "./components/Footer";
 
@@ -60,6 +61,7 @@ const App = () => {
         <About />
         <Skill />
         <Project />
+        <Experience />
         <Contact />
       </main>
       <Footer />
