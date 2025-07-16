@@ -13,12 +13,12 @@ const skillItem = [
   {
     imgSrc: '/images/python-5.svg',
     label: 'Python',
-    desc: ''
+    desc: 'Programming Language'
   },
   {
     imgSrc: '/images/java-4.svg',
     label: 'Java',
-    desc: ''
+    desc: 'Programming Language'
   },
   {
     imgSrc: '/images/figma.svg',
@@ -43,7 +43,7 @@ const skillItem = [
   {
     imgSrc: '/images/vue-9.svg',
     label: 'Vue.js',
-    desc: ''
+    desc: 'Framework'
   },
   {
     imgSrc: '/images/nuxt-2.svg',
@@ -58,7 +58,7 @@ const skillItem = [
   {
     imgSrc: '/images/postgresql.svg',
     label: 'PostgreSQL',
-    desc: 'Database'
+    desc: 'Object-Relational Database'
   },
   {
     imgSrc: '/images/mongodb.svg',
@@ -67,8 +67,8 @@ const skillItem = [
   },
   {
     imgSrc: '/images/spring-boot-1.svg',
-    label: 'SpringBoot',
-    desc: 'Database'
+    label: 'Spring Boot',
+    desc: 'Backend Framework'
   },
   {
     imgSrc: '/images/react.svg',
@@ -78,17 +78,17 @@ const skillItem = [
   {
     imgSrc: '/images/tailwindcss.svg',
     label: 'TailwindCSS',
-    desc: ''
+    desc: 'Framework'
   },
   {
     imgSrc: '/images/git-bash.svg',
     label: 'Git',
-    desc: ''
+    desc: 'Version Control'
   },
   {
     imgSrc: '/images/numpy-1.svg',
     label: 'Numpy',
-    desc: ''
+    desc: 'Data Processing'
   },
 ];
 
