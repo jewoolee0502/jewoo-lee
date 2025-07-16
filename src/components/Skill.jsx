@@ -11,6 +11,16 @@ import SkillCard from "./SkillCard";;
 
 const skillItem = [
   {
+    imgSrc: '/images/python-5.svg',
+    label: 'Python',
+    desc: 'Programming Language'
+  },
+  {
+    imgSrc: '/images/java-4.svg',
+    label: 'Java',
+    desc: 'Programming Language'
+  },
+  {
     imgSrc: '/images/figma.svg',
     label: 'Figma',
     desc: 'Design tool'
@@ -26,19 +36,39 @@ const skillItem = [
     desc: 'Interaction'
   },
   {
-    imgSrc: '/images/nodejs.svg',
-    label: 'NodeJS',
-    desc: 'Web Server'
+    imgSrc: '/images/typescript.svg',
+    label: 'TypeScript',
+    desc: 'Interaction'
   },
   {
-    imgSrc: '/images/expressjs.svg',
-    label: 'ExpressJS',
-    desc: 'Node Framework'
+    imgSrc: '/images/vue-9.svg',
+    label: 'Vue.js',
+    desc: 'Framework'
+  },
+  {
+    imgSrc: '/images/nuxt-2.svg',
+    label: 'Nuxt',
+    desc: 'Web Framework'
+  },
+  {
+    imgSrc: '/images/firebase-1.svg',
+    label: 'Firebase',
+    desc: 'Realtime Database'
+  },
+  {
+    imgSrc: '/images/postgresql.svg',
+    label: 'PostgreSQL',
+    desc: 'Object-Relational Database'
   },
   {
     imgSrc: '/images/mongodb.svg',
     label: 'MongoDB',
     desc: 'Database'
+  },
+  {
+    imgSrc: '/images/spring-boot-1.svg',
+    label: 'Spring Boot',
+    desc: 'Backend Framework'
   },
   {
     imgSrc: '/images/react.svg',
@@ -48,7 +78,17 @@ const skillItem = [
   {
     imgSrc: '/images/tailwindcss.svg',
     label: 'TailwindCSS',
-    desc: 'User Interface'
+    desc: 'Framework'
+  },
+  {
+    imgSrc: '/images/git-bash.svg',
+    label: 'Git',
+    desc: 'Version Control'
+  },
+  {
+    imgSrc: '/images/numpy-1.svg',
+    label: 'Numpy',
+    desc: 'Data Processing'
   },
 ];
 
