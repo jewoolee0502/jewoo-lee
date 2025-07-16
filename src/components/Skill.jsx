@@ -11,6 +11,16 @@ import SkillCard from "./SkillCard";;
 
 const skillItem = [
   {
+    imgSrc: '/images/python-5.svg',
+    label: 'Python',
+    desc: ''
+  },
+  {
+    imgSrc: '/images/java-4.svg',
+    label: 'Java',
+    desc: ''
+  },
+  {
     imgSrc: '/images/figma.svg',
     label: 'Figma',
     desc: 'Design tool'
@@ -26,18 +36,38 @@ const skillItem = [
     desc: 'Interaction'
   },
   {
-    imgSrc: '/images/nodejs.svg',
-    label: 'NodeJS',
-    desc: 'Web Server'
+    imgSrc: '/images/typescript.svg',
+    label: 'TypeScript',
+    desc: 'Interaction'
   },
   {
-    imgSrc: '/images/expressjs.svg',
-    label: 'ExpressJS',
-    desc: 'Node Framework'
+    imgSrc: '/images/vue-9.svg',
+    label: 'Vue.js',
+    desc: ''
+  },
+  {
+    imgSrc: '/images/nuxt-2.svg',
+    label: 'Nuxt',
+    desc: 'Web Framework'
+  },
+  {
+    imgSrc: '/images/firebase-1.svg',
+    label: 'Firebase',
+    desc: 'Realtime Database'
+  },
+  {
+    imgSrc: '/images/postgresql.svg',
+    label: 'PostgreSQL',
+    desc: 'Database'
   },
   {
     imgSrc: '/images/mongodb.svg',
     label: 'MongoDB',
+    desc: 'Database'
+  },
+  {
+    imgSrc: '/images/spring-boot-1.svg',
+    label: 'SpringBoot',
     desc: 'Database'
   },
   {
@@ -48,7 +78,17 @@ const skillItem = [
   {
     imgSrc: '/images/tailwindcss.svg',
     label: 'TailwindCSS',
-    desc: 'User Interface'
+    desc: ''
+  },
+  {
+    imgSrc: '/images/git-bash.svg',
+    label: 'Git',
+    desc: ''
+  },
+  {
+    imgSrc: '/images/numpy-1.svg',
+    label: 'Numpy',
+    desc: ''
   },
 ];
 
