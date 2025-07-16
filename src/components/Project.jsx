@@ -8,7 +8,7 @@
  */
 import ProjectCard from "./ProjectCard";
 
-const works = [
+const projects = [
   {
     imgSrc: '/images/MenuLens.png',
     title: 'Menu Lens',
@@ -29,10 +29,10 @@ const works = [
   },
 ];
 
-const Work = () => {
+const Project = () => {
   return (
     <section
-      id="work"
+      id="project"
       className="section"
     >
       <div className="container">
@@ -42,7 +42,7 @@ const Work = () => {
         </h2>
 
         <div className="grid gap-x-4 gap-y-5 grid-cols-[repeat(auto-fill,_minmax(280px,_1fr))]">
-          {works.map(({ imgSrc, title, tags, projectLink }, key) => (
+          {projects.map(({ imgSrc, title, tags, projectLink }, key) => (
             <ProjectCard 
               key={key}
               imgSrc={imgSrc}
@@ -59,4 +59,4 @@ const Work = () => {
   )
 }
 
-export default Work
+export default Project
