@@ -19,12 +19,8 @@ const sitemap = [
   },
   {
     label: 'Projects',
-    href: '#work'
+    href: '#project'
   },
-  // {
-  //   label: 'Reviews',
-  //   href: '#reviews'
-  // },
   {
     label: 'Contact Me',
     href: '#contact'
