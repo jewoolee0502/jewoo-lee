@@ -66,5 +66,5 @@ npm run dev
 If you have any questions, collaboration ideas, or just want to say hi, feel free to reach out:
 
 - 📧 **Email:** [jewoo.lee@mail.mcgill.ca](mailto:jewoo.lee@mail.mcgill.ca)
-- 💼 **LinkedIn:** [Jewoo Lee - Linkedin Profile](https://www.linkedin.com/in/jewoo-lee/)
-- 📸 **Instagram:** [Jewoo Lee - Instagram Profile](https://www.instagram.com/jwuu_lee/)
+- 💼 **LinkedIn:** [https://www.linkedin.com/in/jewoo-lee/](https://www.linkedin.com/in/jewoo-lee/)
+- 📸 **Instagram:** [https://www.instagram.com/jwuu_lee/](https://www.instagram.com/jwuu_lee/)
