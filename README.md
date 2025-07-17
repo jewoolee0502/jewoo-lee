@@ -4,7 +4,7 @@ This is my personal portfolio website built with **React**, **TailwindCSS**, and
 It showcases my projects, skills, and essential tools I use as a software developer.  
 Feel free to explore, fork, or use it as inspiration for your own portfolio!
 
-You can also check out my **[CV/Resume](public/files/JEWOOLEE_CV.pdf)** here!
+You can directly check out my **[CV/Resume](public/files/JEWOOLEE_CV.pdf)** right here!
 
 ## ✨ Features
 
