@@ -47,7 +47,7 @@ Make sure you have these installed:
   npm install
   ```
 
-### ▶️ Running the Project Locally
+### 🏃 Running the Project Locally
 ```bash
 npm start
 ```
