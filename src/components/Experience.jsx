@@ -55,6 +55,7 @@ const Experience = () => {
           </h2>
   
           <div className="relative">
+            {/* Vertical Line */}
             <div className="absolute left-1/2 top-0 transform -translate-x-1/2 h-full w-1bg-gray-700"></div>
 
             <div className="flex flex-col space-y-16">
