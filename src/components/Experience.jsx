@@ -10,22 +10,34 @@
 
 const experiences = [
   {
-    title: "Frontend Developer (Independent Contractor)",
-    company: "Data-Curve",
-    date: "May 2024 – Present",
-    description: "Developed AI-resistant interactive components using React, Tailwind CSS, and TypeScript, achieving 20% expansion in front-end data collection. Delivered production-ready code to enhance AI-driven UI generation for language model companies."
+    title: "Full-Stack Developer (Internship)",
+    company: "Wholesale Express",
+    date: "May 2025 – Present",
+    description: ""
   },
   {
-    title: "Software Development Intern (Computer Vision)",
-    company: "Northking Information",
-    date: "Apr 2023 – Aug 2023",
-    description: "Enhanced YOLO model performance (+2.5% accuracy, +4% precision) through optimized CNN architectures and filtering loops. Improved license plate recognition systems contributing to revenue growth using Python and OpenCV."
+    title: "Credit Risk Analyst (Internship)",
+    company: "CI Guaranteee",
+    date: "Apr 2024 – Jul 2024",
+    description: ""
   },
   {
-    title: "Python Machine Learning Engineer Intern",
-    company: "TaiHe Technology",
-    date: "Apr 2022 – Aug 2022",
-    description: "Boosted NLP model accuracy by 7% and processing speed by 2% through parameter optimization. Developed financial event classification systems compatible with quantitative trading algorithms using Numpy and Pandas."
+    title: "Sergeant (Marine)",
+    company: "Republic of Korea Marine Corps (ROKMC)",
+    date: "Sept 2022 – Mar 2024",
+    description: ""
+  },
+  {
+    title: "Project Intern",
+    company: "Hansan Global",
+    date: "Jun 2021 – Sept 2021",
+    description: ""
+  },
+  {
+    title: "Summer Intern",
+    company: "Korea Trade-Investment Promotion Agency (KOTRA)",
+    date: "Jun 2019 – Jul 2019",
+    description: ""
   }
 ];
 
