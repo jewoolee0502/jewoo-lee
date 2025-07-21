@@ -1,4 +1,4 @@
-# 🚀 Personal Portfolio 
+# 🚀 Personal Portfolio Website
 
 This is my personal portfolio website built with **React**, **TailwindCSS**, and other modern web technologies.  
 It showcases my projects, skills, and essential tools I use as a software developer.  
