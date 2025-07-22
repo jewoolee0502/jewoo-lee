@@ -43,7 +43,7 @@ const experiences = [
     title: "Sergeant (Marine)",
     company: "Republic of Korea Marine Corps (ROKMC)",
     date: "Sept 2022 – Mar 2024",
-    description: ""
+    description: `Facilitated communication between the USMC and the ROKMC by providing both linguistic and cultural interpretation, especially during FreedomShield'24.`
   },
   {
     title: "Project Intern",
