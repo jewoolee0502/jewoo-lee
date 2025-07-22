@@ -32,7 +32,12 @@ const experiences = [
     title: "Credit Risk Analyst (Internship)",
     company: "CI Guaranteee",
     date: "Apr 2024 – Jul 2024",
-    description: ""
+    description: `As a credit risk analyst at CI Guarantee, I analyze our partnered company’s credit depending on 
+    their previous year's performance by examining financial statements, cash flow, and owner’s credit. Depending 
+    on the analysis, I then used an internal program to rank them by their credibility to determine how credible 
+    our partnered companies are for us to give them loans and insurance for their future projects. I also directly 
+    communicated with our partnered companies to resolve their questions and curiosities on their confirmed ranks, 
+    and to help them with the application process to receive our credibility test on future possible loans and insurance.`
   },
   {
     title: "Sergeant (Marine)",
@@ -50,7 +55,10 @@ const experiences = [
     title: "Summer Intern",
     company: "Korea Trade-Investment Promotion Agency (KOTRA)",
     date: "Jun 2019 – Jul 2019",
-    description: ""
+    description: `KOTRA is a trade-investment promotion agency operated by the South Korean Government. 
+    During my internship program, I was an overall assistant to my team. Moreover, I also performed 
+    customer service for KOTRA as well as giving out presentations. From this experience, I have gained 
+    basic knowledge of communication, project managing, and presentation skills.`
   }
 ];
 
