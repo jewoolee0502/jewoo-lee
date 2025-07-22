@@ -16,6 +16,19 @@ const experiences = [
     description: ""
   },
   {
+    title: "Full-Stack Developer (Part-time)",
+    company: "Container Foam",
+    date: "Mar 2025 – May 2025",
+    description: `Worked on the development of the Cocktail App, a personalized drink recommendation 
+    platform that suggests cocktail recipes based on users’ mood, flavor preferences, 
+    allergies, and available ingredients. I designed and implemented the PostgreSQL database 
+    schema to ensure a scalable and maintainable backend structure. Integrated Google Document AI 
+    to extract structured recipe data from various cocktail books, and utilized the OpenRouter DeepSeek AI 
+    model to generate and recommend tailored cocktail recipes for users. Although the contract was limited 
+    to two months, I successfully delivered all assigned tasks and helped lay the groundwork for a stable 
+    and scalable platform, ensuring the project is well-positioned for future development.`
+  },
+  {
     title: "Credit Risk Analyst (Internship)",
     company: "CI Guaranteee",
     date: "Apr 2024 – Jul 2024",
