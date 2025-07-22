@@ -49,7 +49,10 @@ const experiences = [
     title: "Project Intern",
     company: "Hansan Global",
     date: "Jun 2021 – Sept 2021",
-    description: ""
+    description: `HANSAN GLOBAL is a Korean Trading company based in Cairo, Egypt. HANSAN GLOBAL 
+    is planning on launching a new business for importing Korean cosmetics into Egypt. Thus, during 
+    my internship program, I completed research on the cosmetic market in Egypt. Moreover, I began 
+    advertising our products on social media and successfully sold several cosmetic products.`
   },
   {
     title: "Summer Intern",
