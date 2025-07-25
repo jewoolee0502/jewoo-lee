@@ -92,7 +92,7 @@ const Experience = () => {
                 }`}
               >
                 {/* Circle */}
-                <div className="absolute left-1/2 transform -translate-x-1/2 bg-neutral-900 border-4 border-indigo-400 w-6 h-6 rounded-full z-10 transition-transform group-hover:scale-110"></div>
+                <div className="absolute left-1/2 transform -translate-x-1/2 bg-neutral-900 border-4 border-sky-400 w-6 h-6 rounded-full z-10 transition-transform group-hover:scale-110"></div>
 
                 {/* Card Container */}
                 <div
@@ -101,17 +101,14 @@ const Experience = () => {
                   }`}
                 >
                   <h3 className="text-xl font-semibold mb-1">{exp.title}</h3>
-                  <p className="text-indigo-400 font-medium">{exp.company}</p>
+                  <p className="text-sky-400 font-medium">{exp.company}</p>
                   <p className="text-sm text-gray-400 mt-1 uppercase tracking-wide">
                     {exp.date}
                   </p>
-                  <p className="text-gray-300 leading-relaxed mt-4 whitespace-pre-line">
+                  <p className="text-gray-300 leading-relaxed mt-4 whitespace-pre-line text-left">
                     {exp.description}
                   </p>
                 </div>
-
-                {/* Empty placeholder for opposite side to maintain spacing */}
-                <div className="hidden lg:block lg:w-1/2"></div>
               </div>
             );
           })}
