@@ -74,16 +74,16 @@ const Experience = () => {
     >
       <div className="container mx-auto px-4 max-w-6xl relative">
         {/* Title */}
-        <h2 className="text-4xl font-bold mb-20 text-center">
+        <h2 className="text-4xl font-bold mb-20">
           My Career Highlights
         </h2>
 
         {/* Vertical Line */}
-        <div className="absolute left-1/2 top-0 transform -translate-x-1/2 w-[2px] h-full bg-gray-700"></div>
+        <div className="absolute left-1/2 top-15 transform -translate-x-1/2 w-[2px] h-full bg-gray-700"></div>
 
         <div className="flex flex-col space-y-20 relative">
           {experiences.map((exp, index) => {
-            const isEven = index % 2 === 0; // alternate layout
+            const isEven = index % 2 === 0;
             return (
               <div
                 key={index}
