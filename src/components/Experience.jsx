@@ -70,43 +70,55 @@ const Experience = () => {
   return (
     <section
       id="experience"
-      className="section py-20 bg-neutral-900 text-white"
+      className="py-20 bg-neutral-900 text-white"
     >
       <div className="container mx-auto px-4 max-w-6xl relative">
-        <h2 className="text-4xl font-bold mb-16 text-center">My Career Highlights</h2>
+        {/* Title */}
+        <h2 className="text-4xl font-bold mb-20 text-center">
+          My Career Highlights
+        </h2>
 
         {/* Vertical Line */}
-        <div className="absolute left-1/2 top-0 transform -translate-x-1/2 h-full w-1 bg-gray-700"></div>
+        <div className="absolute left-1/2 top-0 transform -translate-x-1/2 w-[2px] h-full bg-gray-700"></div>
 
         <div className="flex flex-col space-y-20 relative">
-          {experiences.map((exp, index) => (
-            <div
-              key={index}
-              className={`relative flex flex-col lg:flex-row lg:items-start lg:gap-12 group`}
-            >
-              {/* Timeline Circle */}
-              <div className="absolute left-1/2 transform -translate-x-1/2 bg-neutral-900 border-4 border-indigo-400 w-6 h-6 rounded-full z-10 group-hover:scale-110 transition-transform"></div>
+          {experiences.map((exp, index) => {
+            const isEven = index % 2 === 0; // alternate layout
+            return (
+              <div
+                key={index}
+                className={`relative flex flex-col lg:flex-row ${
+                  !isEven ? "lg:flex-row-reverse" : ""
+                }`}
+              >
+                {/* Circle */}
+                <div className="absolute left-1/2 transform -translate-x-1/2 bg-neutral-900 border-4 border-indigo-400 w-6 h-6 rounded-full z-10 transition-transform group-hover:scale-110"></div>
 
-              {/* LEFT */}
-              <div className="lg:w-1/2 lg:pr-12 text-right">
-                <h3 className="text-xl font-semibold mb-1">{exp.title}</h3>
-                <p className="text-indigo-400 font-medium">{exp.company}</p>
-                <p className="text-sm text-gray-400 mt-1 uppercase tracking-wide">{exp.date}</p>
-              </div>
+                {/* Card Container */}
+                <div
+                  className={`lg:w-1/2 p-6 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors shadow-lg ${
+                    isEven ? "lg:pr-12 text-right" : "lg:pl-12 text-left"
+                  }`}
+                >
+                  <h3 className="text-xl font-semibold mb-1">{exp.title}</h3>
+                  <p className="text-indigo-400 font-medium">{exp.company}</p>
+                  <p className="text-sm text-gray-400 mt-1 uppercase tracking-wide">
+                    {exp.date}
+                  </p>
+                  <p className="text-gray-300 leading-relaxed mt-4 whitespace-pre-line">
+                    {exp.description}
+                  </p>
+                </div>
 
-              {/* RIGHT */}
-              <div className="lg:w-1/2 lg:pl-12 mt-6 lg:mt-0">
-                <p className="text-gray-300 leading-relaxed max-w-prose">
-                  {exp.description}
-                </p>
+                {/* Empty placeholder for opposite side to maintain spacing */}
+                <div className="hidden lg:block lg:w-1/2"></div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
   );
 };
 
-
-export default Experience
+export default Experience;
