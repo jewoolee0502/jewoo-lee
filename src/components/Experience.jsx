@@ -68,48 +68,45 @@ const experiences = [
 
 const Experience = () => {
   return (
-      <section
-        id="experience"
-        className="section py-16 bg-neutral-900 text-white"
-      >
-        <div className="container mx-auto px-4 max-w-5xl">
-  
-          <h2 className="headline-2 mb-8 reveal-up">
-            My Career Highlights
-          </h2>
-  
-          <div className="relative">
-            {/* Vertical Line */}
-            <div className="absolute left-1/2 top-0 transform -translate-x-1/2 h-full w-1bg-gray-700"></div>
+    <section
+      id="experience"
+      className="section py-20 bg-neutral-900 text-white"
+    >
+      <div className="container mx-auto px-4 max-w-6xl relative">
+        <h2 className="text-4xl font-bold mb-16 text-center">My Career Highlights</h2>
 
-            <div className="flex flex-col space-y-16">
-              {experiences.map((exp, index) => (
-                <div
-                  key={index}
-                  className="relative flex flex-col lg:flex-row lg:items-start"
-                >
-                  {/* Circles */}
-                  <div className="absolute left-1/2 transform -translate-x-1/2 bg-white border-4 border-gray-800 w-6 h-6 rounded-full z-10"></div>
+        {/* Vertical Line */}
+        <div className="absolute left-1/2 top-0 transform -translate-x-1/2 h-full w-1 bg-gray-700"></div>
 
-                  {/* Left Content */}
-                  <div className="lg:w-1/2 lg:pr-12 text-right">
-                    <h3 className="text-lg font-semibold">{exp.title}</h3>
-                    <p className="text-gray-400 italic">{exp.company}</p>
-                    <p className="text-sm text-gray-500 mt-1">{exp.date}</p>
-                  </div>
+        <div className="flex flex-col space-y-20 relative">
+          {experiences.map((exp, index) => (
+            <div
+              key={index}
+              className={`relative flex flex-col lg:flex-row lg:items-start lg:gap-12 group`}
+            >
+              {/* Timeline Circle */}
+              <div className="absolute left-1/2 transform -translate-x-1/2 bg-neutral-900 border-4 border-indigo-400 w-6 h-6 rounded-full z-10 group-hover:scale-110 transition-transform"></div>
 
-                  {/* Right Content */}
-                  <div className="lg:w-1/2 lg:pl-12 mt-6 lg:mt-0">
-                    <p className="text-gray-300">{exp.description}</p>
-                  </div>
-                </div>
-              ))}
+              {/* LEFT */}
+              <div className="lg:w-1/2 lg:pr-12 text-right">
+                <h3 className="text-xl font-semibold mb-1">{exp.title}</h3>
+                <p className="text-indigo-400 font-medium">{exp.company}</p>
+                <p className="text-sm text-gray-400 mt-1 uppercase tracking-wide">{exp.date}</p>
+              </div>
+
+              {/* RIGHT */}
+              <div className="lg:w-1/2 lg:pl-12 mt-6 lg:mt-0">
+                <p className="text-gray-300 leading-relaxed max-w-prose">
+                  {exp.description}
+                </p>
+              </div>
             </div>
-          </div>
-  
+          ))}
         </div>
-      </section>
-    )
-}
+      </div>
+    </section>
+  );
+};
+
 
 export default Experience
