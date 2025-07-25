@@ -10,7 +10,7 @@
 
 const experiences = [
   {
-    title: "Full-Stack Developer (Internship)",
+    title: "Full-Stack Developer (Internship) NEED UPDATE",
     company: "Wholesale Express",
     date: "May 2025 – Present",
     description: ""
@@ -19,17 +19,16 @@ const experiences = [
     title: "Full-Stack Developer (Part-time)",
     company: "Container Foam",
     date: "Mar 2025 – May 2025",
-    description: `Worked on the development of the Cocktail App, a personalized drink recommendation 
-    platform that suggests cocktail recipes based on users’ mood, flavor preferences, 
-    allergies, and available ingredients. I designed and implemented the PostgreSQL database 
-    schema to ensure a scalable and maintainable backend structure. Integrated Google Document AI 
-    to extract structured recipe data from various cocktail books, and utilized the OpenRouter DeepSeek AI 
-    model to generate and recommend tailored cocktail recipes for users. Although the contract was limited 
-    to two months, I successfully delivered all assigned tasks and helped lay the groundwork for a stable 
-    and scalable platform, ensuring the project is well-positioned for future development.`
+    description: `As a Part‑Time Full‑Stack Developer at Container Foam, I contributed to the development of Cocktail App, 
+    a personalized drink recommendation platform that suggests recipes based on users’ moods, flavor preferences, allergies, 
+    and available ingredients. I designed and implemented a robust PostgreSQL database schema, ensuring a scalable and 
+    maintainable backend architecture capable of supporting future growth. I integrated Google Document AI to extract and 
+    structure recipe data from various cocktail books, and leveraged the OpenRouter DeepSeek AI model to generate and recommend 
+    tailored cocktail recipes in real time. Despite the project’s two‑month scope, I successfully delivered all assigned tasks, 
+    establishing a solid technical foundation and scalable infrastructure that positioned the platform for seamless future development.`
   },
   {
-    title: "Credit Risk Analyst (Internship)",
+    title: "Credit Risk Analyst (Internship) NEED UPDATE",
     company: "CI Guaranteee",
     date: "Apr 2024 – Jul 2024",
     description: `As a credit risk analyst at CI Guarantee, I analyze our partnered company’s credit depending on 
@@ -40,13 +39,21 @@ const experiences = [
     and to help them with the application process to receive our credibility test on future possible loans and insurance.`
   },
   {
-    title: "Sergeant (Marine)",
+    title: "Sergeant",
     company: "Republic of Korea Marine Corps (ROKMC)",
     date: "Sept 2022 – Mar 2024",
-    description: `Facilitated communication between the USMC and the ROKMC by providing both linguistic and cultural interpretation, especially during FreedomShield'24.`
+    description: `During my service in the Republic of Korea Marine Corps, I advanced through the ranks from Private First Class 
+    to Sergeant while serving as a Communication and Intelligence Marine. I worked closely with my unit and fellow Marines, 
+    developing strong teamwork and communication skills as we pushed through multiple rigorous and high‑intensity training 
+    exercises. In joint operations—including FreedomShield ’23, FreedomShield ’24, and Ssang Yong ’23—I facilitated critical 
+    communication between the U.S. Marine Corps (USMC) and the ROKMC by providing both linguistic and cultural interpretation, 
+    ensuring seamless coordination in demanding environments. These experiences also enhanced my leadership, collaboration, and problem‑solving 
+    abilities under extreme pressure, while further sharpening my capacity to adapt quickly, communicate effectively across language and 
+    cultural barriers, and collaborate with diverse teams to achieve mission objectives. Beyond technical and operational growth, my time 
+    in the ROKMC instilled a powerful mindset that I carry with me in every challenge: nothing is impossible when you work together as a team.`
   },
   {
-    title: "Project Intern",
+    title: "Project Intern NEED UPDATE",
     company: "Hansan Global",
     date: "Jun 2021 – Sept 2021",
     description: `HANSAN GLOBAL is a Korean Trading company based in Cairo, Egypt. HANSAN GLOBAL 
@@ -55,7 +62,7 @@ const experiences = [
     advertising our products on social media and successfully sold several cosmetic products.`
   },
   {
-    title: "Summer Intern",
+    title: "Summer Intern NEED UPDATE",
     company: "Korea Trade-Investment Promotion Agency (KOTRA)",
     date: "Jun 2019 – Jul 2019",
     description: `KOTRA is a trade-investment promotion agency operated by the South Korean Government. 
@@ -68,48 +75,54 @@ const experiences = [
 
 const Experience = () => {
   return (
-      <section
-        id="experience"
-        className="section py-16 bg-neutral-900 text-white"
-      >
-        <div className="container mx-auto px-4 max-w-5xl">
-  
-          <h2 className="headline-2 mb-8 reveal-up">
-            My Career Highlights
-          </h2>
-  
-          <div className="relative">
-            {/* Vertical Line */}
-            <div className="absolute left-1/2 top-0 transform -translate-x-1/2 h-full w-1bg-gray-700"></div>
+    <section
+      id="experience"
+      className="py-20 bg-neutral-900 text-white"
+    >
+      <div className="container mx-auto px-4 max-w-6xl relative">
+        {/* Title */}
+        <h2 className="text-4xl font-bold mb-20">
+          My Career Highlights
+        </h2>
 
-            <div className="flex flex-col space-y-16">
-              {experiences.map((exp, index) => (
+        {/* Vertical Line */}
+        <div className="absolute left-1/2 top-15 transform -translate-x-1/2 w-[2px] h-full bg-gray-700"></div>
+
+        <div className="flex flex-col space-y-20 relative">
+          {experiences.map((exp, index) => {
+            const isEven = index % 2 === 0;
+            return (
+              <div
+                key={index}
+                className={`relative flex flex-col lg:flex-row ${
+                  !isEven ? "lg:flex-row-reverse" : ""
+                }`}
+              >
+                {/* Circle */}
+                <div className="absolute left-1/2 transform -translate-x-1/2 bg-neutral-900 border-4 border-sky-400 w-6 h-6 rounded-full z-10 transition-transform group-hover:scale-110"></div>
+
+                {/* Card Container */}
                 <div
-                  key={index}
-                  className="relative flex flex-col lg:flex-row lg:items-start"
+                  className={`lg:w-1/2 p-6 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors shadow-lg ${
+                    isEven ? "lg:pr-12 text-right" : "lg:pl-12 text-left"
+                  }`}
                 >
-                  {/* Circles */}
-                  <div className="absolute left-1/2 transform -translate-x-1/2 bg-white border-4 border-gray-800 w-6 h-6 rounded-full z-10"></div>
-
-                  {/* Left Content */}
-                  <div className="lg:w-1/2 lg:pr-12 text-right">
-                    <h3 className="text-lg font-semibold">{exp.title}</h3>
-                    <p className="text-gray-400 italic">{exp.company}</p>
-                    <p className="text-sm text-gray-500 mt-1">{exp.date}</p>
-                  </div>
-
-                  {/* Right Content */}
-                  <div className="lg:w-1/2 lg:pl-12 mt-6 lg:mt-0">
-                    <p className="text-gray-300">{exp.description}</p>
-                  </div>
+                  <h3 className="text-xl font-semibold mb-1">{exp.title}</h3>
+                  <p className="text-sky-400 font-medium">{exp.company}</p>
+                  <p className="text-sm text-gray-400 mt-1 uppercase tracking-wide">
+                    {exp.date}
+                  </p>
+                  <p className="text-gray-300 leading-relaxed mt-4 text-left">
+                    {exp.description}
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
-  
+              </div>
+            );
+          })}
         </div>
-      </section>
-    )
-}
+      </div>
+    </section>
+  );
+};
 
-export default Experience
+export default Experience;
