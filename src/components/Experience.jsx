@@ -10,7 +10,7 @@
 
 const experiences = [
   {
-    title: "Full-Stack Developer (Internship)",
+    title: "Full-Stack Developer (Internship) NEED UPDATE",
     company: "Wholesale Express",
     date: "May 2025 – Present",
     description: ""
@@ -28,7 +28,7 @@ const experiences = [
     establishing a solid technical foundation and scalable infrastructure that positioned the platform for seamless future development.`
   },
   {
-    title: "Credit Risk Analyst (Internship)",
+    title: "Credit Risk Analyst (Internship) NEED UPDATE",
     company: "CI Guaranteee",
     date: "Apr 2024 – Jul 2024",
     description: `As a credit risk analyst at CI Guarantee, I analyze our partnered company’s credit depending on 
@@ -39,7 +39,7 @@ const experiences = [
     and to help them with the application process to receive our credibility test on future possible loans and insurance.`
   },
   {
-    title: "Sergeant (Marine)",
+    title: "Sergeant",
     company: "Republic of Korea Marine Corps (ROKMC)",
     date: "Sept 2022 – Mar 2024",
     description: `During my service in the Republic of Korea Marine Corps, I advanced through the ranks from Private First Class 
@@ -53,7 +53,7 @@ const experiences = [
     in the ROKMC instilled a powerful mindset that I carry with me in every challenge: nothing is impossible when you work together as a team.`
   },
   {
-    title: "Project Intern",
+    title: "Project Intern NEED UPDATE",
     company: "Hansan Global",
     date: "Jun 2021 – Sept 2021",
     description: `HANSAN GLOBAL is a Korean Trading company based in Cairo, Egypt. HANSAN GLOBAL 
@@ -62,7 +62,7 @@ const experiences = [
     advertising our products on social media and successfully sold several cosmetic products.`
   },
   {
-    title: "Summer Intern",
+    title: "Summer Intern NEED UPDATE",
     company: "Korea Trade-Investment Promotion Agency (KOTRA)",
     date: "Jun 2019 – Jul 2019",
     description: `KOTRA is a trade-investment promotion agency operated by the South Korean Government. 
