@@ -43,7 +43,15 @@ const experiences = [
     title: "Sergeant (Marine)",
     company: "Republic of Korea Marine Corps (ROKMC)",
     date: "Sept 2022 – Mar 2024",
-    description: `Facilitated communication between the USMC and the ROKMC by providing both linguistic and cultural interpretation, especially during FreedomShield'24.`
+    description: `During my service in the Republic of Korea Marine Corps, I advanced through the ranks from Private First Class 
+    to Sergeant while serving as a Communication and Intelligence Marine. I worked closely with my unit and fellow Marines, 
+    developing strong teamwork and communication skills as we pushed through multiple rigorous and high‑intensity training 
+    exercises. In joint operations—including FreedomShield ’23, FreedomShield ’24, and Ssang Yong ’23—I facilitated critical 
+    communication between the U.S. Marine Corps (USMC) and the ROKMC by providing both linguistic and cultural interpretation, 
+    ensuring seamless coordination in demanding environments. These experiences also enhanced my leadership, collaboration, and problem‑solving 
+    abilities under extreme pressure, while further sharpening my capacity to adapt quickly, communicate effectively across language and 
+    cultural barriers, and collaborate with diverse teams to achieve mission objectives. Beyond technical and operational growth, my time 
+    in the ROKMC instilled a powerful mindset that I carry with me in every challenge: nothing is impossible when you work together as a team.`
   },
   {
     title: "Project Intern",
