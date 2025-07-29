@@ -28,7 +28,7 @@ const experiences = [
     establishing a solid technical foundation and scalable infrastructure that positioned the platform for seamless future development.`
   },
   {
-    title: "Credit Risk Analyst (Internship) NEED UPDATE",
+    title: "Credit Risk Analyst (Internship)",
     company: "CI Guaranteee",
     date: "Apr 2024 – Jul 2024",
     description: `As a Credit Risk Analyst Intern at CI Guarantee, I evaluated the financial credibility of partner companies by 
@@ -71,10 +71,14 @@ const experiences = [
     title: "Summer Intern NEED UPDATE",
     company: "Korea Trade-Investment Promotion Agency (KOTRA)",
     date: "Jun 2019 – Jul 2019",
-    description: `KOTRA is a trade-investment promotion agency operated by the South Korean Government. 
-    During my internship program, I was an overall assistant to my team. Moreover, I also performed 
-    customer service for KOTRA as well as giving out presentations. From this experience, I have gained 
-    basic knowledge of communication, project managing, and presentation skills.`
+    description: `As a Summer Intern at KOTRA (Korea Trade-Investment Promotion Agency), a government-led organization supporting global trade and 
+    investment, I provided operational and presentation support for projects promoting Korean businesses abroad. I collaborated closely with team 
+    members on day-to-day coordination tasks, assisted in event and project logistics, delivered client-facing presentations, and handled customer 
+    inquiries with professionalism and cultural sensitivity. This early exposure to an international, mission-driven organization gave me a strong 
+    foundation in cross-cultural communication, project coordination, and public speaking. More importantly, it shaped my ability to adapt quickly, 
+    collaborate within a fast-paced professional team, and communicate clearly with diverse stakeholders. This experience, combined with my broader 
+    background across technical and leadership roles, has helped me develop a well-rounded and globally aware mindset—one that I’m confident will 
+    contribute positively to any team I join.`
   }
 ];
 
