@@ -28,15 +28,17 @@ const experiences = [
     establishing a solid technical foundation and scalable infrastructure that positioned the platform for seamless future development.`
   },
   {
-    title: "Credit Risk Analyst (Internship) NEED UPDATE",
+    title: "Credit Risk Analyst (Internship)",
     company: "CI Guaranteee",
     date: "Apr 2024 – Jul 2024",
-    description: `As a credit risk analyst at CI Guarantee, I analyze our partnered company’s credit depending on 
-    their previous year's performance by examining financial statements, cash flow, and owner’s credit. Depending 
-    on the analysis, I then used an internal program to rank them by their credibility to determine how credible 
-    our partnered companies are for us to give them loans and insurance for their future projects. I also directly 
-    communicated with our partnered companies to resolve their questions and curiosities on their confirmed ranks, 
-    and to help them with the application process to receive our credibility test on future possible loans and insurance.`
+    description: `As a Credit Risk Analyst Intern at CI Guarantee, I evaluated the financial credibility of partner companies by 
+    analyzing annual financial statements, cash flow reports, and ownership credit data. Using an internal credit assessment platform, 
+    I translated these insights into quantitative risk scores to support loan and insurance decisions for large-scale development 
+    projects. I also served as a point of contact for clients, resolving inquiries regarding their rankings and guiding them through 
+    the application process for future credit evaluations. This role strengthened my analytical and financial reasoning skills, 
+    while also sharpening my professional communication, client-facing, and problem-solving abilities. Through this experience, I 
+    gained a deeper understanding of risk modeling and learned how to present complex financial data clearly and effectively to both 
+    technical and non-technical stakeholders.`
   },
   {
     title: "Sergeant",
@@ -53,22 +55,30 @@ const experiences = [
     in the ROKMC instilled a powerful mindset that I carry with me in every challenge: nothing is impossible when you work together as a team.`
   },
   {
-    title: "Project Intern NEED UPDATE",
+    title: "Project Intern",
     company: "Hansan Global",
     date: "Jun 2021 – Sept 2021",
-    description: `HANSAN GLOBAL is a Korean Trading company based in Cairo, Egypt. HANSAN GLOBAL 
-    is planning on launching a new business for importing Korean cosmetics into Egypt. Thus, during 
-    my internship program, I completed research on the cosmetic market in Egypt. Moreover, I began 
-    advertising our products on social media and successfully sold several cosmetic products.`
+    description: `As a Project Intern at Hansan Global, a Korean trading company based in Cairo, Egypt, I supported the company’s initiative 
+    to launch a new Korean cosmetics import business in the Egyptian market. I conducted in-depth market research to evaluate consumer demand, 
+    competitor positioning, and potential distribution channels. In addition, I developed and executed a targeted social media marketing 
+    strategy, which led to the successful sale of several cosmetic products during the pilot phase. To further support business expansion, I 
+    visited and engaged directly with multiple CEOs and cosmetic retail companies to initiate potential partnerships—strengthening both my 
+    professional communication and cross-cultural negotiation skills. This experience significantly enhanced my market analysis, digital marketing, 
+    and business development capabilities, while also helping me grow as a confident communicator and proactive leader. Working in an international 
+    setting taught me how to adapt quickly, take initiative, and build meaningful relationships in unfamiliar and dynamic environments.`
   },
   {
     title: "Summer Intern NEED UPDATE",
     company: "Korea Trade-Investment Promotion Agency (KOTRA)",
     date: "Jun 2019 – Jul 2019",
-    description: `KOTRA is a trade-investment promotion agency operated by the South Korean Government. 
-    During my internship program, I was an overall assistant to my team. Moreover, I also performed 
-    customer service for KOTRA as well as giving out presentations. From this experience, I have gained 
-    basic knowledge of communication, project managing, and presentation skills.`
+    description: `As a Summer Intern at KOTRA (Korea Trade-Investment Promotion Agency), a government-led organization supporting global trade and 
+    investment, I provided operational and presentation support for projects promoting Korean businesses abroad. I collaborated closely with team 
+    members on day-to-day coordination tasks, assisted in event and project logistics, delivered client-facing presentations, and handled customer 
+    inquiries with professionalism and cultural sensitivity. This early exposure to an international, mission-driven organization gave me a strong 
+    foundation in cross-cultural communication, project coordination, and public speaking. More importantly, it shaped my ability to adapt quickly, 
+    collaborate within a fast-paced professional team, and communicate clearly with diverse stakeholders. This experience, combined with my broader 
+    background across technical and leadership roles, has helped me develop a well-rounded and globally aware mindset—one that I’m confident will 
+    contribute positively to any team I join.`
   }
 ];
 
