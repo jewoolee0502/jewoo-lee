@@ -55,13 +55,17 @@ const experiences = [
     in the ROKMC instilled a powerful mindset that I carry with me in every challenge: nothing is impossible when you work together as a team.`
   },
   {
-    title: "Project Intern NEED UPDATE",
+    title: "Project Intern",
     company: "Hansan Global",
     date: "Jun 2021 – Sept 2021",
-    description: `HANSAN GLOBAL is a Korean Trading company based in Cairo, Egypt. HANSAN GLOBAL 
-    is planning on launching a new business for importing Korean cosmetics into Egypt. Thus, during 
-    my internship program, I completed research on the cosmetic market in Egypt. Moreover, I began 
-    advertising our products on social media and successfully sold several cosmetic products.`
+    description: `As a Project Intern at Hansan Global, a Korean trading company based in Cairo, Egypt, I supported the company’s initiative 
+    to launch a new Korean cosmetics import business in the Egyptian market. I conducted in-depth market research to evaluate consumer demand, 
+    competitor positioning, and potential distribution channels. In addition, I developed and executed a targeted social media marketing 
+    strategy, which led to the successful sale of several cosmetic products during the pilot phase. To further support business expansion, I 
+    visited and engaged directly with multiple CEOs and cosmetic retail companies to initiate potential partnerships—strengthening both my 
+    professional communication and cross-cultural negotiation skills. This experience significantly enhanced my market analysis, digital marketing, 
+    and business development capabilities, while also helping me grow as a confident communicator and proactive leader. Working in an international 
+    setting taught me how to adapt quickly, take initiative, and build meaningful relationships in unfamiliar and dynamic environments.`
   },
   {
     title: "Summer Intern NEED UPDATE",
