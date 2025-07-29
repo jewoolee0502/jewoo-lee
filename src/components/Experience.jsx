@@ -31,12 +31,14 @@ const experiences = [
     title: "Credit Risk Analyst (Internship) NEED UPDATE",
     company: "CI Guaranteee",
     date: "Apr 2024 – Jul 2024",
-    description: `As a credit risk analyst at CI Guarantee, I analyze our partnered company’s credit depending on 
-    their previous year's performance by examining financial statements, cash flow, and owner’s credit. Depending 
-    on the analysis, I then used an internal program to rank them by their credibility to determine how credible 
-    our partnered companies are for us to give them loans and insurance for their future projects. I also directly 
-    communicated with our partnered companies to resolve their questions and curiosities on their confirmed ranks, 
-    and to help them with the application process to receive our credibility test on future possible loans and insurance.`
+    description: `As a Credit Risk Analyst Intern at CI Guarantee, I evaluated the financial credibility of partner companies by 
+    analyzing annual financial statements, cash flow reports, and ownership credit data. Using an internal credit assessment platform, 
+    I translated these insights into quantitative risk scores to support loan and insurance decisions for large-scale development 
+    projects. I also served as a point of contact for clients, resolving inquiries regarding their rankings and guiding them through 
+    the application process for future credit evaluations. This role strengthened my analytical and financial reasoning skills, 
+    while also sharpening my professional communication, client-facing, and problem-solving abilities. Through this experience, I 
+    gained a deeper understanding of risk modeling and learned how to present complex financial data clearly and effectively to both 
+    technical and non-technical stakeholders.`
   },
   {
     title: "Sergeant",
