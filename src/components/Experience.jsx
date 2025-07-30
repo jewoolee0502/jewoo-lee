@@ -68,7 +68,7 @@ const experiences = [
     setting taught me how to adapt quickly, take initiative, and build meaningful relationships in unfamiliar and dynamic environments.`
   },
   {
-    title: "Summer Intern NEED UPDATE",
+    title: "Summer Intern",
     company: "Korea Trade-Investment Promotion Agency (KOTRA)",
     date: "Jun 2019 – Jul 2019",
     description: `As a Summer Intern at KOTRA (Korea Trade-Investment Promotion Agency), a government-led organization supporting global trade and 
