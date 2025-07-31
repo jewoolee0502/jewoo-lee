@@ -3,6 +3,8 @@
  * @license Apache-2.0
  */
 
+import { useState, useRef, useEffect } from "react";
+
 
 /**
  * Components
@@ -10,7 +12,7 @@
 
 const experiences = [
   {
-    title: "Full-Stack Developer (Internship) NEED UPDATE",
+    title: "Full-Stack Developer (Internship)",
     company: "Wholesale Express",
     date: "May 2025 – Present",
     description: `As a Full-Stack Developer Intern at Wholesale Express Canada, I contributed to the development and improvement of a 
@@ -18,8 +20,8 @@ const experiences = [
     launching new features, fixing bugs, and enhancing both frontend and backend functionality to improve the overall user experience. 
     On the backend, I used Firebase Realtime Database to ensure instant updates to vehicle listings, and GraphQL to manage structured 
     data related to vehicles and users. On the frontend, I utilized Vue.js and Nuxt to build clean, responsive, and user-friendly interfaces. 
-    The team worked in Agile two-week sprints, where we iteratively shipped updates and improvements to the platform.
-    
+    The team worked in Agile two-week sprints, where we iteratively shipped updates and improvements to the platform. \n\n
+
     One of the features I contributed to was a public vehicle information page that allows subscribed users to share key vehicle data 
     with non-members via a secure email link. While this was a valuable technical experience, the most meaningful challenge I overcame was 
     adapting to a fully remote team environment. Initially, it was difficult to establish rapport and navigate workflows without face-to-face 
@@ -114,30 +116,59 @@ const Experience = () => {
         <div className="flex flex-col space-y-20 relative">
           {experiences.map((exp, index) => {
             const isEven = index % 2 === 0;
+            const [expanded, setExpanded] = useState(false);
+            const [isOverflowing, setIsOverflowing] = useState(false);
+            const descriptionRef = useRef(null);
+
+            useEffect(() => {
+              if (descriptionRef.current) {
+                const lineHeight = parseFloat(getComputedStyle(descriptionRef.current).lineHeight);
+                const height = descriptionRef.current.scrollHeight;
+                const lines = height / lineHeight;
+                if (lines > 5) setIsOverflowing(true);
+              }
+            }, []);
+
             return (
               <div
                 key={index}
-                className={`relative flex flex-col lg:flex-row ${
-                  !isEven ? "lg:flex-row-reverse" : ""
-                }`}
+                className={`relative flex flex-col lg:flex-row ${!isEven ? "lg:flex-row-reverse" : ""}`}
               >
                 {/* Circle */}
-                <div className="absolute left-1/2 transform -translate-x-1/2 bg-neutral-900 border-4 border-sky-400 w-6 h-6 rounded-full z-10 transition-transform group-hover:scale-110"></div>
+                <div className="absolute left-1/2 transform -translate-x-1/2 bg-neutral-900 border-4 border-sky-400 w-6 h-6 rounded-full z-10"></div>
 
-                {/* Card Container */}
-                <div
-                  className={`lg:w-1/2 p-6 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors shadow-lg ${
-                    isEven ? "lg:pr-12 text-right" : "lg:pl-12 text-left"
-                  }`}
-                >
+                {/* Card */}
+                <div className={`lg:w-1/2 p-6 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors shadow-lg ${isEven ? "lg:pr-12 text-right" : "lg:pl-12 text-left"}`}>
                   <h3 className="text-xl font-semibold mb-1">{exp.title}</h3>
                   <p className="text-sky-400 font-medium">{exp.company}</p>
-                  <p className="text-sm text-gray-400 mt-1 uppercase tracking-wide">
-                    {exp.date}
-                  </p>
-                  <p className="text-gray-300 leading-relaxed mt-4 text-left">
-                    {exp.description}
-                  </p>
+                  <p className="text-sm text-gray-400 mt-1 uppercase tracking-wide">{exp.date}</p>
+
+                  {/* Description */}
+                  <div
+                    ref={descriptionRef}
+                    className={`mt-4 text-gray-300 leading-relaxed text-left transition-all duration-300 ease-in-out ${
+                      !expanded ? "max-h-[7.5rem] overflow-hidden" : ""
+                    }`}
+                    style={{
+                      maskImage: !expanded && isOverflowing
+                        ? "linear-gradient(to bottom, black 60%, transparent 100%)"
+                        : "none"
+                    }}
+                  >
+                    {exp.description.split('\n\n').map((para, i) => (
+                      <p key={i} className="mb-4">{para.trim()}</p>
+                    ))}
+                  </div>
+
+                  {/* Toggle */}
+                  {isOverflowing && (
+                    <button
+                      onClick={() => setExpanded(!expanded)}
+                      className="mt-2 text-sky-400 hover:underline text-sm font-medium"
+                    >
+                      {expanded ? "Show less" : "Show more"}
+                    </button>
+                  )}
                 </div>
               </div>
             );
