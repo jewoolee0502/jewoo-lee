@@ -167,9 +167,15 @@ const Experience = () => {
 
                   {/* Show More/Show Less Label (non-clickable) */}
                   {isOverflowing && (
-                    <p className="mt-2 text-sky-400 text-sm font-medium pointer-events-none select-none">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation(); // prevent card toggle
+                        setExpanded(!expanded);
+                      }}
+                      className="mt-2 text-sky-400 text-sm font-medium hover:underline focus:outline-none"
+                    >
                       {expanded ? "Show less" : "Show more"}
-                    </p>
+                    </button>
                   )}
                 </div>
               </div>
