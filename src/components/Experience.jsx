@@ -134,11 +134,16 @@ const Experience = () => {
                 key={index}
                 className={`relative flex flex-col lg:flex-row ${!isEven ? "lg:flex-row-reverse" : ""}`}
               >
-                {/* Circle */}
+                {/* Timeline Circle */}
                 <div className="absolute left-1/2 transform -translate-x-1/2 bg-neutral-900 border-4 border-sky-400 w-6 h-6 rounded-full z-10"></div>
 
-                {/* Card */}
-                <div className={`lg:w-1/2 p-6 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors shadow-lg ${isEven ? "lg:pr-12 text-right" : "lg:pl-12 text-left"}`}>
+                {/* Clickable Card */}
+                <div
+                  onClick={() => setExpanded(!expanded)}
+                  className={`cursor-pointer lg:w-1/2 p-6 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors shadow-lg ${
+                    isEven ? "lg:pr-12 text-right" : "lg:pl-12 text-left"
+                  }`}
+                >
                   <h3 className="text-xl font-semibold mb-1">{exp.title}</h3>
                   <p className="text-sky-400 font-medium">{exp.company}</p>
                   <p className="text-sm text-gray-400 mt-1 uppercase tracking-wide">{exp.date}</p>
@@ -160,14 +165,11 @@ const Experience = () => {
                     ))}
                   </div>
 
-                  {/* Toggle */}
+                  {/* Show More/Show Less Label (non-clickable) */}
                   {isOverflowing && (
-                    <button
-                      onClick={() => setExpanded(!expanded)}
-                      className="mt-2 text-sky-400 hover:underline text-sm font-medium"
-                    >
+                    <p className="mt-2 text-sky-400 text-sm font-medium pointer-events-none select-none">
                       {expanded ? "Show less" : "Show more"}
-                    </button>
+                    </p>
                   )}
                 </div>
               </div>
