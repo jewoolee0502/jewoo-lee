@@ -13,7 +13,20 @@ const experiences = [
     title: "Full-Stack Developer (Internship) NEED UPDATE",
     company: "Wholesale Express",
     date: "May 2025 – Present",
-    description: ""
+    description: `As a Full-Stack Developer Intern at Wholesale Express Canada, I contributed to the development and improvement of a 
+    large-scale vehicle auction platform that enables car dealerships to seamlessly buy and sell vehicles. My responsibilities included 
+    launching new features, fixing bugs, and enhancing both frontend and backend functionality to improve the overall user experience. 
+    On the backend, I used Firebase Realtime Database to ensure instant updates to vehicle listings, and GraphQL to manage structured 
+    data related to vehicles and users. On the frontend, I utilized Vue.js and Nuxt to build clean, responsive, and user-friendly interfaces. 
+    The team worked in Agile two-week sprints, where we iteratively shipped updates and improvements to the platform.
+    
+    One of the features I contributed to was a public vehicle information page that allows subscribed users to share key vehicle data 
+    with non-members via a secure email link. While this was a valuable technical experience, the most meaningful challenge I overcame was 
+    adapting to a fully remote team environment. Initially, it was difficult to establish rapport and navigate workflows without face-to-face 
+    interaction. However, by proactively scheduling meetings, taking initiative to communicate with designers, developers, and product leads, 
+    and seeking continuous feedback, I successfully integrated into the team. This experience significantly strengthened my remote collaboration, 
+    cross-functional communication, and independent problem-solving skills, while reinforcing my ability to quickly adapt to unfamiliar 
+    environments and contribute meaningfully to a fast-moving development team.`
   },
   {
     title: "Full-Stack Developer (Part-time)",
