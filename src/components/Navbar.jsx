@@ -22,8 +22,43 @@ const Navbar = ({ navOpen }) => {
         activeBox.current.style.height = lastActiveLink.current.offsetHeight + 'px';
     }
 
-    useEffect(initActiveBox, []);
-    window.addEventListener('resize', initActiveBox);
+    useEffect(() => {
+        const handleScroll = () => {
+            const sections = document.querySelectorAll("section[id]");
+            const scrollY = window.scrollY;
+
+            sections.forEach((section) => {
+            const sectionTop = section.offsetTop - 100; // Offset to trigger early
+            const sectionHeight = section.offsetHeight;
+            const sectionId = section.getAttribute("id");
+
+            if (scrollY >= sectionTop && scrollY < sectionTop + sectionHeight) {
+                const currentLink = document.querySelector(`a[href="#${sectionId}"]`);
+                if (currentLink && currentLink !== lastActiveLink.current) {
+                lastActiveLink.current?.classList.remove("active");
+                currentLink.classList.add("active");
+                lastActiveLink.current = currentLink;
+
+                // Animate active box
+                activeBox.current.style.top = currentLink.offsetTop + "px";
+                activeBox.current.style.left = currentLink.offsetLeft + "px";
+                activeBox.current.style.width = currentLink.offsetWidth + "px";
+                activeBox.current.style.height = currentLink.offsetHeight + "px";
+                }
+            }
+            });
+        };
+
+        window.addEventListener("scroll", handleScroll);
+        window.addEventListener("resize", initActiveBox);
+        initActiveBox(); // Initialize position once on mount
+
+        return () => {
+            window.removeEventListener("scroll", handleScroll);
+            window.removeEventListener("resize", initActiveBox);
+        };
+        }, []);
+
 
     const activeCurrentLink = (event) => {
         lastActiveLink.current?.classList.remove('active');
