@@ -85,7 +85,7 @@ const Contact = () => {
                 id="name"
                 autoComplete="name"
                 required
-                placeholder="Jung-kook Jeon"
+                placeholder="John Doe"
                 className="text-field reveal-up"
               />
             </div>
@@ -104,7 +104,7 @@ const Contact = () => {
                 id="email"
                 autoComplete="email"
                 required
-                placeholder="BTS@example.com"
+                placeholder="john.doe@example.com"
                 className="text-field reveal-up"
               />
             </div>
