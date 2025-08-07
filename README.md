@@ -53,7 +53,9 @@ Make sure you have these installed:
 ```bash
 npm start
 ```
+
 or
+
 ```bash
 npm run dev
 ```
