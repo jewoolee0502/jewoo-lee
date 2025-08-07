@@ -55,8 +55,6 @@ npm start
 ```
 or
 ```bash
-
-
 npm run dev
 ```
 
