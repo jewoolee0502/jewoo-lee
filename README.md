@@ -20,7 +20,7 @@ You can directly check out my **[CV/Resume](public/files/JEWOOLEE_CV.pdf)** righ
 
 - **Frontend:** React, TailwindCSS
 - **UI Design:** Figma
-- **Hosting:** (e.g. Vercel / Netlify / GitHub Pages)
+- **Hosting:** Vercel
 
 ---
 
