@@ -41,13 +41,13 @@ Make sure you have these installed:
 git clone https://github.com/your-username/your-portfolio.git
 ```
 2. **Navigate to the project folder**
-  ```bash
-  cd jewoo-lee
-  ```
+```bash
+cd jewoo-lee
+```
 3. **Install dependencies**
-  ```bash
-  npm install
-  ```
+```bash
+npm install
+```
 
 ### 🏃 Running the Project Locally
 ```bash
