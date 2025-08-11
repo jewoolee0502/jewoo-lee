@@ -76,4 +76,4 @@ If you have any questions, collaboration ideas, or just want to say hi, feel fre
 - 📧 **Email:** [jewoo.lee@mail.mcgill.ca](mailto:jewoo.lee@mail.mcgill.ca)
 - 💼 **LinkedIn:** [https://www.linkedin.com/in/jewoo-lee/](https://www.linkedin.com/in/jewoo-lee/)
 - 📸 **Instagram:** [https://www.instagram.com/jwuu_lee/](https://www.instagram.com/jwuu_lee/)
-- 👤 **Portfolio Website:** [https://www.jewoo-lee.vercel.app](https://www.jewoolee.dev)
+- 👤 **Portfolio Website:** [https://www.jewoolee.dev](https://www.jewoolee.dev)
