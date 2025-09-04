@@ -27,6 +27,18 @@ const projects = [
     tags: ['Machine Learning', 'API', 'Data Analysis'],
     projectLink: 'https://devpost.com/software/adstar'
   },
+  {
+    imgSrc: '/images/HTTP.png',
+    title: 'Health and Toning Targeted Program (HTTP)',
+    tags: ['SpringBoot', 'SQL', 'React', 'Agile/Scrum'],
+    projectLink: 'https://github.com/jewoolee0502/ECSE428_HTTP'
+  },
+  {
+    imgSrc: '/images/Library.png',
+    title: 'Library Management System Application',
+    tags: ['Java', 'Gradle', 'Vue', 'Web/Android/iOS', 'Agile/Scrum'],
+    projectLink: 'https://github.com/jewoolee0502/project-group-04'
+  },
 ];
 
 const Project = () => {
