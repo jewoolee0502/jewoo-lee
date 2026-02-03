@@ -12,6 +12,24 @@ import { useState, useRef, useEffect } from "react";
 
 const experiences = [
   {
+    title: "Full-Stack Developer (Part-time)",
+    company: "Wholesale Express",
+    date: "August 2025 – December 2025",
+    description: `As a Part-Time Full-Stack Developer at Wholesale Express Canada, I transitioned from an internship role into a 
+    permanent contract position with increased technical ownership and responsibility. In this role, I began contributing to a 
+    platform-wide v2 upgrade, focusing on modernizing the frontend and reorganizing backend services and database structures to 
+    improve maintainability, scalability, and long-term development velocity. \n\n
+
+    Compared to my internship, I took on a deeper backend-focused role, working extensively with GraphQL and Firebase Realtime Database 
+    to optimize API calls, improve data synchronization, and enhance overall platform efficiency and reliability. I also refactored 
+    frontend components to support the new architecture while ensuring a smooth transition from the existing system. \n\n
+
+    Working as a remote part-time developer in an Agile environment, I collaborated closely with engineers, designers, and product 
+    stakeholders while independently driving technical improvements. This experience strengthened my ability to take ownership of 
+    production systems, make architectural trade-offs, and contribute meaningfully to the evolution of a large-scale platform used by 
+    real dealerships.`
+  },
+  {
     title: "Full-Stack Developer (Internship)",
     company: "Wholesale Express",
     date: "May 2025 – August 2025",
