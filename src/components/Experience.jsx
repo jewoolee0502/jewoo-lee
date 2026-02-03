@@ -14,7 +14,7 @@ const experiences = [
   {
     title: "Full-Stack Developer (Internship)",
     company: "Wholesale Express",
-    date: "May 2025 – Present",
+    date: "May 2025 – August 2025",
     description: `As a Full-Stack Developer Intern at Wholesale Express Canada, I contributed to the development and improvement of a 
     large-scale vehicle auction platform that enables car dealerships to seamlessly buy and sell vehicles. My responsibilities included 
     launching new features, fixing bugs, and enhancing both frontend and backend functionality to improve the overall user experience. 
