@@ -69,7 +69,7 @@ const SplineHero = () => {
         />
       </div>
 
-      <div className="relative z-10 h-full">
+      <div className="relative z-10 h-full pointer-events-none">
         <div className="container h-full flex flex-col justify-center">
           <div className="max-w-xl space-y-6">
             <p className="flex items-center gap-2 text-sm text-zinc-300">
@@ -88,7 +88,7 @@ const SplineHero = () => {
               Software engineer crafting playful, cinematic web experiences that blend 3D and motion.
             </p>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 pointer-events-auto">
               <ButtonPrimary
                 href="/files/JEWOOLEE_CV.pdf"
                 target="_blank"
