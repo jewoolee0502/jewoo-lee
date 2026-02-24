@@ -20,7 +20,7 @@ gsap.registerPlugin(useGSAP, ScrollTrigger)
  * Comopnents
  */
 import Header from './components/Header'
-import Hero from './components/Hero'
+import SplineHero from './components/SplineHero'
 import About from './components/About'
 import Skill from './components/Skill'
 import Project from './components/Project'
@@ -52,7 +52,7 @@ const App = () => {
     <ReactLenis root>
       <Header />
       <main>
-        <Hero />
+        <SplineHero />
         <About />
         <Skill />
         <Project />
