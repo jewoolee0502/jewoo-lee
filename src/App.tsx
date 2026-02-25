@@ -3,23 +3,15 @@
  * @license Apache-2.0
  */
 
-/**
- * Node modules
- */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { ReactLenis } from 'lenis/react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useGSAP } from '@gsap/react'
 
-/**
- * Register gsap plugins
- */
 gsap.registerPlugin(useGSAP, ScrollTrigger)
 
-/**
- * Comopnents
- */
+import LoadingScreen from './components/LoadingScreen'
 import Header from './components/Header'
 import SplineHero from './components/SplineHero'
 import Hero from './components/Hero'
@@ -31,23 +23,49 @@ import Contact from './components/Contact'
 import Footer from './components/Footer'
 
 const App = () => {
-  const splineHeroRef = useRef<HTMLElement>(null)
+  const [splineLoaded, setSplineLoaded] = useState(false)
   const [headerHidden, setHeaderHidden] = useState(true)
+  const handleSplineLoad = useCallback(() => setSplineLoaded(true), [])
 
-  useEffect(() => {
-    const el = splineHeroRef.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => setHeaderHidden(entry.isIntersecting),
-      { threshold: 0.1 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
+  const splineSectionRef = useRef<HTMLElement>(null)
+  const splineInnerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   useGSAP(() => {
-    const elements = gsap.utils.toArray<HTMLElement>('.reveal-up')
+    if (!splineSectionRef.current || !splineInnerRef.current || !contentRef.current) return
 
+    const scrollIndicator = splineInnerRef.current.querySelector('.scroll-indicator')
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: splineSectionRef.current,
+        start: 'top top',
+        end: 'bottom top',
+        scrub: 2,
+        onUpdate: (self) => {
+          setHeaderHidden(self.progress < 0.3)
+        },
+      },
+    })
+
+    tl.to(
+      splineInnerRef.current,
+      { opacity: 0, scale: 0.92, y: -60, ease: 'none' },
+      0
+    )
+
+    if (scrollIndicator) {
+      tl.to(scrollIndicator, { opacity: 0, y: 20, ease: 'none', duration: 0.15 }, 0)
+    }
+
+    tl.fromTo(
+      contentRef.current,
+      { opacity: 0, y: 100 },
+      { opacity: 1, y: 0, ease: 'none' },
+      0.4
+    )
+
+    const elements = gsap.utils.toArray<HTMLElement>('.reveal-up')
     elements.forEach((element) => {
       gsap.to(element, {
         scrollTrigger: {
@@ -66,16 +84,32 @@ const App = () => {
 
   return (
     <ReactLenis root>
+      <LoadingScreen loaded={splineLoaded} />
+
       <Header hidden={headerHidden} />
+
       <main>
-        <SplineHero ref={splineHeroRef} />
-        <Hero />
-        <About />
-        <Skill />
-        <Project />
-        <Experience />
-        <Contact />
+        <section ref={splineSectionRef} id="home" className="relative h-[250vh]">
+          <div className="sticky top-0 h-screen w-full overflow-hidden">
+            <div
+              ref={splineInnerRef}
+              className="h-full w-full will-change-transform origin-center"
+            >
+              <SplineHero onSplineLoad={handleSplineLoad} />
+            </div>
+          </div>
+        </section>
+
+        <div ref={contentRef}>
+          <Hero />
+          <About />
+          <Skill />
+          <Project />
+          <Experience />
+          <Contact />
+        </div>
       </main>
+
       <Footer />
     </ReactLenis>
   )

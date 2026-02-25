@@ -147,3 +147,32 @@ body {
 .text-field::placeholder {
   @apply text-zinc-400;
 }
+
+/* ------------------------------------------------------- *\
+ * CRT / SPLINE EFFECTS
+\* ------------------------------------------------------- */
+
+.crt-scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.12) 0px,
+    rgba(0, 0, 0, 0.12) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation: crt-flicker 4s ease-in-out infinite;
+}
+
+@keyframes crt-flicker {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 0.35; }
+}
+
+.scroll-indicator {
+  animation: scroll-fade 2.5s ease-in-out infinite;
+}
+
+@keyframes scroll-fade {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}

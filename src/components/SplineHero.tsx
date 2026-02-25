@@ -1,56 +1,65 @@
 /**
- * Cinematic Spline Hero
+ * Cinematic Spline Hero – animation-only layer with CRT effects and mouse parallax.
  */
 
-import { forwardRef } from 'react'
+import { useRef, useCallback } from 'react'
 import Spline from '@splinetool/react-spline'
-import { ButtonPrimary, ButtonOutline } from './Button'
 
-const SplineHero = forwardRef<HTMLElement>(function SplineHero(_, ref) {
+interface SplineHeroProps {
+  onSplineLoad?: () => void
+}
+
+const SplineHero = ({ onSplineLoad }: SplineHeroProps) => {
+  const parallaxRef = useRef<HTMLDivElement>(null)
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = parallaxRef.current
+    if (!el) return
+    const x = (e.clientX / window.innerWidth - 0.5) * 2
+    const y = (e.clientY / window.innerHeight - 0.5) * 2
+    el.style.transform = `translate(${x * 8}px, ${y * 6}px)`
+  }, [])
+
+  const handleMouseLeave = useCallback(() => {
+    const el = parallaxRef.current
+    if (!el) return
+    el.style.transition = 'transform 0.6s ease-out'
+    el.style.transform = 'translate(0, 0)'
+    setTimeout(() => {
+      if (el) el.style.transition = ''
+    }, 600)
+  }, [])
+
   return (
-    <section ref={ref} id="home" className="relative h-screen w-full overflow-hidden bg-black text-white">
-      <div className="absolute inset-0">
-        <Spline scene="https://prod.spline.design/UWqFUDwTtvtxSBak/scene.splinecode" />
+    <div
+      className="relative h-full w-full overflow-hidden bg-black"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Spline scene with parallax wrapper */}
+      <div ref={parallaxRef} className="absolute inset-0 will-change-transform">
+        <Spline
+          scene="https://prod.spline.design/UWqFUDwTtvtxSBak/scene.splinecode"
+          onLoad={onSplineLoad}
+        />
       </div>
 
-      {/* <div className="relative z-10 h-full pointer-events-none">
-        <div className="container h-full flex flex-col justify-center">
-          <div className="max-w-xl space-y-6">
-            <p className="flex items-center gap-2 text-sm text-zinc-300">
-              <span className="relative inline-flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-              </span>
-              Available for Work
-            </p>
+      {/* CRT scanlines overlay */}
+      <div className="crt-scanlines pointer-events-none absolute inset-0 z-10" />
 
-            <h1 className="headline-1">
-              Jewoo (Jay) Lee
-            </h1>
+      {/* CRT vignette */}
+      <div className="pointer-events-none absolute inset-0 z-10 shadow-[inset_0_0_120px_rgba(0,0,0,0.7)]" />
 
-            <p className="max-w-md text-zinc-300">
-              Software engineer crafting playful, cinematic web experiences that blend 3D and motion.
-            </p>
+      {/* Bottom gradient */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 z-10 bg-gradient-to-t from-black to-transparent" />
 
-            <div className="flex flex-wrap items-center gap-3 pointer-events-auto">
-              <ButtonPrimary
-                href="/files/JEWOOLEE_CV.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                label="Download CV"
-                icon="download"
-              />
-
-              <ButtonOutline href="#about" label="Scroll down" icon="arrow_downward" />
-            </div>
-          </div>
-        </div>
-      </div> */}
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black to-transparent" />
-    </section>
+      {/* Scroll indicator */}
+      <div className="scroll-indicator pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+        <span className="text-zinc-500 text-xs tracking-[0.3em] uppercase">Scroll</span>
+        <span className="block w-px h-8 bg-gradient-to-b from-zinc-500 to-transparent animate-bounce" />
+      </div>
+    </div>
   )
-})
+}
 
 export default SplineHero
-
