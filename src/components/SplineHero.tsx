@@ -2,17 +2,18 @@
  * Cinematic Spline Hero
  */
 
+import { forwardRef } from 'react'
 import Spline from '@splinetool/react-spline'
 import { ButtonPrimary, ButtonOutline } from './Button'
 
-const SplineHero = () => {
+const SplineHero = forwardRef<HTMLElement>(function SplineHero(_, ref) {
   return (
-    <section id="home" className="relative h-screen w-full overflow-hidden bg-black text-white">
+    <section ref={ref} id="home" className="relative h-screen w-full overflow-hidden bg-black text-white">
       <div className="absolute inset-0">
         <Spline scene="https://prod.spline.design/UWqFUDwTtvtxSBak/scene.splinecode" />
       </div>
 
-      <div className="relative z-10 h-full pointer-events-none">
+      {/* <div className="relative z-10 h-full pointer-events-none">
         <div className="container h-full flex flex-col justify-center">
           <div className="max-w-xl space-y-6">
             <p className="flex items-center gap-2 text-sm text-zinc-300">
@@ -44,12 +45,12 @@ const SplineHero = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black to-transparent" />
     </section>
   )
-}
+})
 
 export default SplineHero
 
