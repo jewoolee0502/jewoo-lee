@@ -10,6 +10,24 @@ import ProjectCard from "./ProjectCard";
 
 const projects = [
   {
+    imgSrc: '/images/RecycleWise.png',
+    title: 'RecycleWise',
+    tags: ['React.js', 'Supabase', 'PostgreSQL', 'Google Maps API', 'QR Code'],
+    projectLink: 'https://github.com/jewoolee0502/RecycleWise'
+  },
+  {
+    imgSrc: '/images/WhenAreYouFree.png',
+    title: 'WhenAreYouFree',
+    tags: ['Azure DevOps', 'Express.js', 'Vue/Nuxt.js', 'PostgreSQL', 'Agile', 'Prisma ORM'],
+    projectLink: 'https://github.com/jewoolee0502/WhenAreYouFree'
+  },
+  {
+    imgSrc: '/images/Duonosaur.png',
+    title: 'Duonosaur',
+    tags: ['React Native', 'JavaScript/TypeScript', 'Speech Recognition API', 'Node.js'],
+    projectLink: 'https://devpost.com/software/duonosaur'
+  },
+  {
     imgSrc: '/images/MenuLens.png',
     title: 'MenuLens',
     tags: ['API', 'OCR', 'AI Prompting', 'Prompt Engineering', 'Python'],
