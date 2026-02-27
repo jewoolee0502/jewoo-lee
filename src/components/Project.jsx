@@ -11,7 +11,7 @@ import ProjectCard from "./ProjectCard";
 const projects = [
   {
     imgSrc: '/images/MenuLens.png',
-    title: 'Menu Lens',
+    title: 'MenuLens',
     tags: ['API', 'OCR', 'AI Prompting', 'Prompt Engineering', 'Python'],
     projectLink: 'https://devpost.com/software/menulens'
   },
