@@ -120,33 +120,41 @@ const Project = ({ isDesktop }) => {
                 className="project-item group grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-4 sm:gap-6 py-5 sm:py-7 transition-all duration-500"
                 data-cursor-view
               >
-                <div className="flex flex-col justify-center">
-                  <h3 className="font-display text-lg sm:text-2xl font-bold tracking-tight text-ink group-hover:text-ember transition-colors duration-400">
-                    {title}
-                  </h3>
-                  <p className="font-body text-sm sm:text-[15px] text-muted mt-1.5 sm:mt-2 max-w-md italic">
-                    {description}
-                  </p>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {tags.map((tag, i) => (
-                      <span
-                        key={i}
-                        className="font-display text-[10px] font-medium tracking-wider uppercase text-faint group-hover:text-muted transition-colors duration-400 bg-ink/[0.03] px-2 py-0.5 rounded"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                <div className="flex items-start gap-4 sm:gap-6">
+                  {/* Index number */}
+                  <span className="font-display text-sm sm:text-base font-bold text-faint/40 pt-1 shrink-0">
+                    _{String(index + 1).padStart(2, '0')}.
+                  </span>
+
+                  <div className="flex flex-col justify-center">
+                    <h3 className="font-display text-lg sm:text-2xl font-bold tracking-tight text-ink group-hover:text-ember transition-colors duration-400">
+                      {title}
+                    </h3>
+                    <p className="font-body text-sm sm:text-[15px] text-muted mt-1.5 sm:mt-2 max-w-md italic">
+                      {description}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {tags.slice(0, 3).map((tag, i) => (
+                        <span
+                          key={i}
+                          className="font-display text-[10px] font-medium tracking-wider uppercase text-faint group-hover:text-muted transition-colors duration-400"
+                        >
+                          {tag}{i < Math.min(tags.length, 3) - 1 ? ' \u00B7' : ''}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
+                {/* Thumbnail — always visible */}
                 <div className="relative w-full sm:w-52 aspect-[16/10] sm:aspect-video rounded-lg overflow-hidden bg-surface shrink-0 border border-ink/[0.04]">
                   <img
                     src={imgSrc}
                     alt={title}
                     loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                   />
-                  <div className="absolute inset-0 flex items-center justify-center bg-void/0 group-hover:bg-void/40 transition-all duration-500">
+                  <div className="absolute inset-0 flex items-center justify-center bg-void/0 group-hover:bg-void/30 transition-all duration-500">
                     <span className="material-symbols-rounded text-ink opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 group-hover:rotate-45 transition-all duration-500 text-xl">
                       arrow_outward
                     </span>

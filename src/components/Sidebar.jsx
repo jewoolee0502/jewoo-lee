@@ -58,6 +58,14 @@ const Sidebar = ({ sections, activeSection, onNavigate }) => {
         {/* Divider line */}
         <div className="h-px bg-gradient-to-r from-transparent via-ink/[0.06] to-transparent" />
 
+        {/* Vertical email */}
+        <a
+          href="mailto:jewoo.lee@mail.mcgill.ca"
+          className="font-display text-[10px] font-bold tracking-[0.2em] uppercase text-faint hover:text-ember transition-colors duration-300"
+        >
+          jewoo.lee@mail.mcgill.ca
+        </a>
+
         <a
           href="/files/JEWOOLEE_CV.pdf"
           target="_blank"
@@ -72,7 +80,6 @@ const Sidebar = ({ sections, activeSection, onNavigate }) => {
           {[
             { label: 'Github', full: 'GitHub', href: 'https://github.com/jewoolee0502' },
             { label: 'Linkedin', full: 'LinkedIn', href: 'https://www.linkedin.com/in/jewoo-lee/' },
-            // { label: 'Instagram', full: 'Instagram', href: 'https://www.instagram.com/jwuu_lee/' },
           ].map(({ label, full, href }) => (
             <a
               key={label}

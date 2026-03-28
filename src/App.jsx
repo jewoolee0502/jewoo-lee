@@ -12,6 +12,8 @@ import { useGSAP } from '@gsap/react'
 gsap.registerPlugin(useGSAP, ScrollTrigger)
 
 import Cursor from './components/Cursor'
+import ParticleBackground from './components/ParticleBackground'
+import ScrollProgress from './components/ScrollProgress'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Hero from './components/Hero'
@@ -93,7 +95,8 @@ const App = () => {
     return (
       <>
         <Cursor />
-        <div className="flex h-screen overflow-hidden bg-void">
+        <ParticleBackground />
+        <div className="flex h-screen overflow-hidden bg-void relative z-[1]">
           <Sidebar
             sections={sections}
             activeSection={activeSection}
@@ -115,6 +118,8 @@ const App = () => {
   return (
     <ReactLenis root>
       <Cursor />
+      <ParticleBackground />
+      <ScrollProgress />
       <Header />
 
       <main>
