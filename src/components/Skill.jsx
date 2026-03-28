@@ -3,127 +3,88 @@
  * @license Apache-2.0
  */
 
+import { useRef } from 'react'
+import { gsap } from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { useGSAP } from '@gsap/react'
 
-/**
- * Components
- */
-import SkillCard from "./SkillCard";;
+const skillCategories = [
+  {
+    category: 'Languages',
+    skills: ['Python', 'Java', 'JavaScript', 'TypeScript']
+  },
+  {
+    category: 'Frontend',
+    skills: ['React', 'Vue.js', 'Nuxt', 'Tailwind CSS']
+  },
+  {
+    category: 'Backend & Data',
+    skills: ['Spring Boot', 'Firebase', 'Supabase', 'PostgreSQL', 'SQL', 'MongoDB', 'NumPy']
+  },
+  {
+    category: 'Tools',
+    skills: ['Git', 'Azure', 'Figma']
+  }
+]
 
-const skillItem = [
-  {
-    imgSrc: '/images/python-5.svg',
-    label: 'Python',
-    desc: 'Programming Language'
-  },
-  {
-    imgSrc: '/images/java-4.svg',
-    label: 'Java',
-    desc: 'Programming Language'
-  },
-  {
-    imgSrc: '/images/figma.svg',
-    label: 'Figma',
-    desc: 'Design tool'
-  },
-  {
-    imgSrc: '/images/css3.svg',
-    label: 'CSS',
-    desc: 'User Interface'
-  },
-  {
-    imgSrc: '/images/javascript.svg',
-    label: 'JavaScript',
-    desc: 'Interaction'
-  },
-  {
-    imgSrc: '/images/typescript.svg',
-    label: 'TypeScript',
-    desc: 'Interaction'
-  },
-  {
-    imgSrc: '/images/vue-9.svg',
-    label: 'Vue.js',
-    desc: 'Framework'
-  },
-  {
-    imgSrc: '/images/nuxt-2.svg',
-    label: 'Nuxt',
-    desc: 'Web Framework'
-  },
-  {
-    imgSrc: '/images/firebase-1.svg',
-    label: 'Firebase',
-    desc: 'Realtime Database'
-  },
-  {
-    imgSrc: '/images/postgresql.svg',
-    label: 'PostgreSQL',
-    desc: 'Object-Relational Database'
-  },
-  {
-    imgSrc: '/images/mongodb.svg',
-    label: 'MongoDB',
-    desc: 'Database'
-  },
-  {
-    imgSrc: '/images/spring-boot-1.svg',
-    label: 'Spring Boot',
-    desc: 'Backend Framework'
-  },
-  {
-    imgSrc: '/images/react.svg',
-    label: 'React',
-    desc: 'Framework'
-  },
-  {
-    imgSrc: '/images/tailwindcss.svg',
-    label: 'TailwindCSS',
-    desc: 'Framework'
-  },
-  {
-    imgSrc: '/images/git-bash.svg',
-    label: 'Git',
-    desc: 'Version Control'
-  },
-  {
-    imgSrc: '/images/numpy-1.svg',
-    label: 'Numpy',
-    desc: 'Data Processing'
-  },
-];
+const Skill = ({ isDesktop }) => {
+  const sectionRef = useRef(null)
 
+  useGSAP(() => {
+    const label = sectionRef.current.querySelector('.section-label')
+    const rows = sectionRef.current.querySelectorAll('.skill-row')
 
-const Skill = () => {
+    if (!isDesktop) {
+      ScrollTrigger.create({
+        trigger: sectionRef.current,
+        start: 'top 75%',
+        once: true,
+        onEnter: () => {
+          const tl = gsap.timeline()
+          tl.fromTo(label, { x: -30, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, ease: 'power3.out', clearProps: 'all' })
+            .fromTo(rows,
+              { opacity: 0, x: -40 },
+              { opacity: 1, x: 0, stagger: 0.12, duration: 0.7, ease: 'power3.out', clearProps: 'all' },
+              '-=0.3'
+            )
+        }
+      })
+    }
+  }, { scope: sectionRef, dependencies: [] })
+
   return (
-    <section className="section">
-      <div className="container">
-
-        <h2 className="headline-2 reveal-up">
-          Essential Tools I use
-        </h2>
-
-        <p className="text-zinc-400 mt-3 mb-8 max-w-[50ch] reveal-up">
-          Discover the powerfull tools and technologies I use to create exceptional, high-performing websites & applications.
-        </p>
-
-        <div className="grid gap-3 grid-cols-[repeat(auto-fill,_minmax(250px,_1fr))]">
-          {
-            skillItem.map(({ imgSrc, label, desc }, key) =>
-            (
-              <SkillCard
-                key={key}
-                imgSrc={imgSrc}
-                label={label}
-                desc={desc}
-                classes="reveal-up"
-              />
-            ))
-          }
+    <section ref={sectionRef} className={isDesktop ? 'p-12 lg:p-16 xl:p-20' : 'section'}>
+      <div className={isDesktop ? '' : 'container'}>
+        {/* Section label */}
+        <div className="section-label flex items-center gap-4 mb-8 sm:mb-14">
+          <span className="font-display text-[11px] font-bold tracking-[0.25em] uppercase text-ember">
+            Skills
+          </span>
+          <div className="flex-1 h-px bg-gradient-to-r from-ember/20 to-transparent" />
         </div>
 
+        <div className="space-y-0">
+          {skillCategories.map(({ category, skills }, i) => (
+            <div
+              key={category}
+              className="skill-row group flex flex-col sm:flex-row sm:items-baseline gap-1.5 sm:gap-10 py-5 sm:py-7 border-b border-ink/[0.04] last:border-b-0"
+            >
+              <span className="font-display text-xs sm:text-sm font-bold tracking-wider uppercase text-ember/80 shrink-0 sm:w-40">
+                {category}
+              </span>
+              <div className="flex flex-wrap gap-x-1 gap-y-1">
+                {skills.map((skill, j) => (
+                  <span key={skill} className="font-body text-base sm:text-lg text-muted group-hover:text-ink transition-colors duration-500">
+                    {skill}{j < skills.length - 1 && <span className="text-faint mx-2">/</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
-  ) 
+  )
 }
 
 export default Skill
