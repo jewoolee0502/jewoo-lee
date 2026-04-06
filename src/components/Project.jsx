@@ -10,49 +10,49 @@ import ProjectCard from "./ProjectCard";
 
 const projects = [
   {
-    imgSrc: '/images/RecycleWise.png',
+    imgSrc: '/images/RecycleWise.webp',
     title: 'RecycleWise',
     tags: ['React.js', 'Supabase', 'PostgreSQL', 'Google Maps API', 'QR Code'],
     projectLink: 'https://github.com/jewoolee0502/RecycleWise'
   },
   {
-    imgSrc: '/images/WhenAreYouFree.png',
+    imgSrc: '/images/WhenAreYouFree.webp',
     title: 'WhenAreYouFree',
     tags: ['Azure DevOps', 'Express.js', 'Vue/Nuxt.js', 'PostgreSQL', 'Agile', 'Prisma ORM'],
     projectLink: 'https://github.com/jewoolee0502/WhenAreYouFree'
   },
   {
-    imgSrc: '/images/Duonosaur.png',
+    imgSrc: '/images/Duonosaur.webp',
     title: 'Duonosaur',
     tags: ['React Native', 'JavaScript/TypeScript', 'Speech Recognition API', 'Node.js'],
     projectLink: 'https://devpost.com/software/duonosaur'
   },
   {
-    imgSrc: '/images/MenuLens.png',
+    imgSrc: '/images/MenuLens.webp',
     title: 'MenuLens',
     tags: ['API', 'OCR', 'AI Prompting', 'Prompt Engineering', 'Python'],
     projectLink: 'https://devpost.com/software/menulens'
   },
   {
-    imgSrc: '/images/MarletNests.png',
+    imgSrc: '/images/MarletNests.webp',
     title: 'Marlet Nests',
     tags: ['API', 'Python', 'Realtime Database'],
     projectLink: 'https://devpost.com/software/martlet-s-nest'
   },
   {
-    imgSrc: '/images/adStar.png',
+    imgSrc: '/images/adStar.webp',
     title: 'adStar',
     tags: ['Machine Learning', 'API', 'Data Analysis'],
     projectLink: 'https://devpost.com/software/adstar'
   },
   {
-    imgSrc: '/images/HTTP.png',
+    imgSrc: '/images/HTTP.webp',
     title: 'Health and Toning Targeted Program (HTTP)',
     tags: ['SpringBoot', 'SQL', 'React', 'Agile/Scrum'],
     projectLink: 'https://github.com/jewoolee0502/ECSE428_HTTP'
   },
   {
-    imgSrc: '/images/Library.png',
+    imgSrc: '/images/Library.webp',
     title: 'Library Management System Application',
     tags: ['Java', 'Gradle', 'Vue', 'Web/Android/iOS', 'Agile/Scrum'],
     projectLink: 'https://github.com/jewoolee0502/project-group-04'
