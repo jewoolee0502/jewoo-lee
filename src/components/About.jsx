@@ -53,7 +53,7 @@ const About = ({ isDesktop }) => {
             style={{ clipPath: 'inset(0)' }}
           >
             <img
-              src="/images/jewoolee_edited.png"
+              src="/images/jewoolee_edited.webp"
               alt="Jewoo Lee"
               className="w-full h-full object-cover"
             />

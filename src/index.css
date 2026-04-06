@@ -103,14 +103,6 @@ body::after {
   @apply text-faint italic;
 }
 
-/* Custom cursor (desktop only) */
-
-@media (pointer: fine) {
-  * {
-    cursor: none !important;
-  }
-}
-
 /* Reduced motion */
 
 @media (prefers-reduced-motion: reduce) {

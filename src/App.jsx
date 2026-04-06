@@ -11,7 +11,6 @@ import { useGSAP } from '@gsap/react'
 
 gsap.registerPlugin(useGSAP, ScrollTrigger)
 
-import Cursor from './components/Cursor'
 import ParticleBackground from './components/ParticleBackground'
 import ScrollProgress from './components/ScrollProgress'
 import Sidebar from './components/Sidebar'
@@ -94,7 +93,6 @@ const App = () => {
   if (isDesktop) {
     return (
       <>
-        <Cursor />
         <ParticleBackground />
         <div className="flex h-screen overflow-hidden bg-void relative z-[1]">
           <Sidebar
@@ -117,7 +115,6 @@ const App = () => {
   // Mobile: scrollable layout
   return (
     <ReactLenis root>
-      <Cursor />
       <ParticleBackground />
       <ScrollProgress />
       <Header />
