@@ -1,79 +1,64 @@
-# 🚀 Personal Portfolio Website
+# Jewoo Lee — Portfolio
 
-This is my personal portfolio website built with **React**, **TailwindCSS**, and other modern web technologies.  
-It showcases my projects, skills, and essential tools I use as a software developer.  
-Feel free to explore, fork, or use it as inspiration for your own portfolio!
+My personal portfolio website, live at **[jewoolee.dev](https://www.jewoolee.dev)**.
 
-You can directly check out my **[CV/Resume](public/files/JEWOOLEE_CV.pdf)** right here!
+It's a single-page site that introduces who I am and what I've built: an about section, my skills, projects, work experience, and a contact form. My CV is in [`public/files/JEWOOLEE_CV.pdf`](public/files/JEWOOLEE_CV.pdf).
 
-## ✨ Features
+## Tech stack
 
-- 🖼️ **Responsive design** with a modern UI/UX
-- ⚡ **Fast and optimized** build with React + TailwindCSS
-- 📄 **Downloadable CV** button
-- 📦 Sections for **About Me, Skills, Projects, and Contact**
-- 🎨 **Dark theme** layout and tool cards (Figma, React, TypeScript, etc.)
+| Area | Tools |
+| --- | --- |
+| Framework | [React 19](https://react.dev/) + [Vite 6](https://vite.dev/) |
+| Styling | [Tailwind CSS 3](https://tailwindcss.com/) |
+| Animation | [GSAP](https://gsap.com/) (scroll animations) + [Lenis](https://lenis.darkroom.engineering/) (smooth scrolling) |
+| Contact form | [Getform](https://getform.io/) |
+| Hosting & analytics | [Vercel](https://vercel.com/) |
 
----
+## Run it locally
 
-## 📦 Tech Stack
-
-- **Frontend:** React, TailwindCSS
-- **UI Design:** Figma
-- **Hosting:** Vercel
-
----
-
-## 🛠️ Getting Started
-
-Follow these steps to run the project locally.
-
-### ✅ Prerequisites
-
-Make sure you have these installed:
-
-- [Node.js](https://nodejs.org/) (v16 or later recommended)
-- [Git](https://git-scm.com/)
-
-### 📥 Installation
-
-1. **Clone the repository**
+**You need:** [Node.js](https://nodejs.org/) 18 or newer (20+ recommended) and [Git](https://git-scm.com/).
 
 ```bash
-git clone https://github.com/your-username/your-portfolio.git
-```
-
-2. **Navigate to the project folder**
-
-```bash
+git clone https://github.com/jewoolee0502/jewoo-lee.git
 cd jewoo-lee
-```
-
-3. **Install dependencies**
-
-```bash
 npm install
-```
-
-### 🏃 Running the Project Locally
-
-```bash
-npm start
-```
-
-or
-
-```bash
 npm run dev
 ```
 
----
+Then open **http://localhost:5173** in your browser. Changes to the code reload automatically.
 
-## 📬 Contact Me
+## Available commands
 
-If you have any questions, collaboration ideas, or just want to say hi, feel free to reach out:
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the local development server |
+| `npm run build` | Build the production site into `dist/` |
+| `npm run preview` | Serve the built `dist/` folder locally to check it before deploying |
+| `npm run lint` | Check the code with ESLint |
 
-- 📧 **Email:** [jewoo.lee@mail.mcgill.ca](mailto:jewoo.lee@mail.mcgill.ca)
-- 💼 **LinkedIn:** [https://www.linkedin.com/in/jewoo-lee/](https://www.linkedin.com/in/jewoo-lee/)
-- 📸 **Instagram:** [https://www.instagram.com/jwuu_lee/](https://www.instagram.com/jwuu_lee/)
-- 👤 **Portfolio Website:** [https://www.jewoolee.dev](https://www.jewoolee.dev)
+## Project structure
+
+```
+├── index.html          # Page shell, fonts, favicon
+├── public/
+│   ├── files/          # CV (PDF)
+│   └── images/         # Project screenshots and skill icons
+└── src/
+    ├── main.jsx        # Entry point (mounts the app + Vercel Analytics)
+    ├── App.jsx         # Page layout and scroll animations
+    ├── index.css       # Tailwind setup and global styles
+    └── components/     # One file per section: Hero, About, Skill, Project, Experience, Contact, ...
+```
+
+To change the site's content, edit the matching file in `src/components/` — for example, projects are listed in `Project.jsx`.
+
+## Contact
+
+- Email: [jewoo.lee@mail.mcgill.ca](mailto:jewoo.lee@mail.mcgill.ca)
+- LinkedIn: [linkedin.com/in/jewoo-lee](https://www.linkedin.com/in/jewoo-lee/)
+- GitHub: [github.com/jewoolee0502](https://github.com/jewoolee0502)
+- Instagram: [@jwuu_lee](https://www.instagram.com/jwuu_lee/)
+
+## License
+
+[Apache 2.0](LICENSE)
