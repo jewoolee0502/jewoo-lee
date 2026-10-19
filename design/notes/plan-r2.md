@@ -542,3 +542,317 @@ Run `npm run build && npm run preview`. For each viewport: **1440×900, 1280×72
 
 **N. Removals**
 - [ ] No Paint or Visitor Wall icon, command (`paint`, `wall`), window or toast. Trophies show 12. No corkboard; the polaroid with tape is on the wall and opens About. No "Inspired by" text anywhere (résumé footer, About JAY-OS). No network request to Supabase in the Network panel.
+
+---
+
+## 7. UX-pass fix round
+
+Inputs: the real-browser pass after phase 5 (headless Chrome over CDP; findings F1–F9 and three nits, all reproduced) and the owner's final decisions A (fast flicks always stop at the open laptop, using the browser's native scroll snapping) and B (a mid-dive or mid-out rest glides on in the direction of the last user scroll; only a tiny movement returns; programmatic scrolls never count as user direction). Base: HEAD `fcf9637` (phases 1–5 committed). Line numbers are hints; search by symbol.
+
+Same build loop as phases 1–5 (Haiku test-writer, Opus implementer, Haiku reviewer against ACCEPTANCE). Every phase ends with `npm test`, `npm run lint`, `npm run build` green. Three phases: **6A** scroll snapping, settle direction, plateau minimum, remap direction, cue; **6B** OS and layout fixes; **6C** scene nits.
+
+| Finding | Severity | Fixed in |
+|---|---|---|
+| F1 trackpad/precision flicks fly through the plateau (latched wheel: only the first event is cancelable) | high | 6A (U1–U5) |
+| F2 Projects and Recycle Bin thumbnails thousands of px tall (`aspect-ratio` without `height:auto`) | high | 6B (U14) |
+| F3 settle ratchet: slow notches, ArrowDown taps, 200 px swipes pulled back (SETTLE_BIAS 0.3) | medium | 6A (U6, U7) |
+| F4 window scroll positions lost when the OS is re-parented (R9 unmet) | medium | 6B (U10) |
+| F5 no-WebGL: HUD over the menubar clock and maximized title bars; notice over window content | medium | 6B (U11) |
+| F6 Esc with the ◆ menu open closes the laptop | low | 6B (U12) |
+| F7 "Go to résumé ↓" pill covers window content on phone/short screens | low | 6B (U13) |
+| F8 resize mid-dive settles the wrong way (the remap's own scrollTo counted as direction) | low | 6A (U7) |
+| F9 1280×720 plateau (86 px) shorter than one 100 px notch | low | 6A (U8) |
+| Nit: hovered mug reads pinker | nit | 6C (U15) |
+| Nit: scroll cue reappears in the tail | nit | 6A (U9) |
+| Nit: dog-tag and floppy hit targets tiny | nit | 6C (U16) |
+
+### 7.1 Snap experiment (run for this plan, 2026-10-19)
+
+**Setup.** A throwaway page outside the repo reproduced the runway: `290vh` track, sticky `100dvh` stage, `diveEnd = round(R/1.9)`, a 40-paragraph résumé plus footer in `#resume-root`. Chrome 155.0.8059.85, `--headless=new`, 1440×900, DPR 1, so `H 900, R 1710, diveEnd 900, insideEnd 1008, outEnd 1548`, résumé start 2610. Inputs over CDP: `Input.synthesizeScrollGesture` with `gestureSourceType:'mouse'` (phased wheel, **no momentum**: on macOS headless the synthetic touchpad gesture never produces an inertial phase, so it models a long two-finger drag) and with `gestureSourceType:'touch', preventFling:false` (finger flick **with momentum**: Chrome's fling, which goes through the same snap-fling path as trackpad momentum); `Input.dispatchMouseEvent` `mouseWheel` 100 px notches; `Input.dispatchKeyEvent`; programmatic `scrollTo`, `scrollIntoView`, `location.hash`. The result is `scrollY` after 800 ms without change. The prototype, profile and logs were deleted afterwards; no screenshots were taken.
+
+**Configurations** (all on `html`):
+- N: no snapping (native reference).
+- A: `mandatory`; targets at 0, at `diveEnd` (`scroll-snap-stop:always`) and the résumé start.
+- B: `proximity`, same targets.
+- C: `mandatory`; `body` as one covering snap area plus the plateau stop.
+- D: `mandatory`; the track and `#resume-root` (with `scroll-margin-top:100vh`) as covering areas plus the plateau stop. E: like D with two JS-sized covering areas. G: D with a normal (not `always`) plateau point.
+- F: `proximity`; the plateau stop only.
+- **J: `mandatory`; a rail of 1 px start-aligned markers every 8 px from 0 to the track bottom, the plateau stop (`always`), `#resume-root` as a covering area.** K: J with a 16 px grid. P: J with a 40 px grid. M: J with `proximity`. L: J without the `#resume-root` area.
+
+**Results** (final `scrollY`; "exact" = equal to N within 2 px):
+
+| Input (native end) | N | A | C | D | F | **J** | M |
+|---|---|---|---|---|---|---|---|
+| touch flick with momentum from the top (≈1800–1850) | 1845 | 900 | 900 | 900 | 1819 | **900** | 1928 |
+| 100 px notches 0.7 s apart from the top (100, 200, …) | 100…1200 | 0 after every notch | 0 every notch | 0 every notch | 100…500, then 900 | **96, 192, …, 1152** | as J |
+| touch drag 200 px from 300 (≈500) | 507 | 0 | 0 | 0 | 508 | **504** | 496 |
+| rest after an instant scrollTo to 450 / 1208 / 1910 / 3310 | exact | 0 / 900 / 2610 / 3310 | 900 / 1208 / 1910 / 3310 | 900 / 901 / 1710 / 3310 | 450 / 1208 / 1910 / 3310 | **448 / 1208 / 1912 / 3310** | as J |
+| one notch down from the plateau (1000) | 1000 | 900 (stuck) | 1000 | 901 (stuck) | 900 (stuck) | **1000** | 1000 |
+| ArrowDown ×3 from the top (40, 80, 120) | 40 80 120 | 900 2610 2650 | 900 940 980 | 900 901 1710 | 40 80 120 | **8 16 24** | 8 16 24 |
+| JS `scrollBy({top:40, behavior:'smooth'})` ×3 | — | — | — | — | — | **40 80 120** | 40 80 120 |
+| PageDown ×4 from the top | 860 1720 2580 3440 | 900 2610 3470 4330 | 900 1760 2620 3480 | 900 1710 2610 3470 | 900 1760 2620 3480 | **856 900 1760 2620** | as J |
+| 12 notches 30 ms apart from the top (1200) | 1200 | 900 | 1155 | 901 | 1213 | **1200** | 1200 |
+| phased wheel gesture without momentum, 1.6 H / 2.5 H | 1440 / 2250 | 900 (overshoots to 1432, pulled back) / 2610 | 1440 / 2250 | 1710 / 2610 | 1440 / 2250 | **1440 / 2248** | 1440 / 2248 |
+| inside the résumé: gestures ±300, notches ±100 | exact | exact | exact | exact | exact | **exact** | exact |
+| up from the résumé: −500 then −300 (2310, 2010) | exact | 2610 2610 | exact | 2610 2610 | exact | **2312 2008** | 2312 2008 |
+| touch flick down from the plateau | 2727 | | | | | **2822** (free) | |
+| scrollIntoView résumé / hash / find-like scrollIntoView / End / Home | exact | exact | exact | exact | exact | **exact** | exact |
+| at the plateau, resize to 1280×720 (new diveEnd 720) | 900 | 720 | 720 | 720 | 720 | **720** | 720 |
+| at 450, resize to 1280×720 | 450 | 0 | 720 | 720 | 450 | **448** | 448 |
+| snapping off, scrollTo 450, snapping on | 450 | 0 | 900 | 900 | 450 | **448** | 448 |
+
+K behaved like J with 8 px deviations (arrows 16 px). P quantised every notch to 80 px. L yanked every résumé position to 2608 (no free scrolling without a covering area).
+
+**What the numbers say.**
+1. Only `mandatory` plus `scroll-snap-stop:always` stops a momentum flick at the plateau (A, C, D, J: 900). Proximity lets it through (B 1807, F 1819, M 1928), because Chrome drops a candidate that is outside the proximity range of the fling's natural end.
+2. Chrome applies the stop to flings and to keyboard paging (its end-and-direction strategy: PageDown from 856 stops at 900, PageUp from the résumé stops at 900). Notched wheels and non-momentum phased gestures use the end-position strategy and ignore the stop (J: 12 fast notches → 1200; 2.5 H drag → 2248). Trackpad momentum goes through Chrome's snap-fling controller exactly like the touch flick measured here; it cannot be synthesized on macOS headless, so it is a manual check (6A ACCEPTANCE).
+3. Covering snap areas do not free the dive in Chrome: whenever the plateau marker is inside the snapport, Chrome prefers it over the covering position (C, D, E: a rest at 450 → 900; every slow notch → 0). That is the "magnetic" failure. Covering only works where no other snap area is visible, which is why the résumé scrolls freely in every config with a résumé area.
+4. A dense 8 px rail (J) makes mandatory snapping practically free everywhere: a rest moves ≤ 4 px, a notch goes 96 instead of 100, drags and flicks that do not cross the plateau are untouched, nothing sticks at the plateau, and the stop still wins for flicks (900). The one regression is arrow keys (8 px per press, the next rail point); a JS `scrollBy(±40)` lands exactly (40 80 120).
+5. Programmatic scrolls (scrollIntoView, hash, find, End, Home) pass the stop and land exactly. Per-frame instant `scrollTo` under mandatory snapping is itself snapped (A: 450 → 0), so glides must suspend snapping; turning it back on moves ≤ 4 px.
+6. On resize the browser keeps a page that is snapped to the stop on the stop (900 → 720 at 1280×720: still inside). Mid-dive it keeps the pixel position (448): the JS remap still keeps the fraction.
+
+**"Sticky", measurably** (used in the re-checks below):
+- **S1** A user scroll ends more than 5 px (half the rail step + 1) from where the same input ends without snapping, unless it is a flick or a PageDown/Space/PageUp whose native path crosses `diveEnd` (the intended stop).
+- **S2** One notch, one arrow press, one PageDown or a 100 px drag from any rest point moves less than 90 % of its native distance (A, D and F moved 0 % from the plateau).
+- **S3** The page moves by itself more than 5 px after the user stopped, other than the settle glide (U6) and following the stop on resize.
+- **S4** Inside the résumé any input deviates from native by more than 2 px.
+
+J with JS arrow keys passes S1–S4 in Chrome (worst case 4 px). **Chosen: J.**
+
+**Fallback if snapping feels sticky** (any S1–S4 failure in the real-browser pass in Chrome, Safari or Firefox, or the owner's trackpad check): first try a 4 px rail (`SNAP_GRID_PX = 4`, doubles the node count, halves every deviation). If an engine still fails, turn snapping off for it (`snapSupported()` returns false: the `runway-snap` class is never added, nothing else changes) and enable the **plateau latch** instead: a scroll sequence whose origin was above `diveEnd` and that comes to rest in the out segment or tail glides back to `diveEnd` (in `settleTarget`, before the direction rule). The latch is specified here but not built unless the fallback is triggered.
+
+### 7.2 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| U1 | **Mandatory root snapping, on only while the scene is ready.** `html.runway-snap{scroll-snap-type:y mandatory}`. The controller adds the class on the first ready frame (if `snapSupported()`: `RUNWAY_SNAP && CSS.supports('scroll-snap-stop','always')`) and removes it when the scene is unavailable and on unmount. Never in the prerendered HTML, while loading, without JS, or in the no-WebGL fallback (whose runway is collapsed, R10). | Decision A; experiment point 1. Mandatory without the rail would be magnetic everywhere, so it must never apply to a page that has no rail. |
+| U2 | **The snap rail.** `.snap-rail` (absolute, in `#track`, `aria-hidden`) holds one stop `<i class="stop">` at `diveEnd` (`scroll-snap-stop:always`) and plain `<i>` points at `insideEnd`, `outEnd` and every 8 px from 0 to the track bottom; `#resume-root` is a covering area (`scroll-snap-align:start`) so the résumé and footer scroll freely. No other element in the app may declare `scroll-snap-align`. | Experiment points 3–4: the only configuration that stops flicks and leaves the dive, plateau, tail and résumé free (S1–S4). The settle targets (0, diveEnd, insideEnd, outEnd) are exact snap positions, so a glide never ends with a re-snap jump. About 330 nodes at 1440×900, 520 at 1440 px tall; built once per layout change, never per frame. |
+| U3 | **Programmatic scrolls suspend snapping.** `html.snap-hold{scroll-snap-type:none}` while a glide runs and around every instant programmatic jump (`glide.jump`: resize remap, detent snap). | Experiment point 5: per-frame `scrollTo` under mandatory snapping is snapped, which would stall the glide and trip its 2 px foreign-scroll cancel. Safari is known to snap programmatic writes too. |
+| U4 | **Arrow keys step 40 px in JS while snapping is on.** ArrowUp/ArrowDown without modifiers, when `scrollsPage(e)` and the last-clicked OS scroller (`.wb`/`.t-out`) cannot scroll that way: `preventDefault()` and `scrollBy({top: ±40, behavior: reduce ? 'instant' : 'smooth'})`. Space, PageUp/PageDown, Home, End stay native. | Experiment point 4 (native arrows move 8 px under the rail). Chrome sends arrow keys to the last-clicked scroller, so a click inside a window must keep native arrows there. Paging keys respect the stop natively (PageDown from the top: 856, then 900). |
+| U5 | **The JS detent stays,** unchanged (still attached only in the dive). Its snap goes through `glide.jump`. | Experiment point 2: Chrome ignores `scroll-snap-stop` for notched wheels (12 fast notches → 1200). Notched wheel events are all cancelable, and the browser pass showed the detent stops them. It is useless for latched trackpad sequences, which the stop now handles in their momentum phase. Removing it would bring back notched-wheel fly-through. |
+| U6 | **Settle follows the last user direction (decision B).** `settleTarget(s, L, dir, travel)`: in `dive` or `out`, if `|travel| ≥ SETTLE_TINY_PX` (16 px), go to the forward end when `dir > 0` (dive → `diveEnd`, out → `outEnd`) and the back end when `dir < 0` (dive → 0, out → `insideEnd`). A tiny movement returns: it goes to the end behind the movement. `dir = 0` (no user scroll since load) → nearest end. `SETTLE_BIAS` is deleted. | Fixes the ratchet (F3): a 100 px notch, a 40 px arrow press or a 200 px swipe now finishes the dive. 16 px is above trackpad brush and snap jitter (≤ 4 px) and below the smallest deliberate input (an 8 px rail step × 2, a 40 px arrow). Holds and glide cancels are unchanged, so it never fights active scrolling. |
+| U7 | **Direction and travel come from user scrolls only.** `scrollIdle` takes `scroll(y, own)`. `own` scrolls (glide frames, `glide.jump`, the re-snap right after them) move the baseline and the travel origin but never the direction. User direction comes from the last run of same-sign movement that reached `DIR_MIN_PX` (8 px), so a ≤ 4 px snap correction or a reverse twitch at the end of a gesture is ignored. `glide.owns(y)`: `|y − lastWritten| ≤ SNAP_OWN_TOL_PX` (5) and within `OWN_MS` (300 ms) of that write; any external `cancel()` (user input) ends the window. | Decision B ("programmatic scrolls never count") and F8: the remap's instant scroll was read as an upward scroll. The run rule is needed because the browser's own ≤ 4 px snap at the end of a downward drag is an upward scroll event. |
+| U8 | **Plateau minimum 120 px, taken from the out segment.** `insideEnd = max(round(1.12·unit), diveEnd + min(PLATEAU_MIN_PX, floor((outEnd − diveEnd)/2)))`; `diveEnd` and `outEnd` unchanged. | F9: at 1280×720 the plateau was 86 px, less than one 100 px notch. `outEnd` does not move, so the R2 invariant (`z > 0 ⇒ s ≤ R − 0.15 H`) is untouched; the cap keeps at least half of the dive-to-outEnd span for stepping out on tiny screens. |
+| U9 | **The scroll cue shows only at the top and in the dive:** `cueOpacity(pose)` = 0.8 at `top`, `0.8·(1 − ss(0, 0.15, z))` in `dive`, 0 elsewhere (loading uses the same function with `z = 0`). | Nit: in the tail `z = 0` made the cue come back while the stage scrolls away. |
+| U10 | **Window scroll offsets survive re-parenting:** `keepScroll(osEl, fn)` snapshots `scrollTop/Left` of every `.wb`/`.t-out` with a non-zero offset, runs the move, and restores them. `host.setFlat` runs inside it. The re-parent itself stays. | F4. Moving a node resets its descendants' scroll offsets. Avoiding the move would mean giving up either the CSS3D holder (the dive) or the flat host (R4: crisp 2D inside), so save/restore is the small fix. Restoring works while `overflow:hidden` (`.os:not(.live)`), so the order of `setLive` and `setFlat` does not matter. |
+| U11 | **No-WebGL layout is a grid:** in `.track.flat-runway .stage`, a top bar holds the notice (left) and the HUD (right, `position:static`), and the flat host fills the row below. On screens ≤ 600 px wide, the HUD row comes first, then the notice, then the OS. The notice becomes `<p class="fallback-note">`, no longer a floating toast. | F5: nothing overlaps because the OS starts below the bar; the host measures its real size, so `fitWindows` and the compact window CSS keep title bars and the clock visible. |
+| U12 | **Esc closes the open ◆ menu first.** Order: recruiter view → ◆ menu (`os.setMenu(false)`, focus back to `#mb-logo` if focus was inside `#menu-pop`) → exit the laptop. | F6. Standard menu behaviour; a second Esc still leaves. |
+| U13 | **Compact live OS reserves a 60 px strip for the pill.** `.os.compact.live:not(.fallback) .win{height:calc(100% - 104px)!important}` (window bottom 66 px above the screen edge; the pill's top edge is about 51 px above it) and `.icons{bottom:66px}`. The pill itself does not move. | F7. Moving the pill into the compact menubar would overflow at 390 px; hiding it loses the visible way out. `live` without `fallback` is exactly "inside on a compact layout", when the pill shows. |
+| U14 | **Thumbnails: `height:auto` wherever `aspect-ratio` meets width/height attributes.** `.pcard img` gains `height:auto;object-position:top`; Bin's inline styles move to `.pcard.bin-item` rules in apps.css. | F2. With the phase-5 `height` attribute and no CSS height, the attribute wins and the image is thousands of px tall. |
+| U15 | **Softer hover glow:** `GLOW_K` 0.35 → 0.2, and a per-hotspot strength, `MUG.glow = 0.1` for the mug. | Nit: a strong red emissive on the red, white-lettered label reads pink. |
+| U16 | **Invisible hit proxies** for the dog tags and each floppy: a box mesh with `MeshBasicMaterial({ visible: false })`, child of the hotspot group, no shadow, sizes in `props.js` `HIT`. | Nit: the tags are thin plates on a wall far away; floppies are 0.03 thick. The raycaster tests invisible materials; the renderer skips them; `glow()` ignores materials without `emissive`. |
+
+These supersede parts of section 2.2: "Wheel / trackpad on the desk or mid-dive" (flicks now stop by `scroll-snap-stop`, notched bursts still by the detent), "Space / PageDown …" (PageDown from inside the dive stops at the plateau; ArrowUp/Down step 40 px in JS), and R6's direction rule (U6 replaces the 0.3 bias; R6's "JS settle" stays, now next to CSS snapping, which only provides the stop).
+
+---
+
+### Phase 6A: Scroll snapping, settle direction, plateau minimum, remap direction, cue
+
+**Goal.** A momentum flick from the top stops at the open laptop in the browser's own physics; the dive, plateau, tail and résumé scroll as freely as before (S1–S4); a rest part-way glides on in the user's direction; programmatic scrolls never steer the settle; the plateau is at least 120 px; the cue shows only at the top.
+
+**Add**
+- `src/stage/snapRail.js`: `syncSnapRail(el, { stop, points })`. Child 0 is `<i class="stop">`, then one `<i>` per point, in order. Writes `style.top = px + 'px'` only when a node's value changed (keep the last value per node in a `WeakMap`), appends missing nodes, removes extra ones from the end. Never moves a node whose value is unchanged (the browser keeps a snapped page on its snap target). `el == null` is a no-op.
+- `src/stage/arrowStep.js`: `arrowStep({ key, mods, snapping, scroller })` → `0`, `+ARROW_STEP_PX` or `−ARROW_STEP_PX`. Returns 0 unless `snapping`, the key is `ArrowDown`/`ArrowUp`, and no modifier (`alt`, `ctrl`, `meta`, `shift`) is held. Also 0 when `scroller` (the `.wb`/`.t-out` of the last pointerdown, or null) can still scroll that way: down `scrollTop + clientHeight < scrollHeight − 1`, up `scrollTop > 0`.
+
+**Change**
+- `src/core/constants.js`: delete `SETTLE_BIAS`. Add `PLATEAU_MIN_PX = 120`, `SNAP_GRID_PX = 8`, `SNAP_OWN_TOL_PX = 5`, `OWN_MS = 300`, `SETTLE_TINY_PX = 16`, `DIR_MIN_PX = 8`, `ARROW_STEP_PX = 40`, `RUNWAY_SNAP = true` (each with a one-line comment that cites U-numbers).
+- `src/stage/runway.js`:
+  - `runwayLayout`: `insideEnd` per U8.
+  - `settleTarget(s, L, dir, travel = Infinity)` per U6. Exactly: `seg` and `u` from `poseAt`; for `dive` let `back = 0, fwd = L.diveEnd`, for `out` `back = L.insideEnd, fwd = L.outEnd`; other segments → `null`. `tiny = Math.abs(travel) < SETTLE_TINY_PX`. `dir > 0` → `tiny ? back : fwd`; `dir < 0` → `tiny ? fwd : back`; `dir === 0` → `u >= 0.5 ? fwd : back`. Return `null` when `|target − s| < 1`.
+  - `cueOpacity({ seg, z })` per U9.
+  - `snapPoints(L, grid = SNAP_GRID_PX)` → `{ stop: L.diveEnd, points }`: every `k·grid` with `0 ≤ k·grid ≤ L.R + L.stageH`, plus `L.insideEnd` and `L.outEnd`, minus `L.diveEnd`, sorted ascending, unique.
+  - Header comment: add the rail and the direction rule; remove the bias wording.
+- `src/stage/glide.js`: new options `hold = () => {}` and `now` (already present). `to()`: non-reduced → `hold(true)` before the first frame, and on the last frame write the exact target, then `hold(false)`. Reduced motion → `hold(true)`, one write, `hold(false)`. `cancel()` while active → `hold(false)`. Add `jump(top)`: `cancel()`, `hold(true)`, write, `hold(false)`. Every write records `lastWritten` and `lastWriteT = now()`. Add `owns(y)` per U7. `cancel()` called from outside (user input) also sets `lastWriteT = −Infinity`; the internal cancel at the start of `to()`/`jump()` is followed by a write, so it does not matter. Update the header comment.
+- `src/stage/scrollIdle.js`: `scroll(y, own = false)` and `onIdle({ dir, travel })`. State: `prevY`, `origin` (travel origin: `y` at creation, or the first scroll's `y` when created without one, then `prevY` each time `onIdle` fires), `dir` (persists across rests), `runSign`, `runLen`. User scroll: `d = y − prevY`; same sign as `runSign` → `runLen += |d|`, else `runSign = sign(d)`, `runLen = |d|`; when `runLen ≥ DIR_MIN_PX`, `dir = runSign`. Own scroll: `origin += y − prevY`; direction and run untouched. Both set `prevY = y`, `pending = true` and re-arm. `fire()` reports `{ dir, travel: prevY − origin }`, then `origin = prevY`, `runLen = 0`. Holds unchanged.
+- `src/stage/controller.js`:
+  - `settle({ dir, travel })` → `settleTarget(m.s, m.L, dir, travel)` (ready, `!glide.active`, as now).
+  - `update()`: when status is `ready` and the layout differs from the last synced one (compare `R`, `diveEnd`, `insideEnd`, `outEnd`, `stageH`), call `ui.setSnap(L)` before the remap check. The remap becomes `glide.jump(m.trackTopDoc + s)` (no separate `cancel` + `scrollTo`). Status `unavailable` → `ui.setSnap(null)` once. Loading → never call it. Cue: `ui.setCue(cueOpacity(pose))` when ready, `ui.setCue(cueOpacity({ seg: poseAt(s, L).seg, z: 0 }))` while loading.
+  - `onWheel`: the detent snap uses `glide.jump(m.trackTopDoc + r.snapTo)`.
+  - Add `releaseSnap()`: `ui.setSnap?.(null)` and forget the last synced layout.
+  - Header comment: U1–U9 in one paragraph.
+- `src/app/createApp.js`: `app.dom` gains `rail: null`. `createGlide` gets `hold: (on) => document.documentElement.classList.toggle('snap-hold', Boolean(on))`. The controller's `ui` gains `setSnap(L)`: if `!L || !snapSupported()` remove `runway-snap` (and `snap-hold`) from `document.documentElement` and return; else `syncSnapRail(app.dom.rail, snapPoints(L))`, then add `runway-snap`. `snapSupported = () => RUNWAY_SNAP && Boolean(globalThis.CSS?.supports?.('scroll-snap-stop', 'always'))` (overridable through `pick` for tests).
+- `src/stage/Stage.jsx`: inside `section.track`, after the stage div: `<div className="snap-rail" id="snap-rail" aria-hidden="true" ref={railRef} />`. Pass `railRef` to the bindings.
+- `src/stage/useStageBindings.js`:
+  - The layout effect also sets `dom.rail`.
+  - Scroll listener: `const y = window.scrollY; const own = Boolean(app.glide.owns?.(y)); app.glide.onScroll(y); idle.scroll(y, own)`.
+  - `onIdle: (info) => ctrl.settle(info)`.
+  - Track `lastScroller`: in the existing `pointerdown` listener, `lastScroller = e.target?.closest?.('.wb, .t-out') ?? null`.
+  - Keydown: after `graceHold('key')`, `const step = scrollsPage(e) ? arrowStep({ key: e.key, mods: { alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey, shift: e.shiftKey }, snapping: document.documentElement.classList.contains('runway-snap'), scroller: lastScroller }) : 0`; if `step`, `e.preventDefault()` and `window.scrollBy({ top: step, behavior: app.motion.reduce() ? 'instant' : 'smooth' })`. `onKey(e)` still runs (Konami uses arrows).
+  - Cleanup: `ctrl.releaseSnap?.()`.
+  - Update the header comment (snapping, the detent kept for notched wheels).
+- `src/styles/stage.css`, a new block after the runway rules:
+  ```
+  /* plan-r2 §7 U1–U3: the plateau stop and the 8 px rail that keeps mandatory snapping free. */
+  html.runway-snap{scroll-snap-type:y mandatory}
+  html.runway-snap.snap-hold{scroll-snap-type:none}
+  html.runway-snap #resume-root{scroll-snap-align:start}
+  .snap-rail{position:absolute;left:0;top:0;width:1px;height:100%;pointer-events:none}
+  .snap-rail>i{position:absolute;left:0;width:1px;height:1px;scroll-snap-align:start}
+  .snap-rail>i.stop{scroll-snap-stop:always}
+  ```
+
+**TEST LIST**
+1. `src/stage/runway.test.js`
+   - `runwayLayout({ trackH: 2088, stageH: 720 })` → `{ R: 1368, diveEnd: 720, insideEnd: 840, outEnd: 1238 }`; H 1000 / 2900 unchanged (`insideEnd 1120`); `({ trackH: 580, stageH: 200 })` → `diveEnd 200, outEnd 344, insideEnd 272` (cap binds); for `H` in `[390, 600, 720, 844, 900, 1000, 1366]` with `trackH = 2.9·H`: `insideEnd − diveEnd ≥ min(120, floor((outEnd − diveEnd)/2))` and `outEnd` equals `round(1.72·R/1.9)`.
+   - The existing invariant test also runs for `H 720, trackH 2088`.
+   - `remapScroll` with `L1 = H600/1740` (now `insideEnd 720`): `1000 → 600`, `500 → 300`, `1060 → 660`, `1420 → 876`, `2000 → 1240`, `0 → 0`. Update the "L1 is …" test to `insideEnd 720`.
+   - `settleTarget` (H 1000 layout), replacing the bias tests: `(300, +1, 300) → 1000`; `(100, +1, 100) → 1000`; `(900, −1, 100) → 0`; `(10, +1, 10) → 0`; `(990, −1, 10) → 1000`; `(500, 0, 0) → 1000`; `(499, 0, 0) → 0`; `(1200, +1, 80) → 1720`; `(1130, +1, 10) → 1120`; `(1700, −1, 20) → 1120`; `(1710, −1, 10) → 1720`; `(300, +1)` with travel omitted → 1000; nulls unchanged: `(0|1000|1120|1060|1720|1800|2500, L, ±1, 100) → null`, `(999.5, L, +1, 100) → null`.
+   - `cueOpacity`: `{seg:'top', z:0} → 0.8`; `{seg:'dive', z:0.075} → 0.4` (3 dp); `{seg:'dive', z:0.5} → 0`; `inside`, `out` (z 0.5), `tail`, `past` → 0.
+   - `snapPoints(L1000)`: `stop 1000`; `points` strictly ascending; contains 0, 8, 1120, 1720 and 2896; contains no 1000 and nothing above 2900; length 362 (the 363 multiples of 8 from 0 to 2896, minus 1000; 1120 and 1720 are already multiples of 8). With `L720` (`insideEnd 840`, `outEnd 1238`): contains 840 and 1238.
+2. `src/stage/glide.test.js`
+   - `to(1000)` from 0: `hold` called `[true]` before the first `scrollTo` and `[false]` after the last; the last `scrollTo` is exactly 1000.
+   - `cancel()` mid-glide → `hold(false)` once; `cancel()` when idle → no `hold` call.
+   - Reduced motion: call order `hold(true)`, `scrollTo({top:1000, behavior:'instant'})`, `hold(false)`.
+   - `jump(640)` during a glide: the glide stops (no further frame writes), then `hold(true)`, one instant `scrollTo` 640, `hold(false)`; `owns(644)` true, `owns(646)` false.
+   - `owns`: after a frame write of 300, `owns(303)` true; after `now` advances 301 ms, false; after an external `cancel()`, false at once.
+   - Existing tests keep passing (the onScroll 2 px cancel is unchanged).
+3. `src/stage/scrollIdle.test.js`
+   - `scroll(0)`, `scroll(50)`, idle → `onIdle({dir:1, travel:50})`.
+   - Snap jitter: `scroll(0)`, `scroll(300)`, `scroll(296)` → `{dir:1, travel:296}`.
+   - Real reversal: `scroll(0)`, `scroll(300)`, `scroll(280)` → `{dir:−1, travel:280}`.
+   - Own moves: from `y 0`, `scroll(500, true)` → `{dir:0, travel:0}`; then `scroll(520)` → `{dir:1, travel:20}`.
+   - F8: `scroll(0)`, `scroll(450)` → idle `{dir:1, travel:450}`; then `scroll(270, true)` → idle `{dir:1, travel:0}` (the remap neither flips the direction nor counts as travel).
+   - The direction persists across rests: after `{dir:1}`, a lone own scroll keeps `dir 1`.
+   - Existing hold, scrollEnd and dispose tests updated to the object argument.
+4. `src/stage/controller.test.js` (fake `glide` gains `jump: vi.fn()`, `owns: vi.fn(() => false)`; `ui` gains `setSnap: vi.fn()`)
+   - `settle({dir:1, travel:100})` at 100 → `glide.to(1000)`; `settle({dir:1, travel:10})` at 10 → `glide.to(0)`; `settle({dir:−1, travel:200})` at 1300 → `glide.to(1120)`; at 1060 / 2000 → not called; `glide.active` → not called. Replaces test 10.
+   - Test 13 (remap): `glide.jump(600)` instead of `scrollTo`; with the 5 % change, no `jump`.
+   - Test 15 (`onWheel`): the snap is `glide.jump(1000)`; no `scrollTo` from the controller.
+   - `setSnap`: first ready `at(0)` → called once with the layout; ten more frames at other positions → still once; a resize (stage 720, track 2088) → called again with the new layout and before `glide.jump` (check the call order with `mock.invocationCallOrder`); loading → never; unavailable → `setSnap(null)` once over three updates; `releaseSnap()` → `setSnap(null)`.
+   - Cue: `at(0)` 0.8; `at(1720)` 0; `at(2500)` 0. Test 11 (loading at 1000): cue 0 (was 0.8); loading at 0 → 0.8.
+5. `src/stage/snapRail.test.js` (jsdom): first `syncSnapRail(el, { stop: 100, points: [0, 8, 16] })` → 4 children, child 0 has class `stop` and `style.top` `100px`, the others `0px`, `8px`, `16px`; calling again with the same data writes nothing (spy on each child's `style` `top` setter via `Object.defineProperty` or compare a mutation count from a `MutationObserver` on `attributes`); `{ stop: 120, points: [0, 8, 16, 24] }` → only the stop's top changes and one node is appended; `{ stop: 120, points: [0, 8] }` → two children removed from the end; `syncSnapRail(null, …)` does not throw.
+6. `src/stage/arrowStep.test.js`: `ArrowDown`, snapping, no scroller → 40; `ArrowUp` → −40; snapping false → 0; any modifier → 0; `PageDown` → 0; scroller `{scrollTop:0, clientHeight:100, scrollHeight:300}` with `ArrowDown` → 0 and with `ArrowUp` → −40; scroller at its bottom (`scrollTop 200`) with `ArrowDown` → 40.
+7. `src/stage/Stage.test.jsx`
+   - `#snap-rail` exists inside `#track`, outside `#stage`, with `aria-hidden="true"`, and `app.dom.rail` is it.
+   - Test 17 rewritten: two scroll events (0, then 40), 200 ms → `ctrl.settle` called with `{ dir: 1, travel: 40 }`. With `app.glide.owns` returning true for the second event → `settle` called with `{ dir: 0, travel: 0 }`.
+   - Arrow keys: with `document.documentElement.classList.add('runway-snap')`, a cancelable `keydown` ArrowDown on `document.body` → `defaultPrevented`, `window.scrollBy` called with `{ top: 40, behavior: 'smooth' }`; with `app.motion.reduce` true → `behavior: 'instant'`; without the class → not prevented, no `scrollBy`; in an `<input>` → not prevented; after a `pointerdown` inside a `.wb` stub that can scroll down → not prevented. (`window.scrollBy` is a `vi.fn` from `src/test/setup.js`; add it there if missing.)
+   - Unmount calls `ctrl.releaseSnap` (spy) and removes every listener (existing test 9).
+8. `src/styles/stage.css.test.js`: `html.runway-snap` has `scroll-snap-type: y mandatory`; `html.runway-snap.snap-hold` has `scroll-snap-type: none`; `.snap-rail>i` has `scroll-snap-align: start`; `.snap-rail>i.stop` has `scroll-snap-stop: always`; `#resume-root` gets `scroll-snap-align` only under `html.runway-snap`; across all files in `src/styles/`, every rule that declares `scroll-snap-type` has a selector starting with `html.runway-snap`, and the only `scroll-snap-align` rules are the two above; no file declares `scroll-behavior`.
+9. `src/app/createApp.test.js`: with `snapSupported` stubbed true and a rail element in `app.dom.rail`, `app.ctrl`'s `ui.setSnap(L)` (reach it through a ready `update()` with stub rects, or export the ui factory) adds `runway-snap` to `documentElement` and creates `snapPoints(L).points.length + 1` children; `setSnap(null)` removes the class; with `snapSupported` false nothing is added. `app.glide`'s `hold(true)` adds `snap-hold`, `hold(false)` removes it. Clean `documentElement` classes in `afterEach`.
+10. `src/stage/structure.test.js`: no file under `src/` references `SETTLE_BIAS`; `createDetent` is still exported (U5).
+
+**Implementation notes and pitfalls**
+- Never put `scroll-snap-type` on `html` outside the `runway-snap` class: the prerendered page and the no-JS page have no rail, and mandatory snapping without it yanks every position to the résumé area (config L).
+- jsdom has no `CSS.supports`; tests stub `snapSupported` (or `globalThis.CSS`). Remove the classes in `afterEach`, since `documentElement` is shared between tests.
+- Order inside `update()` on a resize: `ui.setSnap(newL)` (moves the rail) before `glide.jump` (which turns snapping off and on around its write). The other order re-snaps to the old rail.
+- `hold(false)` after the final glide write lets the browser re-snap; the targets are snap positions, so it moves 0 px; any ≤ 4 px correction is `own` (within `OWN_MS`).
+- The rail is `<i>` elements without content inside an `aria-hidden` container; do not hide them with `display:none` or `visibility` (a box with no layout is not a snap area).
+- Do not give any résumé section `scroll-snap-align` (S4); the covering area is `#resume-root` only.
+- Chrome's `scrollend` fires after its own snap animation, so the idle fires once per user scroll, as before.
+- An upward flick from the résumé also stops at the open laptop (the stop works in both directions). That is consistent with decision A; Home, Esc and ⏏ still go straight to the top.
+- Mobile toolbar resizes move `diveEnd` a little; a page snapped to the stop follows it (inside the plateau, harmless). Rail points are multiples of 8, so the rest of the rail does not move.
+- Reduced motion: snapping stays (the user started the motion; it stops it). Glides stay instant, as now.
+
+**ACCEPTANCE**
+- TEST LIST green; `npm test`, `npm run lint`, `npm run build` green.
+- `git grep -n SETTLE_BIAS src` prints nothing. The only non-passive wheel or touch listener is still the dive-only `#stage` wheel detent (keydown was never passive).
+- **Browser re-check (headless Chrome over CDP on `npm run build && npm run preview`, the 7.1 method, at 1440×900, 1280×720, 390×844 with touch, 844×390):**
+  - Touch flick with momentum from the top (`synthesizeScrollGesture` touch, `preventFling:false`, 0.4 H at 6000 px/s): rests at `diveEnd` exactly; the OS is flat and live.
+  - 12 notches 30 ms apart from the top: rests at `diveEnd` (detent).
+  - 100 px notches 0.7 s apart from the top: every notch moves forward, the page ends inside after the settle, never back at 0 (F3).
+  - ArrowDown once from the top: moves 40 px, then glides open. ArrowUp/ArrowDown inside an Experience window after clicking it: the window scrolls, not the page.
+  - 390×844: one 200 px swipe from the top glides open; a 10 px nudge returns to the top.
+  - Inside at 1280×720: one notch down stays inside (plateau 120 px, F9); the second steps out and, at rest, glides to the closed wide shot.
+  - Résumé: notches, gestures, arrows deviate ≤ 2 px from native (S4); Cmd/Ctrl+F of a résumé word, the skip link, `#resume`, HUD "Résumé ↓" from the top all land exactly; "Open the laptop ↑" glides in and lands on `diveEnd`.
+  - Mid-dive at 40 % after a downward scroll, resize to half height: the fraction is kept and it settles open, not closed (F8).
+  - The scroll cue is visible at the top and gone everywhere from the plateau to the résumé, including the tail.
+  - S1–S3 hold at every viewport (log the worst deviation).
+- **Manual (owner, real hardware; record the result in the PR):** MacBook trackpad in Chrome, Safari and Firefox: a flick from the top stops at the open laptop; a slow two-finger scroll through the dive shows no visible snapping; résumé scrolling feels native; a notched mouse wheel spun fast stops at the open laptop. Any failure → the 7.1 fallback.
+
+---
+
+### Phase 6B: OS and layout fixes
+
+**Goal.** Thumbnails are thumbnail-sized; window scroll positions survive stepping out and back in; the no-WebGL page has no overlaps; Esc closes the ◆ menu first; the pill never covers window content on compact layouts.
+
+**Add**
+- `src/os/keepScroll.js`: `KEEP_SCROLL = '.wb, .t-out'`; `keepScroll(root, fn, selector = KEEP_SCROLL)` per U10: snapshot `[el, scrollTop, scrollLeft]` for each match with a non-zero offset, `const r = fn()`, then write back only the values that changed; return `r`. `root == null` → just `fn()`.
+
+**Change**
+- `src/os/osHost.js`: the whole body of `setFlat(v, compact)` (class toggles, the `appendChild` either way, `fitFlat()`) runs inside `keepScroll(osEl, () => …)`. Update the `setLive` comment: offsets survive both the live flag and the re-parent.
+- `src/stage/keys.js`: Escape per U12: `recOpen` → close it; else if `app.os.store.get().menuOpen` → `app.os.setMenu(false)` and, when `document.activeElement?.closest?.('#menu-pop')`, `document.getElementById('mb-logo')?.focus()`; else the existing exit rule.
+- `src/stage/NoWebGLNotice.jsx`: `<p className="fallback-note" role="note">3D is unavailable in this browser, so JAY-OS runs flat. Everything still works.</p>` (same text, no inline style, no toast classes).
+- `src/stage/Stage.jsx`: drop `FLAT_FALLBACK` (the z-index moves to CSS).
+- `src/styles/stage.css` (after the `.track.flat-runway` rules):
+  ```
+  /* plan-r2 §7 U11: the fallback stacks a top bar (notice + HUD) over the OS, so nothing overlaps. */
+  .track.flat-runway .stage{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"note hud" "os os"}
+  .track.flat-runway .hud{position:static;grid-area:hud;align-self:center;max-width:none;padding:8px max(14px,env(safe-area-inset-right,0px)) 8px 8px}
+  .track.flat-runway .flat-host{position:relative;inset:auto;grid-area:os;z-index:5}
+  .fallback-note{grid-area:note;align-self:center;margin:0;padding:8px 8px 8px max(14px,env(safe-area-inset-left,0px));font:12px/1.4 var(--f-mono);color:var(--scene-ink)}
+  @media (max-width:600px){.track.flat-runway .stage{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"hud" "note" "os"}.track.flat-runway .hud{justify-content:flex-start;padding-left:max(14px,env(safe-area-inset-left,0px))}}
+  ```
+- `src/styles/os.css` (after the `.os.compact` rules):
+  ```
+  /* plan-r2 §7 U13: inside on a compact layout, windows and icons end above the "Go to résumé ↓" pill. */
+  .os.compact.live:not(.fallback) .win{height:calc(100% - 104px)!important}
+  .os.compact.live:not(.fallback) .icons{bottom:66px}
+  ```
+- `src/styles/apps.css`: `.pcard img{display:block;width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;object-position:top;border-bottom:2px solid #122030}`; add `.pcard.bin-item{display:flex;align-items:center;gap:12px;width:100%}` and `.pcard.bin-item img{flex:none;width:110px;height:auto;border-bottom:0;border-right:2px solid #122030}`.
+- `src/os/apps/Bin.jsx`: `className="pcard bin-item"`; no `style` on the button or the image (keep `width`/`height` attributes and `alt=""`).
+
+**TEST LIST**
+1. `src/os/keepScroll.test.js`: two elements matching `.wb` with stubbed `scrollTop`/`scrollLeft` (instance `Object.defineProperty` with a stored value and a setter spy), offsets `120/0` and `0/0`; `fn` sets the first to `0`; after `keepScroll`, the first is `120` again, the second's setter was never called, and the return value of `fn` is passed through; `keepScroll(null, fn)` calls `fn` once.
+2. `src/os/osHost.test.js`: a `.wb` inside `osEl` with stubbed `scrollTop 200`; spy `flatHost.appendChild` and `holder.appendChild` to reset the stub to 0 after the real call (simulating the browser); after `setFlat(true, false)` the `.wb` reads 200; after `setFlat(false)` it still reads 200. Existing setFlat/fitFlat tests still pass.
+3. `src/stage/keys.test.js`: Escape with `os.store` `menuOpen: true` → `os.setMenu(false)` once and `ctrl.exit` not called; with focus on a button inside a `#menu-pop` element → `#mb-logo` is `document.activeElement` afterwards; `recOpen` and `menuOpen` both true → only the recruiter view closes; `menuOpen` false, phase inside → `ctrl.exit` once (unchanged).
+4. `src/styles/stage.css.test.js`: `.track.flat-runway .stage` declares `display:grid` and `grid-template-areas` containing `"note hud"` and `"os os"`; `.track.flat-runway .hud` has `position:static`; `.track.flat-runway .flat-host` has `position:relative` and `grid-area:os`; `.fallback-note` declares no `position`; the ≤ 600 px media block stacks `"hud" "note" "os"`.
+5. `src/styles/os.css.test.js`: `.os.compact.live:not(.fallback) .win` has `height:calc(100% - 104px)!important`; `.os.compact.live:not(.fallback) .icons` has `bottom:66px`; the `.os.compact .win` rule is unchanged (`calc(100% - 44px)`), so the strip applies only while live.
+6. `src/styles/apps.css.test.js`: `.pcard img` has `height:auto`, `aspect-ratio:16/10` and `object-fit:cover`; `.pcard.bin-item img` has `width:110px` and `height:auto`. Guard: in `apps.css` and `resume.css`, every rule that declares `aspect-ratio` on a selector ending in `img` also declares `height:auto`.
+7. `src/os/apps/apps.test.jsx` Bin: the button has classes `pcard bin-item`; neither it nor the image has a `style` attribute; the image keeps numeric `width`/`height`. Projects: unchanged assertions still pass.
+8. `src/stage/Stage.test.jsx` fallback: the notice is a `p.fallback-note` with `role="note"` and the same text, without a `style` attribute; `#flat-host` has no inline `z-index`.
+
+**Implementation notes and pitfalls**
+- `keepScroll` restores right after the move, in the same task, so no frame shows the reset. Restoring forces a layout; it runs only on the `interactive` flip.
+- Absolutely positioned stage children (scene layer, cue, toasts, tooltip, recruiter view, exit pill) are not grid items, so the fallback grid does not move them. The scene layer is positioned and earlier in the DOM; the flat host is positioned with `z-index:5`, so it paints above it.
+- The fallback flat host is smaller than the stage now; `host.size()` reads `osEl`, so `fitWindows`, `openRect` and the compact window CSS all use the real size. Check the terminal and Mail fit at 390×844.
+- `.os.compact.live:not(.fallback)` must beat `.os.compact .win` (it is more specific and both use `!important`).
+- Do not touch `.r-project img` (it already has `height:auto`).
+
+**ACCEPTANCE**
+- TEST LIST green; `npm test`, `npm run lint`, `npm run build` green.
+- **Browser re-check:**
+  - 1440×900 inside: the Projects window shows 2-column cards about 125 px tall; the Recycle Bin item image is 110×69 (`getBoundingClientRect`).
+  - Open Experience.log and the terminal, scroll both, step out one notch (the OS leaves live), step back in: both offsets are unchanged (`scrollTop` before and after within 1 px). Same after a full exit and re-entry by scroll.
+  - No WebGL (launch Chrome with `--disable-webgl --disable-3d-apis`) at 1440×900 and 390×844: the notice and HUD sit in a bar above the OS; the menubar clock, a maximized window's title bar and close button are fully visible and clickable (`elementFromPoint` at their centres returns them); no element overlaps another (compare rects).
+  - Inside, open the ◆ menu, press Esc: the menu closes, the laptop stays open, focus is on ◆ JAY-OS; Esc again closes the laptop.
+  - 390×844 and 844×390 inside: in Experience.log (last entry scrolled into view), Terminal (input row) and Mail (textarea and send button), `elementFromPoint` at each control's centre returns the control, not the pill.
+
+---
+
+### Phase 6C: Scene nits (glow, hit proxies)
+
+**Goal.** The hovered mug stays red; the dog tags and floppies are easy to hover and click.
+
+**Change**
+- `src/scene/props.js`: `MUG.glow = 0.1`; add `HIT = { tags: { size: [0.42, 1.0, 0.1], pos: [0.02, -0.44, 0] }, floppy: { size: [0.58, 0.07, 0.6], pos: [0, 0.015, 0] } }` (tags-group-local and floppy-group-local).
+- `src/scene/createScene.js`:
+  - `export const GLOW_K = 0.2` (exported for tests). `addHot(obj, label, glow)` stores `glow` in `userData.hot`; `glow(o, on)` uses `o.userData.hot?.glow ?? GLOW_K`. `addHot(mug, 'McGill mug', MUG.glow)`.
+  - One shared `const hitM = new THREE.MeshBasicMaterial({ visible: false })`; `hitBox(parent, { size, pos })` adds `new THREE.Mesh(B(...size), hitM)` at `pos` with `castShadow = receiveShadow = false` (do not use `mk`, which turns shadows on). Add one to `tags` (`HIT.tags`) and one to each floppy group `g` (`HIT.floppy`), not to the floppy `mesh` (the wiggle turns the mesh). `hotspotOf` already walks up to the group, so a proxy hit resolves to the right hotspot.
+  - Dispose already traverses meshes; disposing the shared material more than once is harmless.
+
+**TEST LIST**
+1. `src/scene/props.test.js`
+   - Tags proxy (group-local box `pos ± size/2`) contains both plates (`x −0.085…0.125`, `y −0.82…−0.51`), the chain (`y −0.545…0.005`) and the ring top (`y 0.06`), with at least 0.05 margin in x around the plates; its back face is in front of the wall: `tags z (−2.92) − size[2]/2 > −3`.
+   - Floppy proxy: `size[0] ≥ 0.5 + 0.06`, `size[2] ≥ 0.52 + 0.06`, `0.06 ≤ size[1] ≤ 0.08` (thicker than the floppy, thin enough not to swallow the whole stack).
+   - `MUG.glow < 0.2`; `Math.max(...glowColor(MUG.color, MUG.glow)) ≤ 0.1`.
+2. `src/scene/createScene.test.jsx`
+   - `GLOW_K` is 0.2.
+   - The object whose `userData.hot.label` is `'Dog tags'` has exactly one child mesh with `material.visible === false` and `BoxGeometry` parameters equal to `HIT.tags.size`; each `'Floppy · …'` hotspot group has one such child with `HIT.floppy.size`; none of these meshes casts a shadow.
+   - The mug's `userData.hot.glow` is `MUG.glow`.
+
+**Implementation notes and pitfalls**
+- three r128 (installed): `Raycaster.intersectObject` checks only `layers`, and `Mesh.raycast` only that a material exists, so a `visible:false` material is still hit; the renderer skips it in the colour and shadow passes. Hide the proxy through the material, not `mesh.visible`, so a later three upgrade that skips invisible objects in raycasts does not silently drop the proxies (a test pins this).
+- Proxies of stacked floppies overlap a little; the nearest hit wins, which is the floppy on top from the default camera. Accepted.
+- A seated floppy's proxy sticks out about 0.09 past the base front; hovering the slot area shows that floppy's tooltip and clicking it reopens (the existing reopen rule). Accepted.
+
+**ACCEPTANCE**
+- TEST LIST green; `npm test`, `npm run lint`, `npm run build` green.
+- **Browser re-check** (1440×900 and 390×844 wide shot): hovering within about 10 px outside a dog tag or a floppy's visible edge shows its tooltip and a click acts; the hovered mug's label stays red (screenshot the label area hovered and not hovered: the mean green and blue channels rise by at most 10/255).
+
+### 7.3 Files touched (quick index)
+
+| Phase | Add | Change |
+|---|---|---|
+| 6A | `stage/snapRail.js`, `stage/arrowStep.js` (+ tests) | constants, runway, glide, scrollIdle, controller, createApp, Stage, useStageBindings, stage.css, tests (runway, glide, scrollIdle, controller, Stage, stage.css, createApp, structure) |
+| 6B | `os/keepScroll.js` (+ test) | osHost, keys, NoWebGLNotice, Stage, stage.css, os.css, apps.css, Bin, tests (osHost, keys, stage/os/apps css, apps, Stage) |
+| 6C | — | props, createScene, tests (props, createScene) |
