@@ -10,6 +10,7 @@ import Stage from './Stage.jsx'
 import OsPortal from '../os/OsPortal.jsx'
 import { PROJECTS } from '../content/index.js'
 import { IDLE_MS, SETTLE_GRACE_MS, NARROW_PX, SHORT_PX } from '../core/constants.js'
+import { KONAMI, KONAMI_IDLE_MS } from './keys.js'
 import { runwayLayout } from './runway.js'
 
 const pending = () => new Promise(() => {})
@@ -145,12 +146,25 @@ describe('stage/Stage', () => {
       expect(within(container).getByText(NOTICE)).toBeInTheDocument()
     })
 
-    it('the OS host element is inside .flat-host.on with classes flat, compact and fallback', async () => {
+    // The fallback is compact only on narrow screens; wide ones get the normal scaled desktop.
+    it('the OS host element is inside .flat-host.on with classes flat and fallback, not compact on a wide stage', async () => {
       const { app, container } = renderWithApp(<Stage />, { loadScene: vi.fn(async () => null) })
       await waitFor(() => expect(app.scene.store.get().status).toBe('unavailable'))
       const flatHost = container.querySelector('.flat-host')
       expect(flatHost).toHaveClass('on')
       expect(flatHost.contains(app.host.osEl)).toBe(true)
+      expect(app.host.osEl).toHaveClass('flat')
+      expect(app.host.osEl).not.toHaveClass('compact')
+      expect(app.host.osEl).toHaveClass('fallback')
+    })
+
+    it('on a narrow (390×844) stage the fallback OS is compact', async () => {
+      const { app, container } = renderWithApp(<Stage />, { loadScene: vi.fn(async () => null) })
+      await waitFor(() => expect(app.scene.store.get().status).toBe('unavailable'))
+      const stage = container.querySelector('#stage')
+      Object.defineProperty(stage, 'clientWidth', { configurable: true, value: 390 })
+      Object.defineProperty(stage, 'clientHeight', { configurable: true, value: 844 })
+      triggerResize(stage, { width: 390, height: 844 })
       expect(app.host.osEl).toHaveClass('flat')
       expect(app.host.osEl).toHaveClass('compact')
       expect(app.host.osEl).toHaveClass('fallback')
@@ -418,6 +432,103 @@ describe('stage/Stage', () => {
     expect(settle).toHaveBeenCalledTimes(1)
     expect(settle).toHaveBeenCalledWith({ dir: 0, travel: 0 })
     delete window.scrollY
+  })
+
+  // The Konami code holds the settle while it is typed (stage/keys), and the page moves its arrows
+  // make meanwhile are not the user scrolling either: once the code completes, the settle sees no
+  // direction and no travel, so typing it at the desk never glides the page into the laptop.
+  it('17d. scrolls while the Konami code is held are not user direction: on completion the settle sees dir 0 and travel 0', () => {
+    vi.useFakeTimers()
+    Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: 0 })
+    try {
+      const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      const settle = vi.spyOn(app.ctrl, 'settle')
+      const key = (k) => fireEvent.keyDown(window, { key: k })
+
+      key('ArrowUp')
+      key('ArrowUp')
+      key('ArrowDown')
+      window.scrollY = 40
+      window.dispatchEvent(new Event('scroll'))
+      key('ArrowDown')
+      window.scrollY = 80
+      window.dispatchEvent(new Event('scroll'))
+      for (const k of ['ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b']) key(k)
+      vi.advanceTimersByTime(SETTLE_GRACE_MS + IDLE_MS + 1)
+      expect(settle).not.toHaveBeenCalled()
+
+      key('a')
+      expect(app.ach.store.get().got).toContain('konami')
+      vi.advanceTimersByTime(IDLE_MS + 1)
+      expect(settle).toHaveBeenCalledTimes(1)
+      expect(settle).toHaveBeenCalledWith({ dir: 0, travel: 0 })
+    } finally {
+      delete window.scrollY
+    }
+  })
+
+  // A real user input (wheel, touch, pointer) is the user taking the page back from the Konami
+  // hold: the held code's own flag ends there, so the next scroll is user direction and travel.
+  describe('a real user input after the Konami hold ends its own flag', () => {
+    const inputs = [
+      { name: 'wheel', down: () => new WheelEvent('wheel', { deltaY: 100 }), up: null },
+      { name: 'touchstart', down: () => new Event('touchstart'), up: () => new Event('touchend') },
+      { name: 'pointerdown', down: () => new Event('pointerdown'), up: () => new Event('pointerup') },
+    ]
+
+    it.each(inputs)('after ↑↑, a $name then a scroll to y 300 settles with dir +1 and travel 300', ({ down, up }) => {
+      vi.useFakeTimers()
+      Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: 0 })
+      try {
+        const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+        const settle = vi.spyOn(app.ctrl, 'settle')
+        fireEvent.keyDown(window, { key: 'ArrowUp' })
+        fireEvent.keyDown(window, { key: 'ArrowUp' })
+
+        window.dispatchEvent(down())
+        window.scrollY = 300
+        window.dispatchEvent(new Event('scroll'))
+        if (up) window.dispatchEvent(up())
+        // Long enough for the Konami hold's own give-up (KONAMI_IDLE_MS) as well as the settle.
+        vi.advanceTimersByTime(KONAMI_IDLE_MS + SETTLE_GRACE_MS + IDLE_MS + 1)
+
+        expect(settle).toHaveBeenCalledTimes(1)
+        expect(settle).toHaveBeenCalledWith({ dir: 1, travel: 300 })
+      } finally {
+        delete window.scrollY
+      }
+    })
+  })
+
+  // Scrolls within 150 ms after the Konami code completes are its last native arrow frames: own, so
+  // no direction and no travel. A scroll later than that is the user's, and it counts.
+  it('17e. scrolls within 150 ms after the Konami code completes are own; a scroll after that is user scroll', () => {
+    vi.useFakeTimers()
+    Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: 0 })
+    try {
+      const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      const settle = vi.spyOn(app.ctrl, 'settle')
+      for (const k of KONAMI) fireEvent.keyDown(window, { key: k })
+      expect(app.ach.store.get().got).toContain('konami')
+
+      // Right after completion: two own frames, 100 ms apart (both inside the 150 ms window).
+      window.scrollY = 40
+      window.dispatchEvent(new Event('scroll'))
+      vi.advanceTimersByTime(100)
+      window.scrollY = 80
+      window.dispatchEvent(new Event('scroll'))
+      vi.advanceTimersByTime(100)
+      // 200 ms after completion: the user scrolls on by 40.
+      window.scrollY = 120
+      window.dispatchEvent(new Event('scroll'))
+      vi.advanceTimersByTime(IDLE_MS + SETTLE_GRACE_MS + 1)
+
+      expect(settle).toHaveBeenCalledTimes(1)
+      // The own frames moved the travel origin with them: only the user's 80 -> 120 is travel.
+      expect(settle).toHaveBeenCalledWith({ dir: 1, travel: 40 })
+    } finally {
+      delete window.scrollY
+    }
   })
 
   // The Recruiter view is a dialog over the page: while it is open, a rest mid-dive never settles

@@ -127,7 +127,7 @@ export function createController({
       ctrl.layout = m.L
 
       if (status === 'unavailable') {
-        // R10: no scene, no runway. The flat compact OS is live from the first frame, and the
+        // R10: no scene, no runway. The flat OS is live from the first frame, and the
         // collapsed page never snaps (U1).
         clearSnap()
         if (!fallbackBooted) {
@@ -162,8 +162,8 @@ export function createController({
     },
 
     /** Inside is always flat (R4): compact on narrow screens, scaled to fill otherwise. The
-     *  fallback (no scene) is flat, compact and live (L1280), and its runway collapses at once,
-     *  without waiting for a frame. */
+     *  fallback (no scene) is flat and live (L1280), compact only on narrow screens like inside,
+     *  and its runway collapses at once, without waiting for a frame. */
     applyFlat() {
       const { interactive, narrow } = store.get()
       const unavailable = sceneStatus() === 'unavailable'
@@ -172,7 +172,7 @@ export function createController({
         runwayFlat = true
         ui.setRunway?.(true)
       }
-      os.setFlat(interactive || unavailable, unavailable ? true : narrow)
+      os.setFlat(interactive || unavailable, narrow)
       if (unavailable) os.setLive(true)
       else if (fallbackLive) os.setLive(interactive)
       fallbackLive = unavailable

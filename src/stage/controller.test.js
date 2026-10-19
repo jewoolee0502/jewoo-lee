@@ -234,7 +234,15 @@ describe('stage/controller', () => {
     expect(phase()).toBe('inside')
   })
 
-  it('12. unavailable: setRunway(true) once over three updates, flat compact live, boot once while standby, cue 0', () => {
+  it('12n. unavailable on a narrow screen: the flat OS is compact, because narrow is passed through', () => {
+    const { env, os, ctrl, at } = setup()
+    ctrl.setNarrow(true)
+    env.status = 'unavailable'
+    at(0)
+    expect(os.setFlat).toHaveBeenLastCalledWith(true, true)
+  })
+
+  it('12. unavailable: setRunway(true) once over three updates, flat (not compact on a wide screen) live, boot once while standby, cue 0', () => {
     const { env, os, ui, at } = setup()
     env.status = 'unavailable'
     at(0)
@@ -242,7 +250,9 @@ describe('stage/controller', () => {
     at(200)
     expect(ui.setRunway).toHaveBeenCalledTimes(1)
     expect(ui.setRunway).toHaveBeenCalledWith(true)
-    expect(os.setFlat).toHaveBeenLastCalledWith(true, true)
+    // No-WebGL fallback on a wide screen uses the normal flat layout: compact = narrow (false here).
+    expect(os.setFlat).toHaveBeenLastCalledWith(true, false)
+    expect(os.setFlat).not.toHaveBeenCalledWith(true, true)
     expect(os.setLive).toHaveBeenLastCalledWith(true)
     expect(os.boot).toHaveBeenCalledTimes(1)
     os.state = 'on'

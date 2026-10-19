@@ -1,9 +1,10 @@
 // Round 2 Phase 2 TEST LIST: stage/keys.test.js. Konami (L1039), key handler (L1040–1042), Escape.
 // Escape exits whenever the laptop is open (phase inside or dive), not on the interactive flag.
 // Round 2 §7 6B TEST LIST item 3 (U12): Escape closes the ◆ menu first and returns focus to ◆ JAY-OS.
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { pushKonami, createKeyHandler } from './keys.js'
 import { createStore } from '../core/store.js'
+import { createTimers } from '../core/timers.js'
 
 const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']
 
@@ -159,5 +160,94 @@ describe('stage/keys', () => {
     h({ key: 'Shift' })
     expect(app.scene.api.pressKey).toHaveBeenLastCalledWith('Shift')
     expect(app.snd.click).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Konami holds the idle settle (stage/scrollIdle) while the code is being typed, so arrow keys
+// do not open the laptop by settling the page halfway. API under test:
+//   createKeyHandler({ app, hold, timers })
+// `hold(true)` is called when two or more keys from the start of the code are in progress,
+// `hold(false)` when the code completes, a key does not continue it, or 1.5 s pass with no key.
+// `hold` is the scroll idle's `hold('konami', on)`; `timers` is createTimers()-shaped.
+// The existing calls without `hold` keep working (the callback is optional).
+describe('stage/keys: the Konami code holds the idle settle while it is typed', () => {
+  const KONAMI_IDLE_MS = 1500
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function setupHold(opts) {
+    const app = makeApp(opts)
+    const hold = vi.fn()
+    const handler = createKeyHandler({ app, hold, timers: createTimers() })
+    const press = (...keys) => keys.forEach((key) => handler({ key }))
+    /** The last hold call decides: true while the code is held. */
+    const held = () => hold.mock.calls.at(-1)?.[0] === true
+    return { app, hold, press, held }
+  }
+
+  it('a single key does not hold the settle (one arrow is not the start of the code)', () => {
+    const { press, hold } = setupHold()
+    press('ArrowUp')
+    expect(hold).not.toHaveBeenCalledWith(true)
+  })
+
+  it('two keys from the start of the code hold the settle', () => {
+    const { press, held } = setupHold()
+    press('ArrowUp', 'ArrowUp')
+    expect(held()).toBe(true)
+  })
+
+  it('stays held through the middle of the code, then releases on completion, when disco and the achievement still fire', () => {
+    const { app, press, held, hold } = setupHold({ osState: 'on' })
+    press(...KONAMI.slice(0, 5))
+    expect(held()).toBe(true)
+    press(...KONAMI.slice(5, 9))
+    expect(held()).toBe(true)
+    expect(app.ach.unlock).not.toHaveBeenCalled()
+
+    press('a')
+    expect(held()).toBe(false)
+    expect(hold).toHaveBeenLastCalledWith(false)
+    expect(app.ach.unlock).toHaveBeenCalledWith('konami')
+    expect(app.os.disco).toHaveBeenCalledTimes(1)
+  })
+
+  it('a key that does not continue the code releases the hold at once', () => {
+    const { press, held } = setupHold()
+    press('ArrowUp', 'ArrowUp', 'ArrowDown')
+    expect(held()).toBe(true)
+    press('x')
+    expect(held()).toBe(false)
+  })
+
+  it('a wrong key on the third press (up, up, up) breaks the run and releases the hold', () => {
+    const { press, held } = setupHold()
+    press('ArrowUp', 'ArrowUp', 'ArrowUp')
+    expect(held()).toBe(false)
+  })
+
+  it('1.5 s with no key releases the hold, and 1.49 s does not', () => {
+    const { press, held } = setupHold()
+    press('ArrowUp', 'ArrowUp')
+    vi.advanceTimersByTime(KONAMI_IDLE_MS - 1)
+    expect(held()).toBe(true)
+    vi.advanceTimersByTime(1)
+    expect(held()).toBe(false)
+  })
+
+  it('every key restarts the 1.5 s wait', () => {
+    const { press, held } = setupHold()
+    press('ArrowUp', 'ArrowUp')
+    vi.advanceTimersByTime(1000)
+    press('ArrowDown')
+    vi.advanceTimersByTime(1000)
+    expect(held()).toBe(true)
+    vi.advanceTimersByTime(500)
+    expect(held()).toBe(false)
   })
 })

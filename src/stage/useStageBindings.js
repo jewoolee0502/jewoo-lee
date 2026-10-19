@@ -17,6 +17,8 @@ import { arrowStep, scrollerFor } from './arrowStep.js'
 import { bindHostClasses } from '../os/hostClasses.js'
 import { pinScroll } from './pinScroll.js'
 
+/** How long after the Konami code completes the page's scrolls are still its own arrows'. */
+const KONAMI_TAIL_MS = 150
 const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta'])
 const SCROLL_KEYS = new Set([' ', 'Spacebar', 'PageUp', 'PageDown', 'ArrowUp', 'ArrowDown', 'Home', 'End'])
 
@@ -90,6 +92,9 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
       app.os.refit?.()
     })
     ro.observe(stage)
+    // The fallback's flat host sits in a grid under the notice and HUD bar, so its size can change
+    // while the stage's does not (the bar wrapping, the notice mounting): re-fit on its size too.
+    if (flatHostRef.current) ro.observe(flatHostRef.current)
 
     const timers = app.timers.child()
     // No settle under the Recruiter view: keys there may nudge the page (nothing in the card to
@@ -120,6 +125,7 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
     // Passive and on the window, so a wheel anywhere (the résumé too) cancels a glide and holds
     // the settle whether or not the detent listener is attached.
     listen(window, 'wheel', () => {
+      endKonamiOwn()
       app.glide.cancel()
       graceHold('wheel')
     })
@@ -140,11 +146,22 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
     }
     syncDetent()
     const offDetent = ctrl.store.subscribe(syncDetent)
+    // While the Konami code is typed, its arrows move the page too; those moves are not the user
+    // scrolling, so once the code completes the settle has no direction or travel to follow. Its
+    // last native arrow frames can land just after it completes (KONAMI_TAIL_MS). A real wheel,
+    // touch or pointer press is the user taking the page back, and ends this at once.
+    let konami = false
+    let konamiTail = null
+    const endKonamiOwn = () => {
+      konami = false
+      konamiTail?.()
+      konamiTail = null
+    }
     listen(window, 'scroll', () => {
       const y = window.scrollY
       const own = Boolean(app.glide.owns?.(y))
       app.glide.onScroll(y)
-      idle.scroll(y, own)
+      idle.scroll(y, own || konami)
     })
     if ('onscrollend' in window) listen(window, 'scrollend', () => idle.scrollEnd())
     let lastScroller = null
@@ -153,6 +170,7 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
       ['pointer', 'pointerdown', ['pointerup', 'pointercancel']],
     ]) {
       listen(window, down, (e) => {
+        endKonamiOwn()
         app.glide.cancel()
         idle.hold(kind, true)
         // U4: Chrome sends arrow keys to the window body the pointer last pressed.
@@ -160,7 +178,13 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
       })
       for (const up of ups) listen(window, up, () => idle.hold(kind, false))
     }
-    const onKey = createKeyHandler({ app })
+    // Typing the Konami code holds the settle, so its arrows never open the laptop halfway.
+    const hold = (on) => {
+      if (on) konami = true
+      else endKonamiOwn()
+      idle.hold('konami', on)
+    }
+    const onKey = createKeyHandler({ app, hold, timers })
     listen(
       window,
       'keydown',
@@ -182,7 +206,10 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
           e.preventDefault()
           window.scrollBy({ top: step, behavior: app.motion.reduce() ? 'instant' : 'smooth' })
         }
-        onKey(e)
+        if (onKey(e)) {
+          konami = true
+          konamiTail = timers.timeout(endKonamiOwn, KONAMI_TAIL_MS)
+        }
       },
       false,
     )
