@@ -99,7 +99,8 @@ const T = vi.hoisted(() => {
     PerspectiveCamera: ctor('PerspectiveCamera'),
     Group: ctor('Group'),
     Object3D: ctor('Object3D'),
-    Mesh: ctor('Mesh'),
+    // A real Object3D starts at scale 1; the mock's scale is a plain {x,y,z} so an unset axis reads 1.
+    Mesh: ctor('Mesh', () => ({ scale: { x: 1, y: 1, z: 1 } })),
     Points: ctor('Points'),
     MeshStandardMaterial: ctor('MeshStandardMaterial'),
     MeshBasicMaterial: ctor('MeshBasicMaterial'),
@@ -139,7 +140,8 @@ vi.mock('three/examples/jsm/renderers/CSS3DRenderer.js', () => T.css3d)
 
 import { createScene, CANVAS_FONTS, GLOW_K } from './createScene.js'
 import { MUG, HIT } from './props.js'
-import { glowColor } from './sceneMath.js'
+import { FLOPPIES } from './floppy.js'
+import { glowColor, widePose } from './sceneMath.js'
 
 const { state } = T
 const RESOURCE_KINDS = new Set([
@@ -906,5 +908,129 @@ describe('scene/createScene glow strength and hit proxies (round 2 §7 6C)', () 
       expect(hits[0].receiveShadow, labelOf(f)).toBe(false)
     }
     api.dispose()
+  })
+
+  // Phones pull the wide shot back by k (widePose(aspect).k), so the floppies sit smaller in view
+  // and their invisible hit boxes grow with it in x only: scale.x follows k, scale.z stays 1 (a deeper
+  // box would reach across the pile into the floppy in front), scale.y is untouched.
+  describe('floppy hit boxes follow the phone pull-back k', () => {
+    const PHONE = { w: 390, h: 844 }
+    const DESKTOP = { w: 1440, h: 900 }
+    const sizeStage = (env, { w, h }) => {
+      Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: w })
+      Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: h })
+    }
+    const floppyHits = () =>
+      state.created
+        .filter((o) => o.__kind === 'Group' && labelOf(o).startsWith('Floppy · '))
+        .map((f) => {
+          const hits = hitMeshes(f)
+          expect(hits).toHaveLength(1)
+          return hits[0]
+        })
+
+    it('on a phone, each floppy hit box scales x by widePose(aspect).k, and z stays 1, and k is above 1', () => {
+      const env = setup()
+      sizeStage(env, PHONE)
+      const api = env.build()
+      const k = widePose(PHONE.w / PHONE.h).k
+      expect(k).toBeGreaterThan(1)
+      const hits = floppyHits()
+      expect(hits.length).toBeGreaterThan(0)
+      for (const h of hits) {
+        expect(h.scale.x).toBe(k)
+        expect(h.scale.z).toBe(1)
+        expect(h.scale.y).not.toBe(k)
+      }
+      api.dispose()
+    })
+
+    // Geometric check, pure math on the phone pose. Each floppy's hit box is HIT.floppy (centre at
+    // its home plus HIT.floppy.pos, yawed by home[3] with the group, as the rig is unrotated at rest),
+    // scaled by the hit's scale. A floppy's own centre must lie in its own box, and must not lie in
+    // the box of any other floppy that is nearer the phone camera (widePose(aspect).wp).
+    it('on a phone, no floppy centre lies in a nearer floppy hit box (z not stretched, yaw applied)', () => {
+      const env = setup()
+      sizeStage(env, PHONE)
+      const api = env.build()
+      const aspect = PHONE.w / PHONE.h
+      const { wp } = widePose(aspect)
+      const boxes = FLOPPIES.map((f) => {
+        const hit = hitMeshes(hotOf('Floppy · ' + f.label))[0]
+        const [hx0, hy0, hz0] = HIT.floppy.size
+        const [px, py, pz] = HIT.floppy.pos
+        const [x, y, z, yaw] = f.home
+        const c = Math.cos(yaw)
+        const s = Math.sin(yaw)
+        return {
+          label: f.label,
+          // The world centre of the box, and its yaw about y.
+          centre: [x + c * px + s * pz, y + py, z - s * px + c * pz],
+          yaw,
+          half: [(hx0 / 2) * hit.scale.x, (hy0 / 2) * hit.scale.y, (hz0 / 2) * hit.scale.z],
+          scaleZ: hit.scale.z,
+          home: [x, y, z],
+        }
+      })
+      // Whether point p (world) lies in box b: move it into the box's own axes, then compare.
+      const inside = (p, b) => {
+        const dx = p[0] - b.centre[0]
+        const dy = p[1] - b.centre[1]
+        const dz = p[2] - b.centre[2]
+        const c = Math.cos(b.yaw)
+        const s = Math.sin(b.yaw)
+        const lx = c * dx - s * dz
+        const lz = s * dx + c * dz
+        return Math.abs(lx) <= b.half[0] && Math.abs(dy) <= b.half[1] && Math.abs(lz) <= b.half[2]
+      }
+      const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+      let nearerPairs = 0
+      for (const b of boxes) {
+        expect(b.scaleZ, b.label).toBe(1)
+        // Half depth stays inside the spacing (0.33) plus the margin (0.15).
+        expect(b.half[2], b.label).toBeLessThanOrEqual(0.33 + 0.15)
+        // Its own centre (the group origin) is in its own box.
+        expect(inside(b.home, b), b.label).toBe(true)
+      }
+      for (const a of boxes) {
+        for (const b of boxes) {
+          if (a === b) continue
+          if (dist(b.centre, wp) >= dist(a.centre, wp)) continue
+          nearerPairs += 1
+          expect(inside(a.home, b), `${a.label} centre in nearer ${b.label} box`).toBe(false)
+        }
+      }
+      // The pile has floppies one behind another, so the check is not vacuous.
+      expect(nearerPairs).toBeGreaterThan(0)
+      api.dispose()
+    })
+
+    it('on desktop k is 1, so the floppy hit boxes keep their scale', () => {
+      const env = setup()
+      sizeStage(env, DESKTOP)
+      const api = env.build()
+      expect(widePose(DESKTOP.w / DESKTOP.h).k).toBe(1)
+      for (const h of floppyHits()) {
+        expect(h.scale.x).toBe(1)
+        expect(h.scale.z).toBe(1)
+      }
+      api.dispose()
+    })
+
+    it('when the aspect changes (desktop to phone), the next frame rescales the floppy hit boxes', () => {
+      const env = setup()
+      sizeStage(env, DESKTOP)
+      const api = env.build()
+      sizeStage(env, PHONE)
+      api.frame(0, 0.016)
+      const k = widePose(PHONE.w / PHONE.h).k
+      expect(k).toBeGreaterThan(1)
+      for (const h of floppyHits()) {
+        expect(h.scale.x).toBe(k)
+        expect(h.scale.z).toBe(1)
+      }
+      api.dispose()
+    })
   })
 })

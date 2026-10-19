@@ -440,9 +440,20 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       g.rotation.y = f.home[3]
       rig.add(g)
       const mesh = mk(B(0.5, 0.03, 0.52), [side, side, hued(new THREE.MeshStandardMaterial({ map: lab.t, roughness: 0.6 }), f.col), side, side, side], 0, 0, 0, g)
-      hitBox(g, HIT.floppy) // on the group, not the mesh the wiggle turns
-      return { ...f, m: g, mesh, lab, wamp: 0 }
+      const hit = hitBox(g, HIT.floppy) // on the group, not the mesh the wiggle turns
+      return { ...f, m: g, mesh, hit, lab, wamp: 0 }
     })
+    // Phones pull the wide shot back by k, so the floppies sit smaller in view: their hit boxes
+    // grow by k sideways (x) only, so a tap lands as easily. Depth (z) and height stay, as a deeper
+    // box would reach across the pile into the floppy in front (fitHits: per aspect, like faceMug).
+    let hitAspect = NaN
+    const fitHits = (aspect) => {
+      if (aspect === hitAspect) return
+      hitAspect = aspect
+      const { k } = widePose(aspect)
+      for (const { hit } of floppies) hit.scale.x = k
+    }
+    fitHits(16 / 9)
     let driveBusy = 0
     // The McGill mug (R16). The outer group stands at MUG.pos and the hop tween moves it; the
     // inner `mugBody` takes the hover lift, holds the steam and turns the wordmark to the wide
@@ -755,6 +766,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       css?.setSize(w, h)
       camera.aspect = w / h
       camera.updateProjectionMatrix()
+      fitHits(w / h)
     }
     ro = new ResizeObserver(resize)
     ro.observe(stage)
@@ -854,6 +866,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       }
       const fog = fogFor(widePose(aspect).k)
       faceMug(aspect)
+      fitHits(aspect)
       if (scene.fog.near !== fog.near || scene.fog.far !== fog.far) {
         scene.fog.near = fog.near
         scene.fog.far = fog.far
