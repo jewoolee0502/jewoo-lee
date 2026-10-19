@@ -1,11 +1,35 @@
-// App registry. Later phases register {title, color, w, h, x?, y?, Component}.
+// App registry: {title, color, w, h, x?, y?, Component} per id (L788–866).
 // Lookups never touch inherited Object.prototype members (fix B1).
+// Later phases add bugs, snake, paint, display and wall.
 import { PROJECTS } from '../content/index.js'
 import { own } from '../core/own.js'
 import ProjectDetail from './apps/ProjectDetail.jsx'
 import Art from './apps/Art.jsx'
+import About from './apps/About.jsx'
+import Projects from './apps/Projects.jsx'
+import Experience from './apps/Experience.jsx'
+import Skills from './apps/Skills.jsx'
+import ResumeApp from './apps/ResumeApp.jsx'
+import Mail from './apps/Mail.jsx'
+import Service from './apps/Service.jsx'
+import Trophies from './apps/Trophies.jsx'
+import Bin from './apps/Bin.jsx'
+import AboutOs from './apps/AboutOs.jsx'
+import Terminal from './apps/terminal/Terminal.jsx'
 
-export const registry = new Map()
+export const registry = new Map([
+  ['about', { title: 'About.txt', color: '#4AA6EE', w: 640, h: 470, Component: About }],
+  ['projects', { title: `Projects  ·  ${PROJECTS.length} items`, color: '#FFD15C', w: 640, h: 500, Component: Projects }],
+  ['exp', { title: 'Experience.log', color: '#7FE0A8', w: 680, h: 500, Component: Experience }],
+  ['skills', { title: 'Skills.inv  ·  inventory', color: '#FF8A3D', w: 660, h: 450, Component: Skills }],
+  ['term', { title: 'Terminal · jaysh', color: '#7CFFA0', w: 640, h: 420, Component: Terminal }],
+  ['resume', { title: 'Resume.pdf', color: '#E8452E', w: 600, h: 500, Component: ResumeApp }],
+  ['mail', { title: 'Mail · say hi', color: '#C9A7FF', w: 500, h: 470, Component: Mail }],
+  ['service', { title: 'Service.txt', color: '#B9C3CD', w: 580, h: 430, Component: Service }],
+  ['ach', { title: 'Trophies', color: '#FFD15C', w: 500, h: 500, Component: Trophies }],
+  ['bin', { title: 'Recycle Bin', color: '#3BB273', w: 420, h: 290, Component: Bin }],
+  ['aboutos', { title: 'About JAY-OS', color: '#4AA6EE', w: 420, h: 280, Component: AboutOs }],
+])
 
 const INDEX = /^(0|[1-9]\d*)$/ // no leading zeros: one id per window
 

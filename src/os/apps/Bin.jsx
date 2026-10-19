@@ -1,0 +1,27 @@
+// Recycle Bin (L861–863): one "item", RecycleWise.
+import { useApp } from '../../app/AppContext.jsx'
+import { PROJECTS, projectImage } from '../../content/index.js'
+
+export default function Bin() {
+  const app = useApp()
+  return (
+    <>
+      <p className="muted">1 item</p>
+      <button
+        className="pcard"
+        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}
+        onClick={() => app.os.openApp('p:0')}
+      >
+        <img
+          alt=""
+          src={projectImage(PROJECTS[0])}
+          style={{ width: 110, aspectRatio: '16/10', borderBottom: 0, borderRight: '2px solid #122030' }}
+        />
+        <span>RecycleWise · open</span>
+      </button>
+      <p className="muted" style={{ marginTop: 12 }}>
+        Nothing in here is trash. It’s RecycleWise.
+      </p>
+    </>
+  )
+}
