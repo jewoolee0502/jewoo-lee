@@ -8,18 +8,8 @@ export default function Bin() {
   return (
     <>
       <p className="muted">1 item</p>
-      <button
-        className="pcard"
-        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}
-        onClick={() => app.os.openApp('p:0')}
-      >
-        <img
-          alt=""
-          src={projectImage(PROJECTS[0])}
-          width={w}
-          height={h}
-          style={{ width: 110, aspectRatio: '16/10', borderBottom: 0, borderRight: '2px solid #122030' }}
-        />
+      <button className="pcard bin-item" onClick={() => app.os.openApp('p:0')}>
+        <img alt="" src={projectImage(PROJECTS[0])} width={w} height={h} />
         <span>RecycleWise · open</span>
       </button>
       <p className="muted" style={{ marginTop: 12 }}>

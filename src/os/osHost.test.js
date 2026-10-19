@@ -216,3 +216,46 @@ describe('createOsHost', () => {
     expect(host.scale()).toBe(0.5)
   })
 })
+
+// Round 2 §7 6B TEST LIST item 2 (U10): a window's scroll offset survives the re-parent in setFlat.
+// The browser resets a moved node's scroll offset, so each appendChild here resets it after the real move.
+describe('createOsHost scroll offsets across setFlat (plan §7 6B)', () => {
+  function scrolledWindow(top) {
+    const wb = document.createElement('div')
+    wb.className = 'wb'
+    let t = top
+    Object.defineProperty(wb, 'scrollTop', {
+      configurable: true,
+      get: () => t,
+      set: (v) => {
+        t = v
+      },
+    })
+    return wb
+  }
+
+  function resetOnMove(parent, wb) {
+    const real = parent.appendChild.bind(parent)
+    return vi.spyOn(parent, 'appendChild').mockImplementation((node) => {
+      const out = real(node)
+      wb.scrollTop = 0
+      return out
+    })
+  }
+
+  it('setFlat(true) and back keeps a window at scrollTop 200', () => {
+    const host = createOsHost()
+    const flatHost = makeFlatHost(1200, 675)
+    host.bindFlatHost(flatHost)
+    const wb = scrolledWindow(200)
+    host.osEl.appendChild(wb)
+
+    resetOnMove(flatHost, wb)
+    host.setFlat(true, false)
+    expect(wb.scrollTop).toBe(200)
+
+    resetOnMove(host.holder, wb)
+    host.setFlat(false)
+    expect(wb.scrollTop).toBe(200)
+  })
+})

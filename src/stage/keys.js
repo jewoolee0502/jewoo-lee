@@ -24,8 +24,13 @@ export function createKeyHandler({ app }) {
       else if (!app.motion.reduce()) app.scene?.api?.disco?.(6) // B11
     }
     if (key === 'Escape') {
+      // plan-r2 §7 U12: the recruiter view, then the ◆ menu, then the laptop.
       if (app.ui.store.get().recOpen) app.ui.store.set({ recOpen: false })
-      else if (app.scene?.store.get().status === 'ready' && app.ctrl.store.get().phase !== 'desk') app.ctrl.exit()
+      else if (app.os.store?.get().menuOpen) {
+        const inMenu = document.activeElement?.closest?.('#menu-pop')
+        app.os.setMenu(false)
+        if (inMenu) document.getElementById('mb-logo')?.focus()
+      } else if (app.scene?.store.get().status === 'ready' && app.ctrl.store.get().phase !== 'desk') app.ctrl.exit()
     }
   }
 }

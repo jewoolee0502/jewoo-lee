@@ -94,3 +94,36 @@ describe('styles/os.css phone menubar', () => {
     expect(ruleBody('.menubar')).toMatch(/white-space:\s*nowrap/)
   })
 })
+
+// Round 2 §7 6B TEST LIST item 5 (U13): a compact live OS ends above the "Go to résumé" pill.
+describe('styles/os.css compact live windows clear the résumé pill (plan §7 6B)', () => {
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ selectors: m[1].split(',').map((x) => x.trim()), body: m[2] }))
+  const bodyOf = (selector) => rules.filter((r) => r.selectors.includes(selector)).map((r) => r.body).join(';')
+
+  // The pill's bottom is max(16px, env(safe-area-inset-bottom, 0px)); the strip above it must follow the same
+  // safe-area inset, so a notched phone does not leave the window or icons under the pill.
+  const safeBottom = /max\(\s*16px\s*,\s*env\(\s*safe-area-inset-bottom/
+
+  it('.os.compact.live:not(.fallback) .win clears the pill by the bottom safe area too, important', () => {
+    const body = bodyOf('.os.compact.live:not(.fallback) .win')
+    expect(body).not.toMatch(/104px/)
+    expect(body).toMatch(/height:\s*calc\(100%\s*-[^;]*\)\s*!important/)
+    expect(body).toMatch(safeBottom)
+  })
+
+  it('.os.compact.live:not(.fallback) .icons bottom uses the same max(16px, env(safe-area-inset-bottom)) as the pill', () => {
+    const body = bodyOf('.os.compact.live:not(.fallback) .icons')
+    expect(body).not.toMatch(/bottom:\s*66px/)
+    expect(body).toMatch(safeBottom)
+  })
+
+  it('the plain compact window rule is unchanged (calc(100% - 44px) important)', () => {
+    expect(bodyOf('.os.compact .win')).toMatch(/height:\s*calc\(100%\s*-\s*44px\)\s*!important/)
+  })
+
+  it('the safe-area strip appears only in rules gated by .live', () => {
+    const strip = rules.filter((r) => /safe-area-inset-bottom/.test(r.body))
+    expect(strip.length).toBeGreaterThan(0)
+    for (const r of strip) expect(r.selectors.every((s) => s.includes('.live')), r.selectors.join(',')).toBe(true)
+  })
+})

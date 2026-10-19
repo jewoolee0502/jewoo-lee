@@ -2,6 +2,7 @@
 // `osEl` moves between the holder and the flat host. React renders into `osEl` through a
 // portal, and only this module writes classes, data-state and inline size on these nodes.
 import { OS_W, OS_H } from '../core/constants.js'
+import { keepScroll } from './keepScroll.js'
 
 export function createOsHost({ doc = globalThis.document } = {}) {
   const holder = doc.createElement('div')
@@ -80,31 +81,35 @@ export function createOsHost({ doc = globalThis.document } = {}) {
   }
 
   /** L757–761. Returns whether the OS is now flat. The flat host fades in only for the compact
-   *  layout: the scaled one replaces the 3D screen at the same size and place (R4). */
+   *  layout: the scaled one replaces the 3D screen at the same size and place (R4). The move runs
+   *  inside keepScroll, so window scroll offsets survive the re-parent (plan-r2 §7 U10). */
   function setFlat(v, compact) {
-    v = Boolean(v)
-    osEl.classList.toggle('compact', Boolean(compact))
-    flatHost?.classList.toggle('fade', Boolean(compact))
-    if (v !== osEl.classList.contains('flat')) {
-      if (v) {
-        if (!flatHost) return false
-        flatHost.appendChild(osEl)
-        osEl.classList.add('flat')
-        flatHost.classList.add('on')
-      } else {
-        holder.appendChild(osEl)
-        osEl.classList.remove('flat')
-        flatHost?.classList.remove('on')
-        osEl.style.transform = ''
-        curW = curH = 0
-        setSize(OS_W, OS_H)
+    return keepScroll(osEl, () => {
+      v = Boolean(v)
+      osEl.classList.toggle('compact', Boolean(compact))
+      flatHost?.classList.toggle('fade', Boolean(compact))
+      if (v !== osEl.classList.contains('flat')) {
+        if (v) {
+          if (!flatHost) return false
+          flatHost.appendChild(osEl)
+          osEl.classList.add('flat')
+          flatHost.classList.add('on')
+        } else {
+          holder.appendChild(osEl)
+          osEl.classList.remove('flat')
+          flatHost?.classList.remove('on')
+          osEl.style.transform = ''
+          curW = curH = 0
+          setSize(OS_W, OS_H)
+        }
       }
-    }
-    if (v) fitFlat()
-    return osEl.classList.contains('flat')
+      if (v) fitFlat()
+      return osEl.classList.contains('flat')
+    })
   }
 
-  /** L756. Window scroll offsets survive (R9): `.os:not(.live) .wb` is overflow:hidden. */
+  /** L756. Window scroll offsets survive both this flag (R9: `.os:not(.live) .wb` is only
+   *  overflow:hidden) and the re-parent in setFlat (keepScroll, plan-r2 §7 U10). */
   function setLive(v) {
     osEl.classList.toggle('live', Boolean(v))
   }

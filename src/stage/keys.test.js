@@ -1,5 +1,6 @@
 // Round 2 Phase 2 TEST LIST: stage/keys.test.js. Konami (L1039), key handler (L1040–1042), Escape.
 // Escape exits whenever the laptop is open (phase inside or dive), not on the interactive flag.
+// Round 2 §7 6B TEST LIST item 3 (U12): Escape closes the ◆ menu first and returns focus to ◆ JAY-OS.
 import { describe, it, expect, vi } from 'vitest'
 import { pushKonami, createKeyHandler } from './keys.js'
 import { createStore } from '../core/store.js'
@@ -14,13 +15,13 @@ function feed(buf, keys) {
   return { buf, matched }
 }
 
-function makeApp({ osState = 'on', reduce = false, status = 'ready', phase = 'inside', recOpen = false, sndOn = false, api = true } = {}) {
+function makeApp({ osState = 'on', reduce = false, status = 'ready', phase = 'inside', recOpen = false, menuOpen = false, sndOn = false, api = true } = {}) {
   return {
     ach: { unlock: vi.fn() },
     toasts: { toast: vi.fn() },
     snd: { store: createStore({ on: sndOn }), click: vi.fn() },
     motion: { reduce: () => reduce },
-    os: { state: osState, disco: vi.fn() },
+    os: { state: osState, disco: vi.fn(), store: createStore({ menuOpen }), setMenu: vi.fn() },
     scene: {
       store: createStore({ status }),
       api: api ? { pressKey: vi.fn(), disco: vi.fn() } : null,
@@ -106,6 +107,47 @@ describe('stage/keys', () => {
     const loading = makeApp({ phase: 'inside', status: 'loading' })
     createKeyHandler({ app: loading })({ key: 'Escape' })
     expect(loading.ctrl.exit).not.toHaveBeenCalled()
+  })
+
+  it('3a. Escape with the ◆ menu open closes the menu once and does not exit the laptop', () => {
+    const app = makeApp({ menuOpen: true, phase: 'inside', status: 'ready' })
+    createKeyHandler({ app })({ key: 'Escape' })
+    expect(app.os.setMenu).toHaveBeenCalledTimes(1)
+    expect(app.os.setMenu).toHaveBeenCalledWith(false)
+    expect(app.ctrl.exit).not.toHaveBeenCalled()
+  })
+
+  it('3b. Escape with focus inside #menu-pop returns focus to #mb-logo', () => {
+    const logo = document.createElement('button')
+    logo.id = 'mb-logo'
+    const pop = document.createElement('div')
+    pop.id = 'menu-pop'
+    const item = document.createElement('button')
+    pop.appendChild(item)
+    document.body.append(logo, pop)
+    item.focus()
+    try {
+      const app = makeApp({ menuOpen: true, phase: 'inside', status: 'ready' })
+      createKeyHandler({ app })({ key: 'Escape' })
+      expect(document.activeElement).toBe(logo)
+    } finally {
+      document.body.innerHTML = ''
+    }
+  })
+
+  it('3c. with the recruiter view and the ◆ menu both open, Escape closes only the recruiter view', () => {
+    const app = makeApp({ recOpen: true, menuOpen: true, phase: 'inside', status: 'ready' })
+    createKeyHandler({ app })({ key: 'Escape' })
+    expect(app.ui.store.get().recOpen).toBe(false)
+    expect(app.os.setMenu).not.toHaveBeenCalled()
+    expect(app.ctrl.exit).not.toHaveBeenCalled()
+  })
+
+  it('3d. with the ◆ menu closed, Escape inside the laptop still exits once (unchanged)', () => {
+    const app = makeApp({ menuOpen: false, phase: 'inside', status: 'ready' })
+    createKeyHandler({ app })({ key: 'Escape' })
+    expect(app.os.setMenu).not.toHaveBeenCalled()
+    expect(app.ctrl.exit).toHaveBeenCalledTimes(1)
   })
 
   it('6. every key calls scene.api.pressKey(key); with sound on, a single character clicks and Shift does not', () => {

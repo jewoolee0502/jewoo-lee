@@ -156,12 +156,23 @@ describe('stage/Stage', () => {
       expect(app.host.osEl).toHaveClass('fallback')
     })
 
-    it('flat-host has inline z-index 5 and no trap class', async () => {
+    it('flat-host has no inline z-index (the stacking moved to CSS) and no trap class', async () => {
       const { app, container } = renderWithApp(<Stage />, { loadScene: vi.fn(async () => null) })
       await waitFor(() => expect(app.scene.store.get().status).toBe('unavailable'))
       const flatHost = container.querySelector('.flat-host')
-      expect(flatHost.style.zIndex).toBe('5')
+      expect(flatHost.style.zIndex).toBe('')
       expect(flatHost).not.toHaveClass('trap')
+    })
+
+    // Round 2 §7 6B TEST LIST item 8 (U11): the notice is a note in the top bar, not a floating toast.
+    it('the notice is a p.fallback-note with role note, the same text and no inline style', async () => {
+      const { app, container } = renderWithApp(<Stage />, { loadScene: vi.fn(async () => null) })
+      await waitFor(() => expect(app.scene.store.get().status).toBe('unavailable'))
+      const note = within(container).getByText(NOTICE)
+      expect(note.tagName).toBe('P')
+      expect(note).toHaveClass('fallback-note')
+      expect(note).toHaveAttribute('role', 'note')
+      expect(note).not.toHaveAttribute('style')
     })
 
     it('the OS host element also has class live in the fallback, so window bodies scroll', async () => {

@@ -14,8 +14,6 @@ import SceneMount from './SceneMount.jsx'
 import { useStageBindings } from './useStageBindings.js'
 import '../styles/stage.css'
 
-const FLAT_FALLBACK = { zIndex: 5 }
-
 export default function Stage() {
   const app = useApp()
   const status = useStore(app.scene.store, (s) => s.status)
@@ -38,7 +36,7 @@ export default function Stage() {
       <section className="track" id="track" ref={trackRef}>
         <div className="stage" id="stage" ref={stageRef}>
           <div className="scene-layer" ref={sceneLayerRef} />
-          <div className="flat-host" id="flat-host" ref={flatHostRef} style={unavailable ? FLAT_FALLBACK : undefined} />
+          <div className="flat-host" id="flat-host" ref={flatHostRef} />
           <Hud recButtonRef={recButtonRef} />
           <ExitPill />
           <Cue ref={cueRef} />

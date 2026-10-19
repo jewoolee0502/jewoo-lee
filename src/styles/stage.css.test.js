@@ -119,3 +119,44 @@ describe('styles/stage.css', () => {
     })
   })
 })
+
+// Round 2 §7 6B TEST LIST item 4 (U11): the no-WebGL layout is a grid, a top bar (notice + HUD) over the OS.
+describe('styles/stage.css no-WebGL top bar (plan §7 6B)', () => {
+  const bodiesOf = (selector) => {
+    const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return [...css.matchAll(new RegExp('(?:^|[};\\n])\\s*' + esc + '\\s*\\{([^}]*)\\}', 'g'))].map((m) => m[1]).join(';')
+  }
+  const mediaBlocks600 = [...css.matchAll(/@media\s*\(max-width:\s*600px\)\s*\{((?:[^{}]*\{[^{}]*\})*)\}/g)].map((m) => m[1])
+
+  it('.track.flat-runway .stage is a grid whose areas are a note and HUD row over the OS row', () => {
+    const grid = bodiesOf('.track.flat-runway .stage')
+    expect(grid).toMatch(/display:\s*grid/)
+    expect(grid).toMatch(/grid-template-areas:\s*"note hud"\s+"os os"/)
+  })
+
+  it('.track.flat-runway .hud is static inside the grid, in the hud area', () => {
+    const hud = bodiesOf('.track.flat-runway .hud')
+    expect(hud).toMatch(/position:\s*static/)
+    expect(hud).toMatch(/grid-area:\s*hud/)
+  })
+
+  it('.track.flat-runway .flat-host is in-flow (relative) in the os area and stacks above the scene', () => {
+    const host = bodiesOf('.track.flat-runway .flat-host')
+    expect(host).toMatch(/position:\s*relative/)
+    expect(host).toMatch(/grid-area:\s*os/)
+  })
+
+  it('.fallback-note is a grid item in the note area and declares no position', () => {
+    const note = bodiesOf('.fallback-note')
+    expect(note).toMatch(/grid-area:\s*note/)
+    expect(note).not.toMatch(/position\s*:/)
+  })
+
+  it('the 600px block stacks the HUD row first, then the note, then the OS', () => {
+    const stacked = mediaBlocks600.some((block) => {
+      const m = block.match(/\.track\.flat-runway \.stage\{([^}]*)\}/)
+      return Boolean(m) && /grid-template-areas:\s*"hud"\s+"note"\s+"os"/.test(m[1])
+    })
+    expect(stacked).toBe(true)
+  })
+})

@@ -293,6 +293,21 @@ describe('Bin', () => {
   })
 })
 
+// Round 2 §7 6B TEST LIST item 7 (U14): the Bin item is styled by apps.css classes, not inline styles.
+describe('Bin item styles', () => {
+  it('the RecycleWise item is a pcard bin-item button with no inline style on it or its image', () => {
+    const { app } = bootedApp()
+    const w = open(app, 'bin')
+    const btn = within(w).getByText('RecycleWise · open').closest('button')
+    expect(btn).toHaveClass('pcard', 'bin-item')
+    expect(btn).not.toHaveAttribute('style')
+    const img = btn.querySelector('img')
+    expect(img).not.toHaveAttribute('style')
+    expect(img.getAttribute('width')).toMatch(/^\d+$/)
+    expect(img.getAttribute('height')).toMatch(/^\d+$/)
+  })
+})
+
 describe('AboutOs', () => {
   it('shows the title, the build line and the muted laptop line (no credit line)', () => {
     const { app } = bootedApp()

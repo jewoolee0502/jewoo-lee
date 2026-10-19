@@ -1,10 +1,8 @@
-// Fallback notice (L1279).
-const STYLE = { position: 'absolute', left: 16, bottom: 16, zIndex: 50, maxWidth: 340 }
-
+// Fallback notice (L1279). plan-r2 §7 U11: a note in the fallback's top bar, not a floating toast.
 export default function NoWebGLNotice() {
   return (
-    <div className="toast info" style={STYLE}>
+    <p className="fallback-note" role="note">
       3D is unavailable in this browser, so JAY-OS runs flat. Everything still works.
-    </div>
+    </p>
   )
 }

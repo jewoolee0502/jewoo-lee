@@ -51,3 +51,44 @@ describe('styles/apps.css terminal input focus', () => {
     expect(thumb.map((r) => r.body).join(';')).toMatch(/object-fit:\s*cover/)
   })
 })
+
+// Round 2 §7 6B TEST LIST item 6 (U14): thumbnails take their height from the width, so the
+// width/height attributes cannot make them thousands of pixels tall; the Bin item styles live in CSS.
+describe('styles/apps.css thumbnails and the Bin item (plan §7 6B)', () => {
+  const rulesFor = (selector) => rules.filter((r) => r.selector === selector).map((r) => r.body).join(';')
+
+  it('.pcard img keeps the 16:10 box, crops with cover and takes its height from the width', () => {
+    const body = rulesFor('.pcard img')
+    expect(body).toMatch(/height:\s*auto/)
+    expect(body).toMatch(/aspect-ratio:\s*16\s*\/\s*10/)
+    expect(body).toMatch(/object-fit:\s*cover/)
+  })
+
+  it('.pcard.bin-item is a flex row that fills the width', () => {
+    const body = rulesFor('.pcard.bin-item')
+    expect(body).toMatch(/display:\s*flex/)
+    expect(body).toMatch(/width:\s*100%/)
+  })
+
+  it('.pcard.bin-item img is 110px wide with its height from the width', () => {
+    const body = rulesFor('.pcard.bin-item img')
+    expect(body).toMatch(/width:\s*110px/)
+    expect(body).toMatch(/height:\s*auto/)
+  })
+
+  // Guard: any image rule that sets an aspect-ratio must also set height:auto, so a width/height
+  // attribute can never win over the ratio. `.pol img` is exempt: About.jsx gives it no attributes.
+  it('every img rule with aspect-ratio in apps.css and resume.css also declares height:auto', () => {
+    const exempt = new Set(['.pol img'])
+    const offenders = []
+    for (const file of ['apps.css', 'resume.css']) {
+      const text = readFileSync(resolve(process.cwd(), 'src/styles', file), 'utf8')
+      for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selectors = m[1].split(',').map((x) => x.trim())
+        const isImg = selectors.some((s) => /img$/.test(s) && !exempt.has(s))
+        if (isImg && /aspect-ratio\s*:/.test(m[2]) && !/height\s*:\s*auto/.test(m[2])) offenders.push(file + ': ' + m[1].trim())
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
