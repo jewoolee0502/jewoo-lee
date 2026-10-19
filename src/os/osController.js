@@ -124,7 +124,8 @@ export function createOsController({ host, registry, ach, snd, motion, timers, s
     const open = findWin(id)
     if (open) {
       z += 1
-      const fields = { z, shakeNonce: open.shakeNonce + 1 }
+      // `opened` counts re-opens (not focuses), so a window can tell the two apart.
+      const fields = { z, shakeNonce: open.shakeNonce + 1, opened: open.opened + 1 }
       if (opts.cmd) fields.cmd = { text: opts.cmd, nonce: ++cmdNonce }
       patchWin(id, fields)
       store.set({ focusedId: id })
@@ -143,6 +144,7 @@ export function createOsController({ host, registry, ach, snd, motion, timers, s
       z,
       opening: true,
       shakeNonce: 0,
+      opened: 0,
       cmd: opts.cmd ? { text: opts.cmd, nonce: ++cmdNonce } : null,
     }
     store.set((s) => ({ wins: [...s.wins, rec], focusedId: id }))

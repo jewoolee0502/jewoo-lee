@@ -239,6 +239,24 @@ describe('osController', () => {
       expect(c.store.get().focusedId).toBe('a')
     })
 
+    // The terminal re-syncs its caret on `opened`, which only an openApp of an open window bumps.
+    // A focus (a pointerdown on the window, os.focus) moves z but never `opened`.
+    it('each openApp of an already-open window bumps its opened counter; a focus does not', () => {
+      const { c } = makeController()
+      bootToOn(c)
+      const first = c.openApp('a')
+      expect(first.opened).toBe(0)
+      c.openApp('b')
+
+      c.focus('a')
+      expect(c.store.get().wins.find((w) => w.id === 'a').opened).toBe(0)
+
+      expect(c.openApp('a').opened).toBe(1)
+      expect(c.openApp('a').opened).toBe(2)
+      expect(c.store.get().wins.find((w) => w.id === 'a').opened).toBe(2)
+      expect(c.store.get().wins.filter((w) => w.id === 'a')).toHaveLength(1)
+    })
+
     it('openApp with cmd sets cmd.text, and the nonce increases on every call', () => {
       const { c } = makeController()
       bootToOn(c)

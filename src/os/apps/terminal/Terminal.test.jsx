@@ -1,11 +1,12 @@
 // jaysh window (plan Phase 4 TEST LIST; prototype L876–930, keys per L931–935).
 // Assumed: Terminal.jsx default-exports the window component taking `win`.
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { act, fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithApp } from '../../../test/renderWithApp.jsx'
 import { AppProvider } from '../../../app/AppContext.jsx'
 import Terminal from './Terminal.jsx'
+import { JayOS } from '../../JayOS.jsx'
 
 const HELP_FIRST = 'whoami        who is Jay'
 const HELP = [
@@ -119,5 +120,106 @@ describe('Terminal', () => {
     } finally {
       focusSpy.mockRestore()
     }
+  })
+
+  // The signal is the window's `opened` counter (osController bumps it when openApp finds the window
+  // already open, e.g. the desktop icon). A z change alone is a focus, not a re-open, so it must not
+  // pull the caret into the terminal.
+  it('a new `opened` count (re-opened) moves focus to the input; a z change alone does not', () => {
+    vi.useFakeTimers()
+    const { input, rerender, app } = mount({ id: 'term', cmd: null, z: 21, opened: 0 })
+    act(() => {
+      vi.advanceTimersByTime(60)
+    })
+    const elsewhere = document.createElement('button')
+    document.body.append(elsewhere)
+    try {
+      act(() => {
+        elsewhere.focus()
+      })
+      expect(input).not.toHaveFocus()
+
+      rerender(
+        <AppProvider app={app}>
+          <Terminal win={{ id: 'term', cmd: null, z: 22, opened: 0 }} />
+        </AppProvider>,
+      )
+      expect(input).not.toHaveFocus()
+
+      rerender(
+        <AppProvider app={app}>
+          <Terminal win={{ id: 'term', cmd: null, z: 22, opened: 1 }} />
+        </AppProvider>,
+      )
+      expect(document.activeElement).toBe(input)
+    } finally {
+      elsewhere.remove()
+    }
+  })
+
+  // The real window (OS + Window + Terminal): a pointerdown that brings the terminal to the front
+  // keeps the keyboard where it was, and re-opening it from the desktop icon puts it in the prompt.
+  describe('focus through the OS window', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    function bootedWithTerm() {
+      const result = renderWithApp(<JayOS />)
+      act(() => {
+        result.app.os.boot()
+      })
+      act(() => {
+        vi.advanceTimersByTime(2200)
+      })
+      act(() => {
+        result.app.os.openApp('term')
+      })
+      // The mount focus (60 ms) runs first; then another window takes focus, so z moves past it.
+      act(() => {
+        vi.advanceTimersByTime(300)
+      })
+      act(() => {
+        result.app.os.openApp('about')
+      })
+      const input = screen.getByLabelText('Terminal command')
+      const win = document.querySelector('section.win[data-app="term"]')
+      const elsewhere = document.createElement('button')
+      document.body.append(elsewhere)
+      return { ...result, input, win, elsewhere }
+    }
+
+    it('a pointerdown that focuses the terminal window does not move focus into its input', () => {
+      const { app, input, win, elsewhere } = bootedWithTerm()
+      try {
+        act(() => {
+          elsewhere.focus()
+        })
+        const zBefore = app.os.store.get().wins.find((w) => w.id === 'term').z
+        fireEvent.pointerDown(win)
+        expect(app.os.store.get().wins.find((w) => w.id === 'term').z).toBeGreaterThan(zBefore)
+        expect(app.os.store.get().focusedId).toBe('term')
+        expect(input).not.toHaveFocus()
+        expect(document.activeElement).toBe(elsewhere)
+      } finally {
+        elsewhere.remove()
+      }
+    })
+
+    it('re-opening the terminal (openApp on the open window, as the desktop icon does) focuses its input', () => {
+      const { app, input, elsewhere } = bootedWithTerm()
+      try {
+        act(() => {
+          elsewhere.focus()
+        })
+        expect(input).not.toHaveFocus()
+        act(() => {
+          app.os.openApp('term')
+        })
+        expect(input).toHaveFocus()
+      } finally {
+        elsewhere.remove()
+      }
+    })
   })
 })

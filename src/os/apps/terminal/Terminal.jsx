@@ -61,6 +61,17 @@ export default function Terminal({ win }) {
     return () => clearTimeout(id)
   }, [])
 
+  // Re-opened while open (the desktop icon again): the caret goes back to the prompt. `opened`
+  // moves only on a re-open, so a plain focus (a pointerdown on the window) or another window
+  // taking focus never pulls the keyboard here. The first open is the timer above.
+  const opened = win?.opened
+  const lastOpened = useRef(opened)
+  useEffect(() => {
+    if (opened === lastOpened.current) return
+    lastOpened.current = opened
+    inRef.current?.focus({ preventScroll: true })
+  }, [opened])
+
   // Keep the newest output in view.
   useLayoutEffect(() => {
     const el = outRef.current
