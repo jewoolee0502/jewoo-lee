@@ -1,9 +1,10 @@
-// The desktop layer (L316–338): menubar, menu, icons, wallmark, windows and fx.
+// The desktop layer (L316–338): wallpaper canvas, menubar, menu, icons, wallmark, windows and fx.
 import { useState } from 'react'
 import { useApp } from '../app/AppContext.jsx'
 import { useStore } from '../core/store.js'
 import { own } from '../core/own.js'
 import { MODES } from '../wallpaper/modes.js'
+import WallpaperCanvas from '../wallpaper/WallpaperCanvas.jsx'
 import { DesktopContext } from './DesktopContext.js'
 import MenuBar from './MenuBar.jsx'
 import MenuPop from './MenuPop.jsx'
@@ -39,6 +40,7 @@ export default function Desktop() {
   return (
     <DesktopContext.Provider value={deskEl}>
       <div className="layer l-desk" id="l-desk" ref={setDeskEl} onPointerDown={onPointerDown}>
+        <WallpaperCanvas />
         <MenuBar />
         {menuOpen ? <MenuPop /> : null}
         <DesktopIcons />
