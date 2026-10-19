@@ -6,22 +6,39 @@
 //   z:  0 ──────► 1          1           1 ──────────► 0         0        0
 //
 // z > 0 only before outEnd, and the stage stays pinned until R, so the half-laptop state
-// (screen open while the stage scrolls away) cannot happen (R2).
-import { RUNWAY, INSIDE_ON, INSIDE_OFF, DETENT_GAP_MS, DETENT_RELEASE_UP_PX, DETENT_BASELINE_DECAY, DETENT_LAG_PX, SETTLE_BIAS } from '../core/constants.js'
-import { clamp } from '../core/math.js'
+// (screen open while the stage scrolls away) cannot happen (R2). The plateau is at least
+// PLATEAU_MIN_PX, taken from the out segment, so outEnd (and the invariant) never moves (U8).
+//
+// Snapping (plan-r2 §7 U1–U2): the page snaps mandatorily to a rail of points every SNAP_GRID_PX
+// plus the settle targets, with one always-stop at diveEnd, so a momentum flick rests at the open
+// laptop and any other rest moves at most half a rail step. A rest part-way through the dive or
+// the out segment glides on in the last user direction; a tiny movement returns (U6).
+import {
+  RUNWAY,
+  INSIDE_ON,
+  INSIDE_OFF,
+  DETENT_GAP_MS,
+  DETENT_RELEASE_UP_PX,
+  DETENT_BASELINE_DECAY,
+  DETENT_LAG_PX,
+  PLATEAU_MIN_PX,
+  SNAP_GRID_PX,
+  SETTLE_TINY_PX,
+} from '../core/constants.js'
+import { clamp, ss } from '../core/math.js'
 
 const SUM = RUNWAY.dive + RUNWAY.inside + RUNWAY.out + RUNWAY.tail
 
 export function runwayLayout({ trackH, stageH }) {
   const R = Math.max(1, trackH - stageH)
   const unit = R / SUM
-  return {
-    R,
-    diveEnd: Math.round(RUNWAY.dive * unit),
-    insideEnd: Math.round((RUNWAY.dive + RUNWAY.inside) * unit),
-    outEnd: Math.round((RUNWAY.dive + RUNWAY.inside + RUNWAY.out) * unit),
-    stageH,
-  }
+  const diveEnd = Math.round(RUNWAY.dive * unit)
+  const outEnd = Math.round((RUNWAY.dive + RUNWAY.inside + RUNWAY.out) * unit)
+  const insideEnd = Math.max(
+    Math.round((RUNWAY.dive + RUNWAY.inside) * unit),
+    diveEnd + Math.min(PLATEAU_MIN_PX, Math.floor((outEnd - diveEnd) / 2)),
+  )
+  return { R, diveEnd, insideEnd, outEnd, stageH }
 }
 
 const frac = (s, a, b) => (b > a ? clamp((s - a) / (b - a), 0, 1) : 0)
@@ -45,17 +62,41 @@ export function poseAt(s, L) {
 /** R8 hysteresis, so sub-pixel jitter never swaps the OS between flat and 3D. */
 export const nextInteractive = (prev, z) => (prev ? z >= INSIDE_OFF : z >= INSIDE_ON)
 
-/** Whether a rest at fraction `u` goes on to the segment's far end, biased by direction (R6). */
-const goesOn = (u, dir) => (dir > 0 ? u >= SETTLE_BIAS : dir < 0 ? u > 1 - SETTLE_BIAS : u >= 0.5)
-
-/** R6: where a page at rest at `s` should glide to (track-relative), or null to stay put. */
-export function settleTarget(s, L, dir) {
+/**
+ * R6, U6: where a page at rest at `s` should glide to (track-relative), or null to stay put. In the
+ * dive or the out segment it goes on in the last user direction `dir`; a movement of less than
+ * SETTLE_TINY_PX since the last rest (`travel`) returns to the end behind it. No direction yet
+ * (dir 0) goes to the nearer end.
+ */
+export function settleTarget(s, L, dir, travel = Infinity) {
   const { seg, u } = poseAt(s, L)
-  let target = null
-  if (seg === 'dive') target = goesOn(u, dir) ? L.diveEnd : 0
-  else if (seg === 'out') target = goesOn(u, dir) ? L.outEnd : L.insideEnd
-  if (target === null || Math.abs(target - s) < 1) return null
-  return target
+  let back
+  let fwd
+  if (seg === 'dive') [back, fwd] = [0, L.diveEnd]
+  else if (seg === 'out') [back, fwd] = [L.insideEnd, L.outEnd]
+  else return null
+  const tiny = Math.abs(travel) < SETTLE_TINY_PX
+  const target = dir > 0 ? (tiny ? back : fwd) : dir < 0 ? (tiny ? fwd : back) : u >= 0.5 ? fwd : back
+  return Math.abs(target - s) < 1 ? null : target
+}
+
+/** U9: the scroll cue shows at the top and fades out early in the dive; nowhere else. */
+export function cueOpacity({ seg, z }) {
+  if (seg === 'top') return 0.8
+  if (seg === 'dive') return 0.8 * (1 - ss(0, 0.15, z))
+  return 0
+}
+
+/**
+ * U2: the snap rail for layout `L`. `stop` (diveEnd) is the always-stop; `points` are every `grid`
+ * px over the whole track plus the plateau and out ends (exact settle targets), ascending and unique.
+ */
+export function snapPoints(L, grid = SNAP_GRID_PX) {
+  const end = L.R + L.stageH
+  const set = new Set([L.insideEnd, L.outEnd])
+  for (let p = 0; p <= end; p += grid) set.add(p)
+  set.delete(L.diveEnd)
+  return { stop: L.diveEnd, points: [...set].filter((p) => p >= 0 && p <= end).sort((a, b) => a - b) }
 }
 
 /** Resize: the same segment and fraction in the new layout; past the track keeps its offset. */

@@ -2,7 +2,7 @@
 // while the OS is not live. A bare selector would stop the bodies from scrolling in the
 // no-WebGL fallback, where the OS is flat and still interactive.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { RUNWAY, TRACK_VH } from '../core/constants.js'
 
@@ -63,5 +63,59 @@ describe('styles/stage.css', () => {
   // gets .hud-dim from createApp's setHud, and this rule turns the pointer off for the HUD.
   it('.stage.hud-dim .hud has pointer-events none, so a faded HUD cannot take clicks', () => {
     expect(body(css, '.stage.hud-dim .hud')).toMatch(/pointer-events:\s*none/)
+  })
+
+  // Phase 6A (plan-r2 section 7, U1–U3): mandatory snapping exists only with the rail (html.runway-snap),
+  // the glide suspends it (snap-hold), and the only snap areas are the rail's markers and #resume-root.
+  describe('snap rules (phase 6A)', () => {
+    const styleDir = resolve(process.cwd(), 'src/styles')
+    const styleFiles = readdirSync(styleDir).filter((f) => f.endsWith('.css'))
+    const allRules = styleFiles.flatMap((f) => {
+      const text = readFileSync(resolve(styleDir, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+      return text
+        .split('}')
+        .map((chunk) => {
+          const i = chunk.lastIndexOf('{')
+          return i < 0 ? null : { file: f, selector: chunk.slice(0, i).replace(/\s+/g, ' ').trim(), body: chunk.slice(i + 1) }
+        })
+        .filter(Boolean)
+    })
+    const norm = (sel) => sel.replace(/\s+/g, '')
+
+    it('html.runway-snap is mandatory y snapping, and html.runway-snap.snap-hold turns it off', () => {
+      expect(body(css, 'html.runway-snap')).toMatch(/scroll-snap-type:\s*y mandatory/)
+      expect(body(css, 'html.runway-snap.snap-hold')).toMatch(/scroll-snap-type:\s*none/)
+    })
+
+    it('the rail is an absolute, click-through strip; its markers are snap points and the plateau marker is always-stop', () => {
+      expect(body(css, '.snap-rail')).toMatch(/position:\s*absolute/)
+      expect(body(css, '.snap-rail')).toMatch(/pointer-events:\s*none/)
+      expect(body(css, '.snap-rail>i')).toMatch(/scroll-snap-align:\s*start/)
+      expect(body(css, '.snap-rail>i.stop')).toMatch(/scroll-snap-stop:\s*always/)
+    })
+
+    it('#resume-root is a snap area only under html.runway-snap, so the résumé scrolls freely', () => {
+      expect(body(css, 'html.runway-snap #resume-root')).toMatch(/scroll-snap-align:\s*start/)
+      expect(body(css, '#resume-root')).not.toMatch(/scroll-snap-align/)
+    })
+
+    it('every rule that declares scroll-snap-type is gated by html.runway-snap, in every stylesheet', () => {
+      const rules = allRules.filter((r) => /scroll-snap-type\s*:/.test(r.body))
+      expect(rules.length).toBeGreaterThan(0)
+      for (const r of rules) expect(norm(r.selector).startsWith('html.runway-snap'), `${r.file}: ${r.selector}`).toBe(true)
+    })
+
+    it('the only scroll-snap-align rules are the rail markers and #resume-root under runway-snap', () => {
+      const allowed = ['.snap-rail>i', 'html.runway-snap#resume-root']
+      for (const r of allRules.filter((r) => /scroll-snap-align\s*:/.test(r.body))) {
+        expect(allowed, `${r.file}: ${r.selector}`).toContain(norm(r.selector))
+      }
+    })
+
+    it('no stylesheet declares scroll-behavior (the page scrolls only by the glide and the native rules)', () => {
+      for (const f of styleFiles) {
+        expect(readFileSync(resolve(styleDir, f), 'utf8'), f).not.toMatch(/scroll-behavior\s*:/)
+      }
+    })
   })
 })

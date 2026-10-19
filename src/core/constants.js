@@ -30,7 +30,21 @@ export const DETENT_BASELINE_DECAY = 0.85
 /** R5: how far smooth scrolling may run past diveEnd before the next wheel event (px); a larger
  *  jump came from touch or the scrollbar. */
 export const DETENT_LAG_PX = 120
-/** R6: how far into a segment (in the direction of travel) a resting position must be to go on. */
-export const SETTLE_BIAS = 0.3
+/** U8: the plateau (diveEnd → insideEnd) is at least this many px, taken from the out segment. */
+export const PLATEAU_MIN_PX = 120
+/** U2: the snap rail has a point every this many px, so mandatory snapping moves a rest ≤ 4 px. */
+export const SNAP_GRID_PX = 8
+/** U7: a scroll within this many px of the glide's last write is the glide's own (or its re-snap). */
+export const SNAP_OWN_TOL_PX = 5
+/** U7: …and only within this long after that write (ms). */
+export const OWN_MS = 300
+/** U6: a rest that moved less than this since the last one is tiny and returns (px). */
+export const SETTLE_TINY_PX = 16
+/** U7: the user direction changes only after a same-sign run of at least this many px. */
+export const DIR_MIN_PX = 8
+/** U4: one ArrowUp/ArrowDown press while the page snaps (px). */
+export const ARROW_STEP_PX = 40
+/** U1: mandatory root snapping with the plateau stop (off → the 7.1 fallback). */
+export const RUNWAY_SNAP = true
 /** Resize: a pinned-range change above this fraction keeps the segment and fraction. */
 export const REMAP_THRESHOLD = 0.15

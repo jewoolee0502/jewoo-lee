@@ -2,6 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
+import * as constants from '../core/constants.js'
+import { createDetent } from './runway.js'
 
 // Vitest runs from the project root (vite.config.js sits there).
 const root = process.cwd()
@@ -227,5 +229,30 @@ describe('round 2 phase 5 scripts', () => {
     expect(sh).toMatch(/2000/)
     // The width check must come before the copy into design/img/originals.
     expect(sh.indexOf('pixelWidth')).toBeLessThan(sh.indexOf('cp '))
+  })
+})
+
+// Phase 6A TEST LIST (plan-r2 section 7): the settle bias is gone, the detent stays, and the new constants exist.
+describe('phase 6A structure', () => {
+  it('no file under src/ references SETTLE_BIAS (U6 replaced the bias with the last user direction)', () => {
+    expect(filesImporting(/SETTLE_BIAS/)).toEqual([])
+  })
+
+  it('constants.js drops SETTLE_BIAS and carries the 6A values (U1–U9)', () => {
+    expect(constants).not.toHaveProperty('SETTLE_BIAS')
+    expect(constants).toMatchObject({
+      PLATEAU_MIN_PX: 120,
+      SNAP_GRID_PX: 8,
+      SNAP_OWN_TOL_PX: 5,
+      OWN_MS: 300,
+      SETTLE_TINY_PX: 16,
+      DIR_MIN_PX: 8,
+      ARROW_STEP_PX: 40,
+      RUNWAY_SNAP: true,
+    })
+  })
+
+  it('createDetent is still exported (U5: the JS detent stays for notched wheels)', () => {
+    expect(typeof createDetent).toBe('function')
   })
 })

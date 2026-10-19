@@ -1,4 +1,5 @@
 // Round 2 Phase 2 TEST LIST: stage/runway.test.js. Pure scroll-model math (plan-r2 section 2).
+// Phase 6A (plan-r2 section 7): U6 settle by direction, U8 plateau minimum, U9 cue, U2 snap points.
 // Reference harness: H = 1000 (stage height), trackH = 2900 → R = 1900, diveEnd 1000,
 // insideEnd 1120, outEnd 1720. Positions s are track-relative (s = −trackRect.top).
 import { describe, it, expect } from 'vitest'
@@ -10,6 +11,8 @@ import {
   remapScroll,
   wheelPixels,
   createDetent,
+  cueOpacity,
+  snapPoints,
 } from './runway.js'
 
 const H = 1000
@@ -23,6 +26,24 @@ describe('stage/runway', () => {
 
     it('floors R at 1 when the track is no taller than the stage', () => {
       expect(runwayLayout({ trackH: 1000, stageH: 1000 }).R).toBe(1)
+    })
+
+    // Phase 6A (U8): the plateau is at least PLATEAU_MIN_PX (120), capped at half the out span.
+    it('U8: 1280×720 (R 1368) gets a 120 px plateau: insideEnd 840, not 806', () => {
+      expect(runwayLayout({ trackH: 2088, stageH: 720 })).toMatchObject({ R: 1368, diveEnd: 720, insideEnd: 840, outEnd: 1238 })
+    })
+
+    it('U8: on a tiny screen the minimum is capped at half the out span (trackH 580, stageH 200 → insideEnd 272)', () => {
+      expect(runwayLayout({ trackH: 580, stageH: 200 })).toMatchObject({ diveEnd: 200, insideEnd: 272, outEnd: 344 })
+    })
+
+    it('U8: for phone and laptop heights the plateau is at least min(120, half the out span), and outEnd is unchanged', () => {
+      for (const H of [390, 600, 720, 844, 900, 1000, 1366]) {
+        const lay = runwayLayout({ trackH: 2.9 * H, stageH: H })
+        const minGap = Math.min(120, Math.floor((lay.outEnd - lay.diveEnd) / 2))
+        expect(lay.insideEnd - lay.diveEnd, `H ${H}`).toBeGreaterThanOrEqual(minGap)
+        expect(lay.outEnd, `H ${H}`).toBe(Math.round((1.72 * lay.R) / 1.9))
+      }
     })
   })
 
@@ -59,6 +80,7 @@ describe('stage/runway', () => {
         { H: 1000, trackH: 2900 },
         { H: 600, trackH: 1740 },
         { H: 844, trackH: 2448 },
+        { H: 720, trackH: 2088 },
       ]
       for (const c of cases) {
         const lay = runwayLayout({ trackH: c.trackH, stageH: c.H })
@@ -83,30 +105,42 @@ describe('stage/runway', () => {
     })
   })
 
-  describe('settleTarget (R6)', () => {
-    it('dive: opens to diveEnd at u ≥ 0.3 going down, closes to 0 below', () => {
+  describe('settleTarget (R6; U6: the last user direction decides, a tiny movement returns)', () => {
+    // SETTLE_TINY_PX is 16: a movement of 15 px is tiny, 16 px is not.
+    it('dive: a downward rest glides on to diveEnd, however shallow (100 px travel)', () => {
+      expect(settleTarget(100, L, 1, 100)).toBe(1000)
+      expect(settleTarget(300, L, 1, 300)).toBe(1000)
+    })
+
+    it('dive: an upward rest glides back to the top, however deep (900 and 100 px travel)', () => {
+      expect(settleTarget(900, L, -1, 100)).toBe(0)
+      expect(settleTarget(300, L, -1, 100)).toBe(0)
+    })
+
+    it('a tiny movement (under 16 px) returns to the end behind it; 16 px counts as deliberate', () => {
+      expect(settleTarget(10, L, 1, 10)).toBe(0)
+      expect(settleTarget(990, L, -1, 10)).toBe(1000)
+      expect(settleTarget(300, L, 1, 15)).toBe(0)
+      expect(settleTarget(300, L, 1, 16)).toBe(1000)
+    })
+
+    it('no user direction (dir 0) splits at the middle of the dive: 500 opens, 499 closes', () => {
+      expect(settleTarget(500, L, 0, 0)).toBe(1000)
+      expect(settleTarget(499, L, 0, 0)).toBe(0)
+    })
+
+    it('out: a downward rest glides on to outEnd; a tiny nudge returns to insideEnd', () => {
+      expect(settleTarget(1200, L, 1, 80)).toBe(1720)
+      expect(settleTarget(1130, L, 1, 10)).toBe(1120)
+    })
+
+    it('out: an upward rest glides back to insideEnd, even past the middle; a tiny nudge goes on', () => {
+      expect(settleTarget(1700, L, -1, 20)).toBe(1120)
+      expect(settleTarget(1710, L, -1, 10)).toBe(1720)
+    })
+
+    it('a travel argument left out counts as a deliberate movement', () => {
       expect(settleTarget(300, L, 1)).toBe(1000)
-      expect(settleTarget(299, L, 1)).toBe(0)
-    })
-
-    it('dive: going up needs u > 0.7 to open', () => {
-      expect(settleTarget(700, L, -1)).toBe(0)
-      expect(settleTarget(701, L, -1)).toBe(1000)
-    })
-
-    it('dive: no direction splits at u 0.5', () => {
-      expect(settleTarget(500, L, 0)).toBe(1000)
-      expect(settleTarget(499, L, 0)).toBe(0)
-    })
-
-    it('out: going down leaves at u ≥ 0.3, otherwise settles back to insideEnd', () => {
-      expect(settleTarget(1300, L, 1)).toBe(1720)
-      expect(settleTarget(1299, L, 1)).toBe(1120)
-    })
-
-    it('out: going up stays out until u > 0.7', () => {
-      expect(settleTarget(1540, L, -1)).toBe(1120)
-      expect(settleTarget(1541, L, -1)).toBe(1720)
     })
 
     it('rest points (plateau, top, tail, résumé) and resting exactly on a target give null', () => {
@@ -123,17 +157,68 @@ describe('stage/runway', () => {
     const L0 = runwayLayout({ trackH: 2900, stageH: 1000 })
     const L1 = runwayLayout({ trackH: 1740, stageH: 600 })
 
-    it('L1 is R 1140 with diveEnd 600, insideEnd 672, outEnd 1032', () => {
-      expect(L1).toMatchObject({ R: 1140, diveEnd: 600, insideEnd: 672, outEnd: 1032 })
+    it('L1 is R 1140 with diveEnd 600, insideEnd 720 (U8 minimum), outEnd 1032', () => {
+      expect(L1).toMatchObject({ R: 1140, diveEnd: 600, insideEnd: 720, outEnd: 1032 })
     })
 
     it('maps each segment by its fraction and keeps the offset beyond R', () => {
       expect(remapScroll(1000, L0, L1)).toBe(600)
       expect(remapScroll(500, L0, L1)).toBe(300)
-      expect(remapScroll(1060, L0, L1)).toBe(636)
-      expect(remapScroll(1420, L0, L1)).toBe(852)
+      expect(remapScroll(1060, L0, L1)).toBe(660)
+      expect(remapScroll(1420, L0, L1)).toBe(876)
       expect(remapScroll(2000, L0, L1)).toBe(1240)
       expect(remapScroll(0, L0, L1)).toBe(0)
+    })
+  })
+
+  // Phase 6A (U9): the scroll cue shows only at the top and fades out through the dive.
+  describe('cueOpacity (U9)', () => {
+    it('is 0.8 at the top', () => {
+      expect(cueOpacity({ seg: 'top', z: 0 })).toBe(0.8)
+    })
+
+    it('fades through the dive: 0.4 at z 0.075 (half of smoothstep over 0 to 0.15)', () => {
+      expect(cueOpacity({ seg: 'dive', z: 0.075 })).toBeCloseTo(0.4, 3)
+    })
+
+    it('is 0 in the dive from z 0.15 on', () => {
+      expect(cueOpacity({ seg: 'dive', z: 0.15 })).toBe(0)
+      expect(cueOpacity({ seg: 'dive', z: 0.5 })).toBe(0)
+    })
+
+    it('is 0 on the plateau, through the out segment, in the tail and past it', () => {
+      expect(cueOpacity({ seg: 'inside', z: 1 })).toBe(0)
+      expect(cueOpacity({ seg: 'out', z: 0.5 })).toBe(0)
+      expect(cueOpacity({ seg: 'tail', z: 0 })).toBe(0)
+      expect(cueOpacity({ seg: 'past', z: 0 })).toBe(0)
+    })
+  })
+
+  // Phase 6A (U2): the rail positions. The stop is diveEnd; the points are every 8 px plus the plateau
+  // and out ends, without diveEnd, ascending and unique.
+  describe('snapPoints (U2)', () => {
+    const L720 = runwayLayout({ trackH: 2088, stageH: 720 })
+
+    it('stops at diveEnd and lists 362 points for the H 1000 layout (multiples of 8 from 0 to 2896, minus 1000)', () => {
+      const { stop, points } = snapPoints(L)
+      expect(stop).toBe(1000)
+      expect(points).toHaveLength(362)
+    })
+
+    it('the points are strictly ascending, include 0, 8, 1120, 1720 and 2896, and stop before 2900', () => {
+      const { points } = snapPoints(L)
+      expect(points.every((p, i) => i === 0 || p > points[i - 1])).toBe(true)
+      for (const p of [0, 8, 1120, 1720, 2896]) expect(points, `point ${p}`).toContain(p)
+      expect(points).not.toContain(1000)
+      expect(Math.max(...points)).toBeLessThanOrEqual(2900)
+    })
+
+    it('adds the plateau and out ends when they are not multiples of 8 (H 720: 840 and 1238)', () => {
+      const { stop, points } = snapPoints(L720)
+      expect(stop).toBe(720)
+      expect(points).toContain(840)
+      expect(points).toContain(1238)
+      expect(points).not.toContain(720)
     })
   })
 

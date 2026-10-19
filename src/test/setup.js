@@ -205,6 +205,7 @@ for (const [name, value] of DOM ? [
 
 function installScrollMocks() {
   window.scrollTo = vi.fn()
+  window.scrollBy = vi.fn()
   Element.prototype.scrollIntoView = vi.fn()
 }
 function installDomMocks() {

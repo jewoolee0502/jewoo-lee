@@ -1,17 +1,19 @@
 // Round 2 Phase 2 TEST LIST: stage/controller.test.js (rewrite). The camera pose is a pure
 // function of the scroll position (R1): no tween, no armed/suppress, no leave().
 // Harness: stage H = 1000, track 2900 (R 1900), rect.top = −scrollY unless env.trackTop is set.
-// `at(y)` sets scrollY and runs one update(). `glide` is a fake { to, cancel, active }.
+// `at(y)` sets scrollY and runs one update(). `glide` is a fake { to, cancel, jump, owns, active }.
+// Phase 6A (plan-r2 section 7): the remap and the detent write through glide.jump (U3); the snap rail
+// is synced through ui.setSnap before a remap (U1, U2); the cue follows cueOpacity (U9).
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createController } from './controller.js'
 
 function setup({ now } = {}) {
   const env = { scrollY: 0, status: 'ready', reduce: false, trackTop: null, trackH: 2900, stageH: 1000 }
   const os = { state: 'standby', boot: vi.fn(), setFlat: vi.fn(), setLive: vi.fn() }
-  const ui = { setCue: vi.fn(), setZoomed: vi.fn(), setRunway: vi.fn(), setHud: vi.fn() }
+  const ui = { setCue: vi.fn(), setZoomed: vi.fn(), setRunway: vi.fn(), setHud: vi.fn(), setSnap: vi.fn() }
   const scrollTo = vi.fn()
   const scrollToResume = vi.fn()
-  const glide = { to: vi.fn(), cancel: vi.fn(), active: false }
+  const glide = { to: vi.fn(), cancel: vi.fn(), jump: vi.fn(), owns: vi.fn(() => false), active: false }
   const ctrl = createController({
     getTrackRect: () => ({
       top: env.trackTop ?? -env.scrollY,
@@ -185,40 +187,47 @@ describe('stage/controller', () => {
     expect(b.scrollToResume).toHaveBeenLastCalledWith('auto')
   })
 
-  it('10. settle(+1) glides to diveEnd at 400 and to 0 at 200; not on plateau or past; not while a glide is active', () => {
+  it('10. settle({dir, travel}) glides by the user direction: down at 100 px travel to diveEnd, up at 200 px from the out segment to insideEnd; a tiny travel returns', () => {
     const a = setup()
-    a.at(400)
-    a.ctrl.settle(1)
+    a.at(100)
+    a.ctrl.settle({ dir: 1, travel: 100 })
     expect(a.lastTo()).toBe(1000)
 
     const b = setup()
-    b.at(200)
-    b.ctrl.settle(1)
+    b.at(10)
+    b.ctrl.settle({ dir: 1, travel: 10 })
     expect(b.lastTo()).toBe(0)
 
     const c = setup()
-    c.at(1060)
-    c.ctrl.settle(1)
-    expect(c.glide.to).not.toHaveBeenCalled()
+    c.at(1300)
+    c.ctrl.settle({ dir: -1, travel: 200 })
+    expect(c.lastTo()).toBe(1120)
 
     const d = setup()
-    d.at(2000)
-    d.ctrl.settle(1)
+    d.at(1060)
+    d.ctrl.settle({ dir: 1, travel: 100 })
     expect(d.glide.to).not.toHaveBeenCalled()
 
     const e = setup()
-    e.at(400)
-    e.glide.active = true
-    e.ctrl.settle(1)
+    e.at(2000)
+    e.ctrl.settle({ dir: 1, travel: 100 })
     expect(e.glide.to).not.toHaveBeenCalled()
+
+    const f = setup()
+    f.at(400)
+    f.glide.active = true
+    f.ctrl.settle({ dir: 1, travel: 100 })
+    expect(f.glide.to).not.toHaveBeenCalled()
   })
 
-  it('11. loading: at 1000 is desk with no flat-on call and cue .8; once ready, the same position is inside', () => {
+  it('11. loading: at 1000 is desk with no flat-on call and cue 0 (U9: the cue follows the segment); at 0 it is .8; once ready, the same position is inside', () => {
     const { env, os, ui, at, phase } = setup()
     env.status = 'loading'
     at(1000)
     expect(phase()).toBe('desk')
     expect(os.setFlat).not.toHaveBeenCalledWith(true, expect.anything())
+    expect(ui.setCue).toHaveBeenLastCalledWith(0)
+    at(0)
     expect(ui.setCue).toHaveBeenLastCalledWith(0.8)
     env.status = 'ready'
     at(1000)
@@ -242,18 +251,20 @@ describe('stage/controller', () => {
     expect(ui.setCue).toHaveBeenLastCalledWith(0)
   })
 
-  it('13. resize remap: a stage/track change over 15 % scrolls to the remapped position; a 5 % change does not', () => {
+  it('13. resize remap: a stage/track change over 15 % jumps to the remapped position (U3: through glide.jump); a 5 % change does not', () => {
     const a = setup()
     a.at(1000)
     a.env.stageH = 600
     a.env.trackH = 1740
     a.ctrl.update(0)
-    expect(a.scrollTo).toHaveBeenCalledWith({ top: 600, behavior: 'instant' })
+    expect(a.glide.jump).toHaveBeenCalledWith(600)
+    expect(a.scrollTo).not.toHaveBeenCalled()
 
     const b = setup()
     b.at(1000)
     b.env.trackH = 2800 // R 1800 against 1900: 5 %
     b.ctrl.update(0)
+    expect(b.glide.jump).not.toHaveBeenCalled()
     expect(b.scrollTo).not.toHaveBeenCalled()
   })
 
@@ -286,22 +297,23 @@ describe('stage/controller', () => {
     }
   })
 
-  it('15. onWheel: a burst crossing the plateau returns true and snaps to 1000; the next event returns true with no extra scroll', () => {
-    const { at, ctrl, scrollTo } = setup()
+  it('15. onWheel: a burst crossing the plateau returns true and snaps to 1000 through glide.jump; the next event returns true with no extra jump', () => {
+    const { at, ctrl, glide, scrollTo } = setup()
     at(800)
     expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })).toBe(true)
-    expect(scrollTo).toHaveBeenCalledWith({ top: 1000, behavior: 'instant' })
-    scrollTo.mockClear()
-    expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 16 })).toBe(true)
+    expect(glide.jump).toHaveBeenCalledWith(1000)
     expect(scrollTo).not.toHaveBeenCalled()
+    glide.jump.mockClear()
+    expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 16 })).toBe(true)
+    expect(glide.jump).not.toHaveBeenCalled()
   })
 
   it('15c. an exact landing on the plateau (800 + 200 = 1000) holds the detent: events < DETENT_GAP_MS apart keep the flag true', () => {
     const clock = { t: 0 }
-    const { at, ctrl, scrollTo } = setup({ now: () => clock.t })
+    const { at, ctrl, glide } = setup({ now: () => clock.t })
     at(800)
     expect(ctrl.onWheel({ deltaY: 200, deltaMode: 0, timeStamp: 0 })).toBe(true)
-    expect(scrollTo).toHaveBeenCalledWith({ top: 1000, behavior: 'instant' })
+    expect(glide.jump).toHaveBeenCalledWith(1000)
     at(1000)
     expect(ctrl.store.get().detent).toBe(true)
     for (let t = 16; t <= 96; t += 16) {
@@ -317,6 +329,114 @@ describe('stage/controller', () => {
     env.status = 'loading'
     at(800)
     expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })).toBe(false)
+  })
+
+  // Phase 6A (U1, U2): the rail is synced once per layout, before any remap, and released with the scene.
+  describe('snap rail sync (U1, U2)', () => {
+    it('the first ready frame syncs the rail with the layout once; ten more frames at other positions do not sync it again', () => {
+      const { ui, at } = setup()
+      at(0)
+      expect(ui.setSnap).toHaveBeenCalledTimes(1)
+      expect(ui.setSnap).toHaveBeenCalledWith(expect.objectContaining({ R: 1900, diveEnd: 1000, insideEnd: 1120, outEnd: 1720 }))
+      for (const y of [100, 500, 1000, 1200, 1500, 1720, 1800, 1900, 2500, 2900]) at(y)
+      expect(ui.setSnap).toHaveBeenCalledTimes(1)
+    })
+
+    it('a resize syncs the new layout again, before glide.jump (the rail must move first, or the browser re-snaps to the old one)', () => {
+      const { env, ui, glide, at } = setup()
+      at(1000)
+      ui.setSnap.mockClear()
+      env.stageH = 720
+      env.trackH = 2088
+      at(1000)
+      expect(ui.setSnap).toHaveBeenCalledWith(expect.objectContaining({ R: 1368, diveEnd: 720, insideEnd: 840, outEnd: 1238 }))
+      expect(glide.jump).toHaveBeenCalled()
+      expect(ui.setSnap.mock.invocationCallOrder[0]).toBeLessThan(glide.jump.mock.invocationCallOrder[0])
+    })
+
+    it('while loading the rail is never synced', () => {
+      const { env, ui, at } = setup()
+      env.status = 'loading'
+      at(0)
+      at(1000)
+      expect(ui.setSnap).not.toHaveBeenCalled()
+    })
+
+    it('unavailable clears the rail once over three updates', () => {
+      const { env, ui, at } = setup()
+      env.status = 'unavailable'
+      at(0)
+      at(100)
+      at(200)
+      expect(ui.setSnap).toHaveBeenCalledTimes(1)
+      expect(ui.setSnap).toHaveBeenCalledWith(null)
+    })
+
+    it('releaseSnap() clears the rail (setSnap(null)) and forgets the synced layout', () => {
+      const { ui, ctrl, at } = setup()
+      at(0)
+      ui.setSnap.mockClear()
+      ctrl.releaseSnap()
+      expect(ui.setSnap).toHaveBeenCalledWith(null)
+      at(0)
+      expect(ui.setSnap).toHaveBeenCalledTimes(2)
+      expect(ui.setSnap).toHaveBeenLastCalledWith(expect.objectContaining({ diveEnd: 1000 }))
+    })
+  })
+
+  // Phase 6A (U9): the cue is visible at the top only, and the loading cue follows the same function.
+  describe('scroll cue (U9)', () => {
+    it('at the top the cue is .8; at 1720 (the tail) and 2500 (the résumé) it is 0', () => {
+      const { ui, at } = setup()
+      at(0)
+      expect(ui.setCue).toHaveBeenLastCalledWith(0.8)
+      at(1720)
+      expect(ui.setCue).toHaveBeenLastCalledWith(0)
+      at(2500)
+      expect(ui.setCue).toHaveBeenLastCalledWith(0)
+    })
+  })
+
+  // Browser re-check (phase 6A): Chrome ends a wheel sequence at its first blocked event and snaps from
+  // where the sequence meant to end (short of the stop), so the detent keeps the CSS snap off until rest.
+  it('15d. a detent snap holds the CSS snap (ui.holdSnap) before its jump, once, until the next settle', () => {
+    const { at, ctrl, ui, glide } = setup()
+    ui.holdSnap = vi.fn()
+    at(800)
+    ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })
+    ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 16 })
+    expect(ui.holdSnap.mock.calls).toEqual([[true]])
+    expect(ui.holdSnap.mock.invocationCallOrder[0]).toBeLessThan(glide.jump.mock.invocationCallOrder[0])
+    at(1000)
+    ctrl.settle({ dir: 1, travel: 200 })
+    expect(ui.holdSnap.mock.calls).toEqual([[true], [false]])
+    ctrl.settle({ dir: 1, travel: 0 })
+    expect(ui.holdSnap).toHaveBeenCalledTimes(2)
+  })
+
+  // Phase 6A TEST LIST (detent snap-hold not stuck): a detent snap to where the page already is moves
+  // nothing, so it must not hold the CSS snap (a hold with no jump would stay on until a settle that never
+  // comes, since no burst ends at a new position).
+  it('15e. a detent snap whose snapTo equals the current s (|snapTo − s| < 1) does not call ui.holdSnap', () => {
+    const { at, ctrl, ui, glide } = setup()
+    ui.holdSnap = vi.fn()
+    at(999.5)
+    const r = ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })
+    expect(r).toBe(true)
+    expect(glide.jump).toHaveBeenCalledWith(1000)
+    expect(ui.holdSnap).not.toHaveBeenCalled()
+  })
+
+  // Phase 6A TEST LIST (runway-snap cleared at once): applyFlat runs on the scene status change and must
+  // clear the rail as soon as the scene is unavailable, not on the next frame.
+  it('15f. applyFlat after the scene turns unavailable (no frame) clears the rail: ui.setSnap(null)', () => {
+    const { env, ui, ctrl, at } = setup()
+    at(0)
+    expect(ui.setSnap).toHaveBeenLastCalledWith(expect.objectContaining({ diveEnd: 1000 }))
+    ui.setSnap.mockClear()
+    env.status = 'unavailable'
+    ctrl.applyFlat()
+    expect(ui.setSnap).toHaveBeenCalledWith(null)
   })
 
   it('16. the controller never boots the OS when the scene is ready (the lid does)', () => {

@@ -10,6 +10,15 @@
 // plain properties written every frame. `detent` says whether the plateau detent can act (the page
 // is in the dive, or a stopped burst is still being held), so the bindings attach the non-passive
 // #stage wheel listener only then.
+//
+// plan-r2 §7 (U1–U9): once the scene is ready the page snaps mandatorily to a rail synced through
+// `ui.setSnap(L)` once per layout (before any remap, so the browser never re-snaps to the old rail),
+// with an always-stop at diveEnd that stops momentum flicks at the open laptop; the scene being
+// unavailable or the stage unmounting (`releaseSnap`) turns it off. The resize remap and the detent
+// snap are instant `glide.jump`s, which hold the snap around their write; a detent snap keeps it off
+// until the next rest, so the browser cannot snap the stopped burst back short of diveEnd. The
+// settle follows the last user direction (`settle({ dir, travel })`), the plateau is at least
+// PLATEAU_MIN_PX, and the cue shows only at the top and in the dive.
 import { createStore } from '../core/store.js'
 import { ss } from '../core/math.js'
 import { REMAP_THRESHOLD, HUD_FADE } from '../core/constants.js'
@@ -21,7 +30,11 @@ import {
   remapScroll,
   wheelPixels,
   createDetent,
+  cueOpacity,
 } from './runway.js'
+
+const sameLayout = (a, b) =>
+  a.R === b.R && a.diveEnd === b.diveEnd && a.insideEnd === b.insideEnd && a.outEnd === b.outEnd && a.stageH === b.stageH
 
 export function createController({
   getTrackRect,
@@ -43,6 +56,26 @@ export function createController({
   let runwayFlat = false
   let fallbackBooted = false
   let fallbackLive = false
+  // The layout the snap rail was last synced to (null: not synced), and whether it was cleared
+  // for the fallback.
+  let snapL = null
+  let snapCleared = false
+  // Whether a detent snap keeps the page's CSS snap suspended until the next rest (see onWheel).
+  let detentHold = false
+
+  /** U1: the fallback (no scene) never snaps; cleared once, as soon as the scene is unavailable. */
+  function clearSnap() {
+    if (snapCleared) return
+    snapCleared = true
+    snapL = null
+    ui.setSnap?.(null)
+  }
+
+  function releaseDetentHold() {
+    if (!detentHold) return
+    detentHold = false
+    ui.holdSnap?.(false)
+  }
 
   function setDetent(v) {
     if (v !== store.get().detent) store.set({ detent: v })
@@ -74,6 +107,10 @@ export function createController({
       let { s } = m
       const prev = ctrl.layout
       const status = sceneStatus()
+      if (status === 'ready' && m.L.R > 1 && !(snapL && sameLayout(snapL, m.L))) {
+        snapL = m.L
+        ui.setSnap?.(m.L)
+      }
       // A big resize (rotation, window snap) keeps the reader in the same segment and fraction.
       // Small ones (the mobile toolbar) are left alone: the invariant holds at any R. The
       // fallback has no runway to keep, and an unmeasured track (R 1) is not a layout.
@@ -85,13 +122,14 @@ export function createController({
         Math.abs(m.L.R - prev.R) / prev.R > REMAP_THRESHOLD
       ) {
         s = remapScroll(s, prev, m.L)
-        glide.cancel()
-        scrollTo({ top: m.trackTopDoc + s, behavior: 'instant' })
+        glide.jump(m.trackTopDoc + s)
       }
       ctrl.layout = m.L
 
       if (status === 'unavailable') {
-        // R10: no scene, no runway. The flat compact OS is live from the first frame.
+        // R10: no scene, no runway. The flat compact OS is live from the first frame, and the
+        // collapsed page never snaps (U1).
+        clearSnap()
         if (!fallbackBooted) {
           fallbackBooted = true
           if (os.state === 'standby') os.boot()
@@ -107,7 +145,7 @@ export function createController({
         ctrl.z = 0
         ctrl.seg = 'top'
         if (store.get().phase !== 'desk') store.set({ phase: 'desk' })
-        ui.setCue(0.8)
+        ui.setCue(cueOpacity({ seg: poseAt(s, m.L).seg, z: 0 }))
         ui.setHud?.(1)
         return
       }
@@ -119,7 +157,7 @@ export function createController({
       const interactive = store.get().interactive
       const phase = interactive ? 'inside' : pose.z > 0 ? 'dive' : 'desk'
       if (phase !== store.get().phase) store.set({ phase })
-      ui.setCue(0.8 * (1 - ss(0, 0.15, pose.z)))
+      ui.setCue(cueOpacity(pose))
       ui.setHud?.(1 - ss(HUD_FADE[0], HUD_FADE[1], pose.z))
     },
 
@@ -129,6 +167,7 @@ export function createController({
     applyFlat() {
       const { interactive, narrow } = store.get()
       const unavailable = sceneStatus() === 'unavailable'
+      if (unavailable) clearSnap()
       if (unavailable && !runwayFlat) {
         runwayFlat = true
         ui.setRunway?.(true)
@@ -170,12 +209,21 @@ export function createController({
       scrollToResume(isReduced() ? 'auto' : 'smooth')
     },
 
-    /** R6: called once the page is at rest; finishes a half-open dive or a half-closed exit. */
-    settle(dir) {
+    /** R6, U6: called once the page is at rest with the last user direction and the travel since
+     *  the last rest; finishes a half-open dive or a half-closed exit that way. */
+    settle({ dir = 0, travel } = {}) {
+      releaseDetentHold()
       if (sceneStatus() !== 'ready' || glide.active) return
       const m = measure()
-      const t = settleTarget(m.s, m.L, dir)
+      const t = settleTarget(m.s, m.L, dir, travel)
       if (t !== null) glide.to(m.trackTopDoc + t)
+    },
+
+    /** U1: the stage is going away: stop snapping and sync the rail afresh next time. */
+    releaseSnap() {
+      snapL = null
+      detentHold = false
+      ui.setSnap?.(null)
     },
 
     /** R5: the plateau detent. Returns true when the wheel event should be prevented. */
@@ -188,7 +236,17 @@ export function createController({
         s: m.s,
         diveEnd: m.L.diveEnd,
       })
-      if (r.snapTo != null) scrollTo({ top: m.trackTopDoc + r.snapTo, behavior: 'instant' })
+      if (r.snapTo != null) {
+        // The browser ends the wheel's scroll sequence at the first blocked event and snaps from
+        // where that sequence meant to end, which is short of the stop. Keep the CSS snap off until
+        // the page is at rest (settle), when it re-snaps from diveEnd onto diveEnd itself.
+        // Already on diveEnd (< 1 px): the jump moves nothing, so there is nothing to snap back.
+        if (!detentHold && Math.abs(r.snapTo - m.s) >= 1) {
+          detentHold = true
+          ui.holdSnap?.(true)
+        }
+        glide.jump(m.trackTopDoc + r.snapTo)
+      }
       return r.block
     },
   }

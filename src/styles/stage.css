@@ -5,6 +5,13 @@
 /* plan-r2 R10: no scene, no runway. The flat OS sits in a plain, unpinned stage. */
 .track.flat-runway{height:auto}
 .track.flat-runway .stage{position:relative}
+/* plan-r2 §7 U1–U3: the plateau stop and the 8 px rail that keeps mandatory snapping free. */
+html.runway-snap{scroll-snap-type:y mandatory}
+html.runway-snap.snap-hold{scroll-snap-type:none}
+html.runway-snap #resume-root{scroll-snap-align:start}
+.snap-rail{position:absolute;left:0;top:0;width:1px;height:100%;pointer-events:none}
+.snap-rail>i{position:absolute;left:0;width:1px;height:1px;scroll-snap-align:start}
+.snap-rail>i.stop{scroll-snap-stop:always}
 .stage{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;background:var(--scene);color:var(--scene-ink);touch-action:pan-y}
 .stage .gl{position:absolute;inset:0;width:100%;height:100%;display:block}
 .stage .css3d{position:absolute!important;inset:0;pointer-events:none}

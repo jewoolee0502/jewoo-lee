@@ -1,5 +1,7 @@
 // Round 2 Phase 2 TEST LIST: stage/glide.test.js. Own rAF-driven glide for programmatic scrolls (R7).
 // Fake rAF queue and fake clock: frame(ms) advances the clock and runs every queued callback.
+// Phase 6A (plan-r2 section 7, U3 and U7): the glide holds the CSS snap around its writes, jump() is an
+// instant programmatic write, and every write records what it wrote so owns(y) can tell it from a user scroll.
 import { describe, it, expect, vi } from 'vitest'
 import { createGlide, glideDuration } from './glide.js'
 
@@ -18,6 +20,7 @@ function harness({ y = 0, reduce = false } = {}) {
   const caf = vi.fn((id) => {
     queue.delete(id)
   })
+  const hold = vi.fn()
   const glide = createGlide({
     getY: () => env.y,
     scrollTo,
@@ -25,6 +28,7 @@ function harness({ y = 0, reduce = false } = {}) {
     caf,
     now: () => env.t,
     reduce: () => env.reduce,
+    hold,
   })
   const frame = (ms = 16) => {
     env.t += ms
@@ -35,7 +39,7 @@ function harness({ y = 0, reduce = false } = {}) {
   const runToEnd = (max = 500) => {
     for (let i = 0; i < max && glide.active; i++) frame()
   }
-  return { env, scrollTo, raf, caf, glide, frame, runToEnd, queue }
+  return { env, scrollTo, raf, caf, hold, glide, frame, runToEnd, queue }
 }
 
 describe('stage/glide', () => {
@@ -111,5 +115,92 @@ describe('stage/glide', () => {
     h.runToEnd()
     expect(h.scrollTo.mock.calls.at(-1)[0].top).toBe(0)
     expect(h.glide.active).toBe(false)
+  })
+
+  // Phase 6A (U3): programmatic writes suspend the CSS snap (html.snap-hold) around themselves.
+  describe('snap hold (U3)', () => {
+    it('to(1000): hold(true) before the first write, hold(false) after the last, and nothing else', () => {
+      const h = harness({ y: 0 })
+      h.glide.to(1000)
+      h.runToEnd()
+      expect(h.hold.mock.calls).toEqual([[true], [false]])
+      expect(h.hold.mock.invocationCallOrder[0]).toBeLessThan(h.scrollTo.mock.invocationCallOrder[0])
+      expect(h.hold.mock.invocationCallOrder[1]).toBeGreaterThan(h.scrollTo.mock.invocationCallOrder.at(-1))
+    })
+
+    it('cancel() mid-glide releases the hold once; cancel() when idle does not touch it', () => {
+      const h = harness({ y: 0 })
+      h.glide.to(1000, { duration: 1 })
+      h.frame()
+      h.hold.mockClear()
+      h.glide.cancel()
+      expect(h.hold.mock.calls).toEqual([[false]])
+      h.hold.mockClear()
+      h.glide.cancel()
+      expect(h.hold).not.toHaveBeenCalled()
+    })
+
+    it('reduced motion: hold(true), one instant scrollTo 1000, then hold(false)', () => {
+      const h = harness({ y: 0, reduce: true })
+      h.glide.to(1000)
+      expect(h.hold.mock.calls).toEqual([[true], [false]])
+      expect(h.hold.mock.invocationCallOrder[0]).toBeLessThan(h.scrollTo.mock.invocationCallOrder[0])
+      expect(h.hold.mock.invocationCallOrder[1]).toBeGreaterThan(h.scrollTo.mock.invocationCallOrder[0])
+    })
+  })
+
+  // Phase 6A (U3): jump(top) is the instant programmatic write used by the resize remap and the detent.
+  describe('jump (U3)', () => {
+    it('jump(640) during a glide stops it, then writes 640 once with the hold around that write', () => {
+      const h = harness({ y: 0 })
+      h.glide.to(1000, { duration: 1 })
+      h.frame()
+      const n = h.scrollTo.mock.calls.length
+      h.hold.mockClear()
+      h.glide.jump(640)
+      h.frame()
+      h.frame()
+      expect(h.glide.active).toBe(false)
+      expect(h.scrollTo.mock.calls.slice(n)).toEqual([[{ top: 640, behavior: 'instant' }]])
+      expect(h.hold.mock.calls.slice(-2)).toEqual([[true], [false]])
+      expect(h.hold.mock.invocationCallOrder.at(-2)).toBeLessThan(h.scrollTo.mock.invocationCallOrder[n])
+    })
+  })
+
+  // Phase 6A (U7): owns(y) is true for a value within SNAP_OWN_TOL_PX (5) of the last write, for
+  // OWN_MS (300) after it. An external cancel() ends the window at once.
+  describe('owns (U7)', () => {
+    it('after a jump to 640, owns(644) is true (4 px) and owns(646) is false (6 px)', () => {
+      const h = harness({ y: 0 })
+      h.glide.jump(640)
+      expect(h.glide.owns(644)).toBe(true)
+      expect(h.glide.owns(646)).toBe(false)
+    })
+
+    it('a frame write is owned for 300 ms, then not', () => {
+      const h = harness({ y: 0 })
+      h.glide.to(1000, { duration: 1 })
+      h.frame()
+      const last = h.scrollTo.mock.calls.at(-1)[0].top
+      const t0 = h.env.t
+      expect(h.glide.owns(last + 3)).toBe(true)
+      h.env.t = t0 + 299
+      expect(h.glide.owns(last + 3)).toBe(true)
+      h.env.t = t0 + 301
+      expect(h.glide.owns(last + 3)).toBe(false)
+    })
+
+    it('an external cancel() ends the window at once', () => {
+      const h = harness({ y: 0 })
+      h.glide.jump(640)
+      expect(h.glide.owns(642)).toBe(true)
+      h.glide.cancel()
+      expect(h.glide.owns(642)).toBe(false)
+    })
+
+    it('before any write, nothing is owned', () => {
+      const h = harness({ y: 0 })
+      expect(h.glide.owns(0)).toBe(false)
+    })
   })
 })
