@@ -292,7 +292,7 @@ Common rules for every phase:
     - cv `/files/JEWOOLEE_CV.pdf`; getform `https://getform.io/f/akknzgea`.
     - about paragraph (L791); facts (L792); education `{school:'McGill University', degree:'B.Eng. Computer Engineering', dates:'Jan 2020 – Dec 2025'}` (from the CV PDF).
     - `resumeTags` (L813); recruiter bullets (L294–297), with bullet 3 built as `${PROJECTS.length} projects, including RecycleWise (McGill capstone), WhenAreYouFree and Duonosaur`.
-    - `site: 'https://jewoolee.dev'` (from the CV; the user confirms it).
+    - `site`: build-time `VITE_SITE_URL`, default `https://jewoo-lee.vercel.app` (the CV domain does not resolve; lead decision).
 - **`lib/png.js`**
   - `encodeIndexedPng({width, height, indices, palette, alpha})` returns a `Uint8Array`:
     - signature; IHDR with bit depth 8 and colour type 3.
@@ -1430,7 +1430,7 @@ grant update (status) on public.drawings to authenticated;
   - `<title>Jewoo (Jay) Lee · Full-stack developer</title>`.
   - `<meta name="description" content="Jewoo (Jay) Lee is a full-stack developer from McGill Computer Engineering in Montréal. Step into JAY-OS, a 3D 90s laptop portfolio, or read the résumé.">`.
   - `theme-color #141C2E`; OG `og:title`, `og:description`, `og:type=website`, `og:url` from `PROFILE.site`; `twitter:card=summary`.
-  - favicon `/images/favicon.svg`; the font links (L3–5); `<link rel="canonical" href="https://jewoolee.dev/">` (the user confirms the domain).
+  - favicon `/images/favicon.svg`; the font links (L3–5); `<link rel="canonical" href="%SITE_URL%/">`, filled by a Vite plugin from `VITE_SITE_URL` (default `https://jewoo-lee.vercel.app`).
 - **Body**:
   ```html
   <a class="skip" href="#resume">Skip to résumé</a>
@@ -1603,14 +1603,14 @@ To move off r128:
 3. **Auth settings:**
    - Authentication > Sign In / Providers: keep **Email** enabled (magic link). Enable **Allow anonymous sign-ins**. Keep "Allow new users to sign up" **on**, because anonymous sign-in needs it. Strangers still cannot create email accounts because the app sends `shouldCreateUser:false`.
    - Optional: enable CAPTCHA (Cloudflare Turnstile) and lower the anonymous sign-in rate limit under Authentication > Rate Limits.
-4. **URL configuration** (Authentication > URL Configuration): Site URL `https://jewoolee.dev` (or the Vercel domain). Redirect URLs: `https://jewoolee.dev/?mod`, `http://localhost:5173/?mod`, `http://localhost:4173/?mod`, and the Vercel preview pattern `https://*-<your-team>.vercel.app/**`.
+4. **URL configuration** (Authentication > URL Configuration): Site URL = `VITE_SITE_URL` (default `https://jewoo-lee.vercel.app`). Redirect URLs: `<site>/?mod`, `http://localhost:5173/?mod`, `http://localhost:4173/?mod`, and the Vercel preview pattern `https://*-<your-team>.vercel.app/**`.
 5. **Create Jay's moderator user:** Authentication > Users > Add user > your email (for example `jewoo.lee@mail.mcgill.ca`), confirmed. Then edit `supabase/seed/admin.sql` with that email and run it in the SQL Editor. Check with `select * from public.admins;`.
 6. **Environment variables:**
    - Vercel > Project > Settings > Environment Variables (Production and Preview): `VITE_SUPABASE_URL` (Project Settings > API > URL) and `VITE_SUPABASE_ANON_KEY` (the anon or publishable key; **never** the service_role or secret key). Redeploy.
    - Locally: `cp .env.example .env.local` and fill both. Without them the site runs the mock wall.
 7. **Moderating:** open `https://<site>/?mod`, open the Visitor Wall, enter your email, click the magic link, and approve or reject. Rejected and taken-down drawings stay in the table for audit, and are never public.
 8. **Confirm content questions:**
-   - Canonical domain `jewoolee.dev` (taken from the CV).
+   - Custom domain: none yet (the CV's domain does not resolve). Set `VITE_SITE_URL` in Vercel if one is attached; the default is `https://jewoo-lee.vercel.app`.
    - The About text still says "student" / "STUDYING", while the CV says the degree ended Dec 2025.
    - The CV's LinkedIn and GitHub handles (`linkedin.com/jewoolee`, `github.com/jewoolee`) differ from the site's (`jewoo-lee`, `jewoolee0502`). The site keeps the prototype's.
    - The adStar and HTTP blurbs are still drafts.
