@@ -3,12 +3,11 @@
 // render must not touch `window`; only event handlers may. The "draft blurb" chip never shows
 // here (D15).
 import { useApp } from '../app/AppContext.jsx'
-import { PROFILE, PROJECTS, ROLES, SKILLS, CAT, projectImage } from '../content/index.js'
+import { PROFILE, PROJECTS, ROLES, SKILLS, CAT, projectDims, projectImage, projectSrcSet } from '../content/index.js'
 import TrophiesGrid, { useGotTrophies } from './TrophiesGrid.jsx'
 
-// Every project card reserves the same 420×263 box; the image covers it (CSS object-fit).
-const IMG_W = 420
-const IMG_H = 263
+// Every project card reserves the same 420:263 box (CSS aspect-ratio); the image covers it. The
+// width and height attributes are the original's, so the browser knows the ratio before loading.
 
 const ext = { target: '_blank', rel: 'noopener' }
 
@@ -48,15 +47,18 @@ function Dates({ value }) {
 }
 
 function ProjectCard({ p }) {
+  const { w, h } = projectDims(p)
   return (
     <article className="col r-project">
       <img
         src={projectImage(p)}
+        srcSet={projectSrcSet(p, 1280)}
+        sizes="(max-width: 600px) calc(100vw - 48px), (max-width: 900px) 45vw, 360px"
         alt={p.title + ' screenshot'}
         loading="lazy"
         decoding="async"
-        width={IMG_W}
-        height={IMG_H}
+        width={w}
+        height={h}
       />
       <h3>{p.title}</h3>
       <p>{p.blurb}</p>

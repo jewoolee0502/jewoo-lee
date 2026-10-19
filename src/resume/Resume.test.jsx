@@ -84,8 +84,11 @@ describe('resume/Resume', () => {
     for (const img of images) {
       expect(img).toHaveAttribute('loading', 'lazy')
       expect(img).toHaveAttribute('decoding', 'async')
-      expect(img).toHaveAttribute('width', '420')
+      expect(img.getAttribute('width')).toMatch(/^\d+$/)
       expect(img.getAttribute('height')).toMatch(/^\d+$/)
+      // Phase 5 TEST LIST item 4: responsive candidates, with a sizes value for the column width.
+      expect(img.getAttribute('srcset')).toMatch(/ 640w/)
+      expect(img.getAttribute('sizes')).toBe('(max-width: 600px) calc(100vw - 48px), (max-width: 900px) 45vw, 360px')
     }
   })
 

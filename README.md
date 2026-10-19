@@ -39,9 +39,9 @@ With no environment variables the site runs fully.
 | `npm run preview` | Serves `dist/` at http://localhost:4173. |
 | `npm test` / `npm run test:watch` | Vitest (unit, component and SSR tests). |
 | `npm run lint` | ESLint. Only `src/scene/createScene.js` may import `three`. |
-| `npm run assets:images` | `design/img/*.jpg` → `public/img/projects/*.webp` (420 px wide) and `public/img/jay.jpg` (sharp). |
+| `npm run assets:images` | Project screenshots from `design/img/originals/<name>.png` (full resolution; falls back to the 420 px `design/img/<name>.jpg` when there is no original) → WebP at 640, 1280 and 1920 px wide, never enlarged (`public/img/projects/<name>-<width>.webp`, quality 82), plus the generated manifest `src/content/projectImages.js` (natural size and files per project; do not edit by hand) and `public/img/jay.jpg` (sharp). The components build `srcset` from the manifest and `sizes` from the OS scale. `design/img/*.jpg` stay for the prototype `design/revamp-lab.html`. |
 | `npm run assets:portrait` | Precomputes the dithered 56×72 `public/img/jay-px.png`. |
-| `npm run assets:joblog` | Headless-Chrome screenshot of the Joblog demo → `joblog.webp` (pixel placeholder if offline). |
+| `npm run assets:joblog` | Headless-Chrome screenshot of the Joblog demo at 2× (2560×1600) → `design/img/originals/joblog.png`, then `assets:images`. If the capture fails the existing source is kept. |
 
 ## Environment variables
 

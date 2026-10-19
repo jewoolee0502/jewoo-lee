@@ -172,3 +172,60 @@ describe('round 2 phase 4 structure', () => {
     expect(text).toMatch(/fonts\.googleapis\.com\/css2\?[^"]*family=EB\+Garamond:wght@500/)
   })
 })
+
+// Phase 5 TEST LIST item 6: image sources and generated outputs.
+describe('round 2 phase 5 images', () => {
+  const PNGS = ['recyclewise', 'whenareyoufree', 'duonosaur', 'menulens', 'marletnests', 'adstar', 'http', 'library']
+
+  it('design/img/originals/ holds the eight restored PNGs, plus joblog.png only when the capture ran', () => {
+    const files = readdirSync(abs('design/img/originals')).sort()
+    for (const name of PNGS) expect(files, name).toContain(name + '.png')
+    const extra = files.filter((f) => !PNGS.map((n) => n + '.png').includes(f))
+    expect(extra.every((f) => f === 'joblog.png'), extra.join(', ')).toBe(true)
+  })
+
+  it('public/img/projects/ holds only width-suffixed files (-640, -1280 or -1920 .webp)', () => {
+    const files = readdirSync(abs('public/img/projects'))
+    expect(files.filter((f) => !/-(640|1280|1920)\.webp$/.test(f))).toEqual([])
+  })
+
+  // Phase 5 TEST LIST item 7 (round 2 framing): the Joblog original is cropped to the sign-in card.
+  it('design/img/originals/joblog.png has a 1.55–1.65 aspect and is at least 1600 px wide', () => {
+    const b = readFileSync(abs('design/img/originals/joblog.png'))
+    expect(b.subarray(1, 4).toString('ascii')).toBe('PNG')
+    const w = b.readUInt32BE(16)
+    const h = b.readUInt32BE(20)
+    expect(w).toBeGreaterThanOrEqual(1600)
+    expect(w / h).toBeGreaterThanOrEqual(1.55)
+    expect(w / h).toBeLessThanOrEqual(1.65)
+  })
+
+  it('the joblog manifest entry matches the original PNG size', () => {
+    const b = readFileSync(abs('design/img/originals/joblog.png'))
+    const manifest = readFileSync(abs('src/content/projectImages.js'), 'utf8')
+    const m = manifest.match(/joblog: \{\s*w: (\d+),\s*h: (\d+),/)
+    expect(m).not.toBeNull()
+    expect({ w: Number(m[1]), h: Number(m[2]) }).toEqual({ w: b.readUInt32BE(16), h: b.readUInt32BE(20) })
+  })
+
+  it('the old design/img/*.jpg prototype images stay, including the joblog fallback', () => {
+    for (const name of [...PNGS, 'joblog']) {
+      expect(existsSync(abs('design/img/' + name + '.jpg')), name).toBe(true)
+    }
+  })
+})
+
+// Phase 5 decisions: the placeholder flag is gone, and the Joblog capture refuses a too-small PNG.
+describe('round 2 phase 5 scripts', () => {
+  it('scripts/optimize-images.mjs no longer supports --placeholder', () => {
+    expect(readFileSync(abs('scripts/optimize-images.mjs'), 'utf8')).not.toContain('--placeholder')
+  })
+
+  it('scripts/capture-joblog.sh checks the captured PNG is at least 2000 px wide before copying it', () => {
+    const sh = readFileSync(abs('scripts/capture-joblog.sh'), 'utf8')
+    expect(sh).toMatch(/sips\s+-g\s+pixelWidth|pixelWidth/)
+    expect(sh).toMatch(/2000/)
+    // The width check must come before the copy into design/img/originals.
+    expect(sh.indexOf('pixelWidth')).toBeLessThan(sh.indexOf('cp '))
+  })
+})

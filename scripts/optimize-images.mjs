@@ -1,75 +1,98 @@
-// Optimizes the prototype images into public/img (not part of `npm run build`).
-//   node scripts/optimize-images.mjs                       all design/img/*.jpg -> public/img/projects/*.webp, jay.jpg -> public/img/jay.jpg
-//   node scripts/optimize-images.mjs --one <src> <name>    one image -> public/img/projects/<name>.webp
-//   node scripts/optimize-images.mjs --placeholder <name>  16:10 pixel Kanban placeholder -> public/img/projects/<name>.webp
-import { mkdir, readdir } from 'node:fs/promises'
+// Optimizes the project screenshots into public/img (not part of `npm run build`, R15).
+//   node scripts/optimize-images.mjs                       every project -> public/img/projects/<name>-<width>.webp,
+//                                                          the manifest src/content/projectImages.js, jay.jpg -> public/img/jay.jpg
+// Source per project: design/img/originals/<name>.png (full resolution), else design/img/<name>.jpg (420 px; only
+// joblog when its capture failed). Widths come from planWidths() and are never enlarged.
+import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
-import { encodeIndexedPng, hexToRgb } from '../src/lib/png.js'
-import { PAL } from '../src/lib/pixelIcons.js'
+import { planWidths } from '../src/content/imagePlan.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SRC_DIR = join(ROOT, 'design/img')
+const ORIG_DIR = join(SRC_DIR, 'originals')
 const OUT_DIR = join(ROOT, 'public/img')
 const PROJ_DIR = join(OUT_DIR, 'projects')
-const WIDTH = 420
+const MANIFEST = join(ROOT, 'src/content/projectImages.js')
+const JAY_WIDTH = 420
+const WEBP = { quality: 82, effort: 6, smartSubsample: true }
 
-async function toWebp(src, name) {
-  const out = join(PROJ_DIR, `${name}.webp`)
-  const info = await sharp(src).resize({ width: WIDTH, withoutEnlargement: true }).webp({ quality: 72 }).toFile(out)
-  console.log(`${out.replace(ROOT + '/', '')}  ${info.width}×${info.height}  ${(info.size / 1024).toFixed(1)} KB`)
-}
+const rel = (p) => p.replace(ROOT + '/', '')
+const kb = (n) => (n / 1024).toFixed(1) + ' KB'
 
-/** 48×30 grid of three Kanban columns in PAL colours, upscaled ×8 nearest. */
-async function placeholder(name) {
-  const W = 48
-  const H = 30
-  const keys = ['D', 'K', 'S', 'W', 'B', 'Y', 'G']
-  const idx = Object.fromEntries(keys.map((k, i) => [k, i]))
-  const px = new Uint8Array(W * H).fill(idx.D)
-  const rect = (x, y, w, h, k) => {
-    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) px[j * W + i] = idx[k]
-  }
-  rect(0, 0, W, 3, 'K') // title bar
-  const accents = ['B', 'Y', 'G']
-  for (let c = 0; c < 3; c++) {
-    const x = 2 + c * 15
-    rect(x, 5, 14, 23, 'K') // column
-    rect(x + 1, 6, 12, 2, accents[c]) // column header
-    const cards = [3, 2, 1][c]
-    for (let n = 0; n < cards; n++) {
-      rect(x + 1, 9 + n * 6, 12, 5, 'W')
-      rect(x + 2, 10 + n * 6, 8, 1, 'S')
-      rect(x + 2, 12 + n * 6, 5, 1, 'S')
+/** Project names: every original PNG plus every prototype JPG (except the portrait). */
+async function projectNames() {
+  const names = new Set()
+  for (const dir of [ORIG_DIR, SRC_DIR]) {
+    if (!existsSync(dir)) continue
+    for (const f of await readdir(dir)) {
+      const ext = extname(f).toLowerCase()
+      if ((dir === ORIG_DIR && ext === '.png') || (dir === SRC_DIR && ext === '.jpg')) names.add(basename(f, extname(f)))
     }
   }
-  const png = encodeIndexedPng({ width: W, height: H, indices: px, palette: keys.map((k) => hexToRgb(PAL[k])) })
-  const out = join(PROJ_DIR, `${name}.webp`)
-  await sharp(Buffer.from(png)).resize({ width: W * 8, height: H * 8, kernel: 'nearest' }).resize({ width: WIDTH }).webp({ quality: 72 }).toFile(out)
-  console.log(`${out.replace(ROOT + '/', '')}  placeholder`)
+  names.delete('jay')
+  return [...names].sort()
+}
+
+/** Writes `<name>-<width>.webp` for every planned width; returns the manifest entry. */
+async function project(name, input, label) {
+  const meta = await sharp(input).metadata()
+  const files = []
+  for (const width of planWidths(meta.width)) {
+    const out = join(PROJ_DIR, `${name}-${width}.webp`)
+    const info = await sharp(input).resize({ width, withoutEnlargement: true }).webp(WEBP).toFile(out)
+    console.log(`${rel(out)}  ${info.width}×${info.height}  ${kb(info.size)}  (${label})`)
+    files.push([width, `/img/projects/${name}-${width}.webp`])
+  }
+  return { w: meta.width, h: meta.height, files }
+}
+
+/** Deletes every file in public/img/projects/ that the plan did not just write. */
+async function pruneStale(manifest) {
+  const keep = new Set(Object.values(manifest).flatMap((e) => e.files.map(([, url]) => basename(url))))
+  for (const f of await readdir(PROJ_DIR)) {
+    if (keep.has(f)) continue
+    await unlink(join(PROJ_DIR, f))
+    console.log(`removed public/img/projects/${f}`)
+  }
+}
+
+function manifestSource(manifest) {
+  const lines = ['// generated by npm run assets:images — do not edit', '', 'export const PROJECT_IMAGES = {']
+  for (const [name, { w, h, files }] of Object.entries(manifest)) {
+    lines.push(`  ${name}: {`, `    w: ${w},`, `    h: ${h},`, '    files: [')
+    for (const [width, url] of files) lines.push(`      [${width}, '${url}'],`)
+    lines.push('    ],', '  },')
+  }
+  lines.push('}', '')
+  return lines.join('\n')
 }
 
 async function main() {
   await mkdir(PROJ_DIR, { recursive: true })
-  const [flag, a, b] = process.argv.slice(2)
-  if (flag === '--one') {
-    if (!a || !b) throw new Error('usage: --one <src> <name>')
-    return toWebp(resolve(a), b)
+  const names = await projectNames()
+  const manifest = {}
+  for (const name of names) {
+    const orig = join(ORIG_DIR, `${name}.png`)
+    if (existsSync(orig)) manifest[name] = await project(name, orig, rel(orig))
+    else manifest[name] = await project(name, join(SRC_DIR, `${name}.jpg`), `${rel(join(SRC_DIR, name))}.jpg, no original`)
   }
-  if (flag === '--placeholder') {
-    if (!a) throw new Error('usage: --placeholder <name>')
-    return placeholder(a)
-  }
-  const files = (await readdir(SRC_DIR)).filter((f) => extname(f).toLowerCase() === '.jpg').sort()
-  for (const f of files) {
-    const name = basename(f, extname(f))
-    if (name === 'jay') continue
-    await toWebp(join(SRC_DIR, f), name)
-  }
+  await pruneStale(manifest)
+  await writeFile(MANIFEST, manifestSource(manifest))
+  console.log(`${rel(MANIFEST)}  ${names.length} projects`)
+
+  let total = 0
+  for (const f of await readdir(PROJ_DIR)) total += (await stat(join(PROJ_DIR, f))).size
+  console.log(`public/img/projects/ total  ${kb(total)}`)
+
   const jay = join(OUT_DIR, 'jay.jpg')
-  const info = await sharp(join(SRC_DIR, 'jay.jpg')).resize({ width: WIDTH, withoutEnlargement: true }).jpeg({ quality: 78, mozjpeg: true }).toFile(jay)
-  console.log(`public/img/jay.jpg  ${info.width}×${info.height}  ${(info.size / 1024).toFixed(1)} KB`)
+  const info = await sharp(join(SRC_DIR, 'jay.jpg'))
+    .resize({ width: JAY_WIDTH, withoutEnlargement: true })
+    .jpeg({ quality: 78, mozjpeg: true })
+    .toFile(jay)
+  console.log(`public/img/jay.jpg  ${info.width}×${info.height}  ${kb(info.size)}`)
 }
 
 main().catch((e) => {

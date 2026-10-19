@@ -61,7 +61,7 @@ describe('Projects and ProjectDetail', () => {
     const p8 = windowEl('p:8')
     expect(p8).not.toBeNull()
     expect(within(p8).getByRole('heading', { level: 2, name: 'Joblog' })).toBeInTheDocument()
-    const links = [...p8.querySelectorAll('a')]
+    const links = [...p8.querySelectorAll('.links a')]
     expect(links.map((a) => a.textContent)).toEqual(['Live demo ↗', 'Open on GitHub ↗'])
     expect(links[0].getAttribute('href')).toBe('https://joblog-nine.vercel.app')
     expect(links[1].getAttribute('href')).toBe('https://github.com/jewoolee0502/Joblog')
@@ -71,7 +71,7 @@ describe('Projects and ProjectDetail', () => {
   it('Duonosaur (p:2) shows live, url and repo links in that order', () => {
     const { app } = bootedApp()
     const w = open(app, 'p:2')
-    const links = [...w.querySelectorAll('a')]
+    const links = [...w.querySelectorAll('.links a')]
     expect(links.map((a) => a.textContent)).toEqual([
       'Live demo ↗',
       'Open on Devpost ↗',
@@ -97,6 +97,74 @@ describe('Projects and ProjectDetail', () => {
     for (const a of w.querySelectorAll('a')) {
       expect(a.getAttribute('target')).toBe('_blank')
       expect(a.getAttribute('rel')).toContain('noopener')
+    }
+  })
+
+  // Phase 5 TEST LIST item 3. `sizes` ignores transforms, so it carries the OS scale (R15).
+  it('the detail image is sharp: srcset, sizes from the OS scale, and the natural width and height', () => {
+    const { app } = bootedApp()
+    act(() => {
+      app.os.store.set({ scale: 1.3333 })
+    })
+    const w = open(app, 'p:0')
+    const img = w.querySelector('img.shot')
+    expect(img).not.toBeNull()
+    expect(img.getAttribute('sizes')).toBe('747px')
+    expect(img.getAttribute('srcset')).toContain('/img/projects/recyclewise-640.webp 640w')
+    expect(img.getAttribute('srcset')).toContain('/img/projects/recyclewise-1920.webp 1920w')
+    expect(img.getAttribute('width')).toBe('3356')
+    expect(img.getAttribute('height')).toBe('1798')
+    expect(img.getAttribute('alt')).toBe('RecycleWise screenshot')
+  })
+
+  it('the detail image is wrapped in a link to the full-size file, opened in a new tab', () => {
+    const { app } = bootedApp()
+    const w = open(app, 'p:0')
+    const link = w.querySelector('img.shot').closest('a')
+    expect(link).not.toBeNull()
+    expect(link.classList.contains('shot-link')).toBe(true)
+    expect(link.getAttribute('href')).toBe('/img/projects/recyclewise-1920.webp')
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toContain('noopener')
+    expect(link.getAttribute('aria-label')).toBe('Open the RecycleWise screenshot full size (opens in a new tab)')
+  })
+
+  it('in the compact (phone) layout the detail sizes fill the viewport minus the gutter', () => {
+    const { app } = bootedApp()
+    act(() => {
+      app.os.store.set({ compact: true, scale: 1 })
+    })
+    const img = open(app, 'p:0').querySelector('img.shot')
+    expect(img.getAttribute('sizes')).toBe('calc(100vw - 52px)')
+  })
+
+  it('the detail sizes follow a later scale change without reopening the window', () => {
+    const { app } = bootedApp()
+    const w = open(app, 'p:2')
+    expect(w.querySelector('img.shot').getAttribute('sizes')).toBe('560px')
+    act(() => {
+      app.os.store.set({ scale: 1.3333 })
+    })
+    expect(w.querySelector('img.shot').getAttribute('sizes')).toBe('747px')
+  })
+
+  it('a portrait original (Duonosaur) offers only the 640 file', () => {
+    const { app } = bootedApp()
+    const img = open(app, 'p:2').querySelector('img.shot')
+    expect(img.getAttribute('srcset')).toBe('/img/projects/duonosaur-640.webp 640w')
+    expect(img.getAttribute('width')).toBe('704')
+    expect(img.getAttribute('height')).toBe('1538')
+  })
+
+  it('Projects grid thumbnails use srcset up to 1280 px, sizes from the scale, and natural dims', () => {
+    const { app } = bootedApp()
+    const sec = open(app, 'projects')
+    for (const img of sec.querySelectorAll('button.pcard img')) {
+      expect(img.getAttribute('srcset'), img.getAttribute('src')).not.toContain('1920w')
+      expect(img.getAttribute('srcset')).toContain('640w')
+      expect(img.getAttribute('sizes')).toBe('200px')
+      expect(img.getAttribute('width')).toMatch(/^\d+$/)
+      expect(img.getAttribute('height')).toMatch(/^\d+$/)
     }
   })
 })
@@ -212,6 +280,16 @@ describe('Bin', () => {
     const w = open(app, 'bin')
     fireEvent.click(within(w).getByText('RecycleWise · open').closest('button'))
     expect(windowEl('p:0')).not.toBeNull()
+  })
+
+  // Phase 5 TEST LIST item 6: the Bin thumbnail reserves its box from the natural size (projectDims).
+  it('the RecycleWise thumbnail carries numeric width and height from projectDims', () => {
+    const { app } = bootedApp()
+    const w = open(app, 'bin')
+    const img = w.querySelector('button.pcard img')
+    expect(img).not.toBeNull()
+    expect(img).toHaveAttribute('width', '3356')
+    expect(img).toHaveAttribute('height', '1798')
   })
 })
 

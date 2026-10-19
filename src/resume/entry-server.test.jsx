@@ -19,6 +19,12 @@ describe('resume/entry-server (node, no DOM)', () => {
     expect(html).toContain('0/12')
   })
 
+  it('prerendered project images carry srcset and sizes (phase 5)', () => {
+    const html = renderResumeHtml()
+    expect(html.match(/srcSet="|srcset="/g)).toHaveLength(9)
+    expect(html).toMatch(/srcSet="\/img\/projects\/recyclewise-640\.webp 640w/)
+  })
+
   it('does not contain the outlet comment, a draft blurb or placeholder values', () => {
     const html = renderResumeHtml()
     expect(html).not.toContain('<!--resume-outlet-->')

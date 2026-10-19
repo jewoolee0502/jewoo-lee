@@ -1,9 +1,10 @@
 // Recycle Bin (L861–863): one "item", RecycleWise.
 import { useApp } from '../../app/AppContext.jsx'
-import { PROJECTS, projectImage } from '../../content/index.js'
+import { PROJECTS, projectDims, projectImage } from '../../content/index.js'
 
 export default function Bin() {
   const app = useApp()
+  const { w, h } = projectDims(PROJECTS[0])
   return (
     <>
       <p className="muted">1 item</p>
@@ -15,6 +16,8 @@ export default function Bin() {
         <img
           alt=""
           src={projectImage(PROJECTS[0])}
+          width={w}
+          height={h}
           style={{ width: 110, aspectRatio: '16/10', borderBottom: 0, borderRight: '2px solid #122030' }}
         />
         <span>RecycleWise · open</span>

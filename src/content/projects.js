@@ -1,4 +1,6 @@
 // Projects (L442–449, then Joblog appended as p9 so p:0 stays RecycleWise; D15).
+import { PROJECT_IMAGES } from './projectImages.js'
+import { srcSetFrom } from './imagePlan.js'
 
 export const PROJECTS = [
   {
@@ -92,5 +94,16 @@ export const PROJECTS = [
   },
 ]
 
-/** Public URL of a project's optimized image. */
-export const projectImage = (p) => `/img/projects/${p.image}.webp`
+const files = (p) => PROJECT_IMAGES[p.image].files
+
+/** Public URL of a project's smallest optimized image (the `src` fallback). */
+export const projectImage = (p) => files(p)[0][1]
+
+/** Public URL of a project's largest optimized image. */
+export const projectFull = (p) => files(p).at(-1)[1]
+
+/** `srcset` of a project's images up to `maxW` px wide. */
+export const projectSrcSet = (p, maxW = Infinity) => srcSetFrom(files(p).filter(([w]) => w <= maxW))
+
+/** Natural size of a project's original screenshot, `{ w, h }`. */
+export const projectDims = (p) => ({ w: PROJECT_IMAGES[p.image].w, h: PROJECT_IMAGES[p.image].h })
