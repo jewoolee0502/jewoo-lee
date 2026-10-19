@@ -54,12 +54,10 @@ export function createApp(overrides = {}) {
       host: app.host,
       registry,
       ach: app.ach,
-      toasts: app.toasts,
       snd: app.snd,
       motion: app.motion,
       timers: app.timers,
       scene: () => app.scene?.api ?? null,
-      ctrl: () => app.ctrl,
     }),
   )
 

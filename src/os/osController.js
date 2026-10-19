@@ -21,8 +21,7 @@ export function BOOT_LINES({ projects = PROJECTS, roles = ROLES } = {}) {
 
 const DEFAULT_COLOR = '#4AA6EE'
 
-// deps: {host, registry, ach, toasts, snd, motion, timers, scene: () => api, ctrl: () => ctrl}.
-// `toasts` and `ctrl` are accepted for later phases; the shell itself does not need them.
+// deps: {host, registry, ach, snd, motion, timers, scene: () => api}.
 export function createOsController({ host, registry, ach, snd, motion, timers, scene }) {
   const t = timers.child()
   const reduce = () => Boolean(motion?.reduce?.())
