@@ -12,7 +12,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "assets:images": "node scripts/optimize-images.mjs",
+    "assets:portrait": "node scripts/make-pixel-portrait.mjs",
+    "assets:joblog": "bash scripts/capture-joblog.sh"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
