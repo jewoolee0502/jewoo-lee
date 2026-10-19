@@ -6,24 +6,30 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import { act, cleanup } from '@testing-library/react'
 import { createRecordingContext } from './fakeCanvas.js'
 
+// Files with `// @vitest-environment node` (the PGlite SQL tests) have no DOM: skip the stubs.
+const DOM = typeof window !== 'undefined'
+
 /* ---------- canvas ---------- */
 
 const contexts = new WeakMap()
 
-HTMLCanvasElement.prototype.getContext = function getContext(type) {
-  // jsdom has no WebGL: only the 2D context is faked, like a browser without WebGL.
-  if (type !== '2d') return null
-  let ctx = contexts.get(this)
-  if (!ctx) {
-    ctx = createRecordingContext(this)
-    contexts.set(this, ctx)
+function installCanvas() {
+  HTMLCanvasElement.prototype.getContext = function getContext(type) {
+    // jsdom has no WebGL: only the 2D context is faked, like a browser without WebGL.
+    if (type !== '2d') return null
+    let ctx = contexts.get(this)
+    if (!ctx) {
+      ctx = createRecordingContext(this)
+      contexts.set(this, ctx)
+    }
+    return ctx
   }
-  return ctx
-}
 
-HTMLCanvasElement.prototype.toDataURL = function toDataURL() {
-  return 'data:image/png;base64,TEST'
+  HTMLCanvasElement.prototype.toDataURL = function toDataURL() {
+    return 'data:image/png;base64,TEST'
+  }
 }
+if (DOM) installCanvas()
 
 /* ---------- matchMedia (controllable reduced motion) ---------- */
 
@@ -77,7 +83,7 @@ function matchMedia(query) {
   return mql
 }
 
-Object.defineProperty(window, 'matchMedia', {
+if (DOM) Object.defineProperty(window, 'matchMedia', {
   configurable: true,
   writable: true,
   value: matchMedia,
@@ -187,10 +193,10 @@ export function triggerResize(el, { width = 0, height = 0 } = {}) {
   return hit.length
 }
 
-for (const [name, value] of [
+for (const [name, value] of DOM ? [
   ['IntersectionObserver', MockIntersectionObserver],
   ['ResizeObserver', MockResizeObserver],
-]) {
+] : []) {
   Object.defineProperty(window, name, { configurable: true, writable: true, value })
   Object.defineProperty(globalThis, name, { configurable: true, writable: true, value })
 }
@@ -201,35 +207,40 @@ function installScrollMocks() {
   window.scrollTo = vi.fn()
   Element.prototype.scrollIntoView = vi.fn()
 }
-installScrollMocks()
+function installDomMocks() {
+  installScrollMocks()
 
-Element.prototype.setPointerCapture = function setPointerCapture() {}
-Element.prototype.releasePointerCapture = function releasePointerCapture() {}
-Element.prototype.hasPointerCapture = function hasPointerCapture() {
-  return false
-}
+  Element.prototype.setPointerCapture = function setPointerCapture() {}
+  Element.prototype.releasePointerCapture = function releasePointerCapture() {}
+  Element.prototype.hasPointerCapture = function hasPointerCapture() {
+    return false
+  }
 
-Object.defineProperty(document, 'fonts', {
-  configurable: true,
-  writable: true,
-  value: { ready: Promise.resolve(), load: () => Promise.resolve([]) },
-})
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    writable: true,
+    value: { ready: Promise.resolve(), load: () => Promise.resolve([]) },
+  })
 
-if (typeof window.requestAnimationFrame !== 'function') {
-  window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16)
+  if (typeof window.requestAnimationFrame !== 'function') {
+    window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16)
+  }
+  if (typeof window.cancelAnimationFrame !== 'function') {
+    window.cancelAnimationFrame = (id) => clearTimeout(id)
+  }
 }
-if (typeof window.cancelAnimationFrame !== 'function') {
-  window.cancelAnimationFrame = (id) => clearTimeout(id)
-}
+if (DOM) installDomMocks()
 
 /* ---------- per-test lifecycle ---------- */
 
 beforeEach(() => {
+  if (!DOM) return
   // Fresh mocks so call history never leaks between tests.
   installScrollMocks()
 })
 
 afterEach(() => {
+  if (!DOM) return
   cleanup()
   localStorage.clear()
   sessionStorage.clear()
