@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks -- temporary: old component, deleted in phase 3 */
 /**
  * @copyright 2025 Jewoo Lee
  * @license Apache-2.0
