@@ -22,7 +22,8 @@ const DEG = Math.PI / 180
  * The McGill mug (R16) on the desk's left front, clear of the floppy lane and the screen. The
  * outer wall is an open cylinder (so the coffee shows) carrying the `label` canvas; `inner` is the
  * inside wall, `coffeeY` the coffee's height. The handle is a half torus of radius `R` turned so
- * it bulges out to +x, its ends on the wall at `center` ± R·scaleY; `lift` is the hover lift.
+ * it bulges out to +x, its ends on the wall at `center` ± R·scaleY; `lift` is the hover lift and
+ * `glow` the hover glow strength.
  */
 export const MUG = {
   pos: [-2.3, 0, 0.85],
@@ -36,6 +37,8 @@ export const MUG = {
   handle: { R: 0.105, tube: 0.028, arc: Math.PI, center: [0.19, 0.225, 0], rotZ: -Math.PI / 2, scaleY: 1.05 },
   lift: 0.06,
   label: { w: 1024, h: 400 },
+  // plan-r2 §7 U15: the mug's own hover glow strength; GLOW_K's red emissive on the red label reads pink.
+  glow: 0.1,
 }
 
 /** The outer wall's radius at height `y` above the mug's base. */
@@ -64,3 +67,14 @@ export const SLOT = { x: 0.95, y: 0.085, z: 1.05, w: 0.56, h: 0.036, frame: [0.6
 
 /** How far the closed lid peeks open while it is hovered at the desk. */
 export const PEEK = 7 * DEG
+
+/**
+ * Invisible hit boxes (plan-r2 §7 U16) that make the thin dog tags and floppies easy to hover and
+ * click. Each is local to its hotspot group: `pos` is the box centre, `size` its [w, h, d]. The tags
+ * box covers both plates, the chain and the ring, and stays in front of the wall; the floppy box is
+ * a little larger than the 0.5 × 0.03 × 0.52 floppy, but thinner than the stack.
+ */
+export const HIT = {
+  tags: { size: [0.42, 1.0, 0.1], pos: [0.02, -0.44, 0] },
+  floppy: { size: [0.58, 0.07, 0.6], pos: [0, 0.015, 0] },
+}

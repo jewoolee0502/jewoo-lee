@@ -137,8 +137,9 @@ const T = vi.hoisted(() => {
 vi.mock('three', () => T.three)
 vi.mock('three/examples/jsm/renderers/CSS3DRenderer.js', () => T.css3d)
 
-import { createScene, CANVAS_FONTS } from './createScene.js'
-import { MUG } from './props.js'
+import { createScene, CANVAS_FONTS, GLOW_K } from './createScene.js'
+import { MUG, HIT } from './props.js'
+import { glowColor } from './sceneMath.js'
 
 const { state } = T
 const RESOURCE_KINDS = new Set([
@@ -789,6 +790,121 @@ describe('scene/createScene hover, dive, peek latch and mug hop (round 2 phase 4
     }
     expect(late.length).toBeGreaterThan(0)
     for (const y of late) expect(Math.abs(y), 'mug at rest after 0.4 s').toBeLessThan(1e-3)
+    api.dispose()
+  })
+})
+
+// Round 2 §7 6C TEST LIST item 2 (U15, U16): GLOW_K 0.2, the mug's own glow strength, and one invisible
+// hit box per dog-tag group and per floppy group (its material is hidden, the mesh is not).
+describe('scene/createScene glow strength and hit proxies (round 2 §7 6C)', () => {
+  beforeEach(() => {
+    state.calls = []
+    state.created = []
+    state.failOn = null
+    state.seq = 0
+    state.hits = []
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const RED = 0xed1b2f
+  const METAL = 0xc3ccd5
+  /** The hot label of a group, or '' (a bare mock member is not a string, so it is not compared). */
+  const labelOf = (o) => {
+    const l = o.userData?.hot?.label
+    return typeof l === 'string' ? l : ''
+  }
+  const hotOf = (label) => state.created.find((o) => o.__kind === 'Group' && labelOf(o) === label)
+  /** The children of a hotspot group whose material is hidden: the hit boxes. */
+  const hitMeshes = (group) => group.children.filter((c) => c.__kind === 'Mesh' && c.material?.__args?.[0]?.visible === false)
+  const canvasOf = (env) => env.mount.querySelector('canvas.gl')
+  const pointer = (el, type, x = 10) => el.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: 10 }))
+  const sized = (env) => {
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+  }
+  const hoverOn = (env, label) => {
+    state.hits = [{ object: hotOf(label) }]
+    pointer(canvasOf(env), 'pointermove')
+  }
+  const emissiveWrites = (mat) =>
+    state.calls.filter((c) => c.kind === 'MeshStandardMaterial' && c.id === mat.__id && (c.method === 'setRGB' || c.method === 'copy'))
+
+  it('GLOW_K is 0.2', () => {
+    expect(GLOW_K).toBe(0.2)
+  })
+
+  it('the mug hotspot carries its own glow strength, MUG.glow', () => {
+    const env = setup()
+    const api = env.build()
+    expect(hotOf('McGill mug').userData.hot.glow).toBe(MUG.glow)
+    api.dispose()
+  })
+
+  it('hovering the mug writes the glow at MUG.glow (the red at 0.1), not at GLOW_K', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const mat = state.created.find((o) => o.__kind === 'MeshStandardMaterial' && o.__args[0]?.color === RED)
+    expect(mat, 'mug red material').toBeDefined()
+
+    hoverOn(env, 'McGill mug')
+
+    const last = emissiveWrites(mat).at(-1)
+    expect(last, 'emissive written on hover').toBeDefined()
+    const want = glowColor(RED, MUG.glow)
+    expect(last.args).toHaveLength(3)
+    last.args.forEach((v, i) => expect(v).toBeCloseTo(want[i], 5))
+    api.dispose()
+  })
+
+  it('a hotspot without its own strength glows at GLOW_K (dog tags: the metal at 0.2)', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const metal = state.created.find((o) => o.__kind === 'MeshStandardMaterial' && o.__args[0]?.color === METAL)
+    expect(metal, 'dog tag metal material').toBeDefined()
+
+    hoverOn(env, 'Dog tags')
+
+    const last = emissiveWrites(metal).at(-1)
+    expect(last, 'emissive written on hover').toBeDefined()
+    const want = glowColor(METAL, GLOW_K)
+    last.args.forEach((v, i) => expect(v).toBeCloseTo(want[i], 5))
+    api.dispose()
+  })
+
+  it('the dog tags group has exactly one hit box: hidden through its material, HIT.tags size, no shadow', () => {
+    const env = setup()
+    const api = env.build()
+    const tags = hotOf('Dog tags')
+    expect(tags).toBeDefined()
+
+    const hits = hitMeshes(tags)
+    expect(hits).toHaveLength(1)
+    expect(hits[0].geometry.__args).toEqual(HIT.tags.size)
+    expect(hits[0].castShadow).toBe(false)
+    expect(hits[0].receiveShadow).toBe(false)
+    expect(hits[0].visible).not.toBe(false)
+    api.dispose()
+  })
+
+  it('each floppy group has one hit box of HIT.floppy size with no shadow', () => {
+    const env = setup()
+    const api = env.build()
+    const floppies = state.created.filter((o) => o.__kind === 'Group' && labelOf(o).startsWith('Floppy · '))
+    expect(floppies.length).toBeGreaterThan(0)
+
+    for (const f of floppies) {
+      const hits = hitMeshes(f)
+      expect(hits, labelOf(f)).toHaveLength(1)
+      expect(hits[0].geometry.__args, labelOf(f)).toEqual(HIT.floppy.size)
+      expect(hits[0].castShadow, labelOf(f)).toBe(false)
+      expect(hits[0].receiveShadow, labelOf(f)).toBe(false)
+    }
     api.dispose()
   })
 })

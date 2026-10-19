@@ -41,7 +41,7 @@ import {
 import { drawSky, drawNote, drawSticker, drawLogo, drawFloppyLabel, drawMirror, drawMugLabel, drawPuff } from './textures.js'
 import { FLOPPIES, createFloppySequencer } from './floppy.js'
 import { createHotspotActions, hotspotOf } from './hotspots.js'
-import { POLAROID, MUG, SLOT, faceAngle } from './props.js'
+import { POLAROID, MUG, SLOT, HIT, faceAngle } from './props.js'
 
 /** The faces the canvas textures draw with; the font gate redraws them once these have loaded. */
 export const CANVAS_FONTS = [
@@ -56,8 +56,9 @@ export const CANVAS_FONTS = [
 const RATE = { lift: 12, steam: 4, lamp: 6, peek: 10, wiggle: 10 }
 const STEAM_N = 18
 const WIGGLE_AMP = 0.06
-// The hover glow is the material's own colour at this strength, so a prop keeps its hue.
-const GLOW_K = 0.35
+// The hover glow is the material's own colour at this strength, so a prop keeps its hue. A hotspot
+// may carry its own strength (the mug, plan-r2 §7 U15).
+export const GLOW_K = 0.2
 const PORTRAIT = 'img/jay-px.png'
 const PORTRAIT_FALLBACK = 'img/jay.jpg'
 const POINTER_EVENTS = ['pointermove', 'pointerdown', 'pointerup', 'pointerleave']
@@ -217,6 +218,16 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       return m
     }
     const B = (w, h, d) => new THREE.BoxGeometry(w, h, d)
+    // plan-r2 §7 U16: invisible hit boxes. Hidden through the material, not mesh.visible: the
+    // raycaster still tests them, the renderer skips them, and glow() skips them (no emissive).
+    const hitM = new THREE.MeshBasicMaterial({ visible: false })
+    const hitBox = (parent, { size, pos }) => {
+      const m = new THREE.Mesh(B(...size), hitM)
+      m.position.set(...pos)
+      m.castShadow = m.receiveShadow = false
+      parent.add(m)
+      return m
+    }
     const canvasTex = (w, h, draw) => {
       const c = document.createElement('canvas')
       c.width = w
@@ -323,6 +334,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     mk(new THREE.CylinderGeometry(0.006, 0.006, 0.55, 6), metal, 0, -0.27, 0, tags)
     mk(B(0.17, 0.28, 0.012), metal, 0, -0.68, 0, tags)
     mk(B(0.17, 0.28, 0.012), metal, 0.04, -0.65, -0.014, tags).rotation.z = 0.15
+    hitBox(tags, HIT.tags)
     let tagSwing = 0.05
     let tagT = 0
 
@@ -428,6 +440,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       g.rotation.y = f.home[3]
       rig.add(g)
       const mesh = mk(B(0.5, 0.03, 0.52), [side, side, hued(new THREE.MeshStandardMaterial({ map: lab.t, roughness: 0.6 }), f.col), side, side, side], 0, 0, 0, g)
+      hitBox(g, HIT.floppy) // on the group, not the mesh the wiggle turns
       return { ...f, m: g, mesh, lab, wamp: 0 }
     })
     let driveBusy = 0
@@ -594,15 +607,15 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       },
     })
     const hot = []
-    const addHot = (obj, label) => {
-      obj.userData.hot = { label, fn: actions.get(label), obj }
+    const addHot = (obj, label, glow) => {
+      obj.userData.hot = { label, fn: actions.get(label), obj, glow }
       hot.push(obj)
     }
     addHot(hinge, 'Laptop · open me')
     addHot(pbtn, 'Power button')
     floppies.forEach((f) => addHot(f.m, 'Floppy · ' + f.label))
     addHot(tags, 'Dog tags')
-    addHot(mug, 'McGill mug')
+    addHot(mug, 'McGill mug', MUG.glow)
     addHot(lamp, 'Desk lamp')
     addHot(pol, 'Polaroid')
     addHot(noteM, 'Sticky note')
@@ -637,12 +650,13 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     }
     function glow(o, on) {
       if (!o) return
+      const k = o.userData.hot?.glow ?? GLOW_K
       o.traverse((m) => {
         if (!m.isMesh) return
         for (const mt of [].concat(m.material)) {
           if (!mt.emissive) continue
           if (!mt.userData.e0) mt.userData.e0 = mt.emissive.clone()
-          if (on) mt.emissive.setRGB(...glowColor(hueOf(mt), GLOW_K))
+          if (on) mt.emissive.setRGB(...glowColor(hueOf(mt), k))
           else mt.emissive.copy(mt.userData.e0)
         }
       })

@@ -3,7 +3,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { POLAROID, MUG, mugRadiusAt, handleEnds, handleBulgeX, faceAngle, SLOT } from './props.js'
+import { POLAROID, MUG, mugRadiusAt, handleEnds, handleBulgeX, faceAngle, SLOT, HIT } from './props.js'
+import { glowColor } from './sceneMath.js'
 
 // handleEnds may return [x, y] pairs or {x, y} points; both are accepted here.
 const pt = (p) => (Array.isArray(p) ? { x: p[0], y: p[1] } : p)
@@ -99,5 +100,51 @@ describe('scene/props McGill mug and drive slot', () => {
     expect(SLOT.x - SLOT.w / 2).toBeGreaterThanOrEqual(-1.5)
     expect(SLOT.x + SLOT.w / 2).toBeLessThanOrEqual(1.5)
     expect(SLOT.x - SLOT.w / 2).toBeGreaterThan(-1.1 + 0.04)
+  })
+})
+
+// Round 2 §7 6C TEST LIST item 1 (U15, U16): a softer mug glow, and invisible hit boxes that cover the
+// dog tags and floppies. HIT boxes are group-local: [x, y, z] centre and [w, h, d] size.
+describe('scene/props hover glow and hit proxies (plan §7 6C)', () => {
+  const lo = ({ pos, size }) => pos.map((p, i) => p - size[i] / 2)
+  const hi = ({ pos, size }) => pos.map((p, i) => p + size[i] / 2)
+
+  it('HIT has a tags box and a floppy box', () => {
+    expect(Object.keys(HIT).sort()).toEqual(['floppy', 'tags'])
+  })
+
+  it('the mug glow is softer than the old 0.35 and below 0.2 (U15)', () => {
+    expect(MUG.glow).toBeLessThan(0.2)
+  })
+
+  it('the mug glow keeps every channel of the red at or below 0.1', () => {
+    expect(Math.max(...glowColor(MUG.color, MUG.glow))).toBeLessThanOrEqual(0.1)
+  })
+
+  it('the tags box covers both plates with a 0.05 margin in x, the chain and the ring top', () => {
+    const [min, max] = [lo(HIT.tags), hi(HIT.tags)]
+    expect(min[0]).toBeLessThanOrEqual(-0.085 - 0.05)
+    expect(max[0]).toBeGreaterThanOrEqual(0.125 + 0.05)
+    expect(min[1]).toBeLessThanOrEqual(-0.82)
+    expect(max[1]).toBeGreaterThanOrEqual(0.06)
+  })
+
+  it('the tags box back face is in front of the wall: tags z -2.92 + pos z - size z / 2 is above -3', () => {
+    expect(-2.92 + HIT.tags.pos[2] - HIT.tags.size[2] / 2).toBeGreaterThan(-3)
+  })
+
+  it('the floppy box is at least 0.06 wider and 0.06 deeper than the 0.5 x 0.52 floppy', () => {
+    expect(HIT.floppy.size[0]).toBeGreaterThanOrEqual(0.5 + 0.06)
+    expect(HIT.floppy.size[2]).toBeGreaterThanOrEqual(0.52 + 0.06)
+  })
+
+  it('the floppy box is thicker than the floppy but not the whole stack (0.06 to 0.08)', () => {
+    expect(HIT.floppy.size[1]).toBeGreaterThanOrEqual(0.06)
+    expect(HIT.floppy.size[1]).toBeLessThanOrEqual(0.08)
+  })
+
+  it('the floppy box covers the floppy plate in y (-0.015 to 0.015 about its origin)', () => {
+    expect(lo(HIT.floppy)[1]).toBeLessThanOrEqual(-0.015)
+    expect(hi(HIT.floppy)[1]).toBeGreaterThanOrEqual(0.015)
   })
 })
