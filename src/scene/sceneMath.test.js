@@ -24,6 +24,13 @@ import {
   fogFor,
   holderAlpha,
   vignetteAlpha,
+  approach,
+  wiggle,
+  stepSteam,
+  peekTarget,
+  peekLatch,
+  glowColor,
+  createTweenList,
 } from './sceneMath.js'
 import * as SM from './sceneMath.js'
 import { ss, easeQuad } from '../core/math.js'
@@ -401,5 +408,114 @@ describe('scene/sceneMath', () => {
       const linear = 1 / d0 + (1 / d - 1 / d0) * e
       expect(Math.abs(apparent - linear) / linear, `e=${e}`).toBeLessThanOrEqual(0.02)
     }
+  })
+
+  // Round 2 Phase 4 TEST LIST 4 (hover, lamp ease, steam, lid peek).
+  it('approach(cur, target, dt, rate) = target + (cur - target) · exp(-rate · dt)', () => {
+    expect(approach(0, 1, 0, 10)).toBe(0)
+    expect(approach(0, 1, 1, 10)).toBeCloseTo(1, 4)
+    expect(approach(1, 0, 0.1, 6)).toBeCloseTo(Math.exp(-0.6), 12)
+  })
+
+  it('wiggle(t, amp) is amp · sin(t · 0.014): zero at t = 0 and never larger than amp', () => {
+    expect(wiggle(0, 0.06)).toBe(0)
+    for (const t of [1, 250, 1234, 5000, 99999]) {
+      expect(Math.abs(wiggle(t, 0.06))).toBeLessThanOrEqual(0.06)
+    }
+  })
+
+  it('stepSteam(y, v, dt) wraps from 0.85 back to 0.45 and otherwise rises', () => {
+    expect(stepSteam(0.84, 1, 0.1)).toBeCloseTo(0.45, 10)
+    const rising = stepSteam(0.5, 1, 0.1)
+    expect(rising).toBeGreaterThan(0.5)
+    expect(rising).toBeLessThan(0.85)
+  })
+
+  it('peekTarget is 7 degrees (in radians) only while hovered, close (z < 0.02) and not reduced', () => {
+    const PEEK = 7 * (Math.PI / 180)
+    expect(peekTarget({ hovered: true, z: 0, reduce: false })).toBeCloseTo(PEEK, 10)
+    expect(peekTarget({ hovered: true, z: 0.019, reduce: false })).toBeCloseTo(PEEK, 10)
+    expect(peekTarget({ hovered: true, z: 0.02, reduce: false })).toBe(0)
+    expect(peekTarget({ hovered: true, z: 0.5, reduce: false })).toBe(0)
+    expect(peekTarget({ hovered: false, z: 0, reduce: false })).toBe(0)
+    expect(peekTarget({ hovered: true, z: 0, reduce: true })).toBe(0)
+  })
+
+  // Round 2 Phase 4 (R14): one object's tweens play leg by leg, each from where the last one left it.
+  it('createTweenList queues a second tween on a busy object and starts it from the first one\'s end', () => {
+    const obj = { position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } }
+    const done = []
+    const list = createTweenList()
+    list.tween(obj, { p: { x: 1, y: 0, z: 0 } }, 1, () => done.push('a'))
+    list.tween(obj, { p: { x: 1, y: 2, z: 0 } }, 1, () => done.push('b'))
+    expect(list.busy(obj)).toBe(true)
+    list.step(0.5)
+    expect(obj.position.y).toBe(0)
+    list.step(0.5)
+    expect(obj.position).toEqual({ x: 1, y: 0, z: 0 })
+    expect(done).toEqual(['a'])
+    list.step(1)
+    expect(obj.position).toEqual({ x: 1, y: 2, z: 0 })
+    expect(done).toEqual(['a', 'b'])
+    expect(list.busy(obj)).toBe(false)
+  })
+
+  it('createTweenList runs tweens on different objects side by side, with durations from durFor', () => {
+    const mk = () => ({ position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } })
+    const a = mk()
+    const b = mk()
+    const list = createTweenList(() => 0.01)
+    list.tween(a, { p: { x: 1, y: 0, z: 0 } }, 5)
+    list.tween(b, { p: { x: 0, y: 0, z: 1 }, r: { x: 0, y: 1, z: 0 } }, 5)
+    list.step(0.02)
+    expect(a.position.x).toBe(1)
+    expect(b.position.z).toBe(1)
+    expect(b.rotation.y).toBe(1)
+  })
+})
+
+// Round 2 Phase 4 decisions (hover glow and lid peek latch). API chosen:
+//   glowColor(hex, k) -> [r, g, b] floats in 0..1: the channels of `hex` (0xRRGGBB) scaled by k.
+//   peekLatch(prevPeeking, pickIsLid, pickIsLaptop) -> boolean: whether the lid stays peeked this frame.
+//     Starts on a lid pick; holds while the pointer is on any laptop part (lid, keyboard, power
+//     button); drops only when the pointer leaves the laptop. A base-first pick does not start it.
+describe('scene/sceneMath hover glow and lid peek latch (round 2 phase 4 decisions)', () => {
+  const chan = (hex) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255].map((v) => v / 255)
+
+  it('glowColor keeps the hue: red 0xed1b2f scaled by 0.35 has r > g and r > b (not the fixed bluish 0x2e4d6b)', () => {
+    const [r, g, b] = glowColor(0xed1b2f, 0.35)
+    expect(r).toBeGreaterThan(g)
+    expect(r).toBeGreaterThan(b)
+  })
+
+  it('glowColor is the colour channels times k, as 0..1 floats', () => {
+    const got = glowColor(0xed1b2f, 0.35)
+    const want = chan(0xed1b2f).map((c) => c * 0.35)
+    got.forEach((v, i) => expect(v).toBeCloseTo(want[i], 10))
+  })
+
+  it('glowColor keeps a blue part blue: 0x2f6fb0 has its largest channel in b', () => {
+    const [r, g, b] = glowColor(0x2f6fb0, 0.35)
+    expect(b).toBeGreaterThan(r)
+    expect(b).toBeGreaterThan(g)
+  })
+
+  it('glowColor with k 0 is black', () => {
+    expect(glowColor(0xed1b2f, 0)).toEqual([0, 0, 0])
+  })
+
+  it('peekLatch starts on a lid pick and holds while the pointer moves from the lid onto the keyboard or power button', () => {
+    expect(peekLatch(false, true, false)).toBe(true)
+    expect(peekLatch(true, false, true)).toBe(true)
+    expect(peekLatch(true, true, false)).toBe(true)
+  })
+
+  it('peekLatch does not start on a base pick (keyboard first, no lid before it)', () => {
+    expect(peekLatch(false, false, true)).toBe(false)
+  })
+
+  it('peekLatch eases back only when the pointer leaves the laptop entirely', () => {
+    expect(peekLatch(true, false, false)).toBe(false)
+    expect(peekLatch(false, false, false)).toBe(false)
   })
 })

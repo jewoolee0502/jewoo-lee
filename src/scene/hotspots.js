@@ -1,5 +1,5 @@
 // Scene hotspots (L1192–1205): label -> action. `local` holds the scene-side effects
-// {swingTags, insertFloppy(i), hopMug, toggleLamp, boostSnow(s)}; the rest goes through `app`.
+// {swingTags, insertFloppy(i), hopMug, steam(s), toggleLamp, boostSnow(s)}; the rest goes through `app`.
 import { FLOPPIES } from './floppy.js'
 
 /** Walks up from a raycast hit to the first object carrying `userData.hot`; returns that data. */
@@ -42,6 +42,7 @@ export function createHotspotActions({ app, local }) {
   })
   actions.set('McGill mug', () => {
     local.hopMug()
+    local.steam(2.5)
     toast('McGill mug', 'Refilled. Productivity +10%.', 'info')
     app.snd.tone(300, 0.1, 'sine', 0.06)
   })

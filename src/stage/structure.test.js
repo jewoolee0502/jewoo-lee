@@ -164,3 +164,11 @@ describe('phase 1 removals', () => {
     expect(hits).toEqual([])
   })
 })
+
+// Round 2 Phase 4 TEST LIST 7: the McGill mug label is set in EB Garamond, loaded by the page's own font link.
+describe('round 2 phase 4 structure', () => {
+  it('index.html Google Fonts link includes EB Garamond at weight 500', () => {
+    const text = readFileSync(abs('index.html'), 'utf8')
+    expect(text).toMatch(/fonts\.googleapis\.com\/css2\?[^"]*family=EB\+Garamond:wght@500/)
+  })
+})

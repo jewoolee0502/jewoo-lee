@@ -79,6 +79,39 @@ export function drawLogo(x, w, h) {
   x.fillText('JAY', w / 2, 90)
 }
 
+/**
+ * The McGill mug's wrap-around label (R16): McGill red all round, with "McGill" in white EB
+ * Garamond centred on it (the canvas centre lands on the mug's front). The size starts at 150 px
+ * and shrinks by 2 px until the word is at most 30 % of the width (about the third of the mug the
+ * camera sees), never below 60 px. Text only: no crest or shield.
+ */
+export function drawMugLabel(x, w, h) {
+  x.fillStyle = '#ED1B2F'
+  x.fillRect(0, 0, w, h)
+  x.textAlign = 'center'
+  x.textBaseline = 'middle'
+  x.fillStyle = '#FFFFFF'
+  const font = (px) => `500 ${px}px "EB Garamond", Garamond, "Times New Roman", serif`
+  let size = 150
+  x.font = font(size)
+  while (size > 60 && x.measureText('McGill').width > 0.3 * w) {
+    size -= 2
+    x.font = font(size)
+  }
+  x.fillText('McGill', w / 2, h * 0.5)
+}
+
+/** A soft round puff for the mug's steam particles: white, fading out to the edge. */
+export function drawPuff(x, w, h) {
+  x.clearRect(0, 0, w, h)
+  const g = x.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2)
+  g.addColorStop(0, 'rgba(255,255,255,1)')
+  g.addColorStop(0.45, 'rgba(255,255,255,.55)')
+  g.addColorStop(1, 'rgba(255,255,255,0)')
+  x.fillStyle = g
+  x.fillRect(0, 0, w, h)
+}
+
 /** A floppy's top face: shutter, label and handwriting (L1163–1164). */
 export function drawFloppyLabel(x, w, h, f) {
   x.fillStyle = f.hex

@@ -22,20 +22,42 @@ import {
   ledDrive,
   screenLightTarget,
   tagAngle,
-  stepTween,
+  createTweenList,
   dragYaw,
   stepParallax,
   widePose,
   fogFor,
   holderAlpha,
   vignetteAlpha,
+  approach,
+  wiggle,
+  stepSteam,
+  peekTarget,
+  peekLatch,
+  glowColor,
+  STEAM_Y0,
+  STEAM_Y1,
 } from './sceneMath.js'
-import { drawSky, drawNote, drawSticker, drawLogo, drawFloppyLabel, drawMirror } from './textures.js'
+import { drawSky, drawNote, drawSticker, drawLogo, drawFloppyLabel, drawMirror, drawMugLabel, drawPuff } from './textures.js'
 import { FLOPPIES, createFloppySequencer } from './floppy.js'
 import { createHotspotActions, hotspotOf } from './hotspots.js'
-import { POLAROID } from './props.js'
+import { POLAROID, MUG, SLOT, faceAngle } from './props.js'
 
-const CANVAS_FONTS = ['20px Silkscreen', '600 54px Caveat', '15px "JetBrains Mono"', '24px VT323', '42px Silkscreen']
+/** The faces the canvas textures draw with; the font gate redraws them once these have loaded. */
+export const CANVAS_FONTS = [
+  '20px Silkscreen',
+  '600 54px Caveat',
+  '15px "JetBrains Mono"',
+  '24px VT323',
+  '42px Silkscreen',
+  '500 64px "EB Garamond"',
+]
+// Per-second ease rates (approach) for the hover lift, the steam, the lamp and the lid peek.
+const RATE = { lift: 12, steam: 4, lamp: 6, peek: 10, wiggle: 10 }
+const STEAM_N = 18
+const WIGGLE_AMP = 0.06
+// The hover glow is the material's own colour at this strength, so a prop keeps its hue.
+const GLOW_K = 0.35
 const PORTRAIT = 'img/jay-px.png'
 const PORTRAIT_FALLBACK = 'img/jay.jpg'
 const POINTER_EVENTS = ['pointermove', 'pointerdown', 'pointerup', 'pointerleave']
@@ -181,7 +203,12 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     const rig = new THREE.Group()
     scene.add(rig)
 
-    const M = (c, o) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, ...o })
+    // `userData.hue` is the colour the hover glow is made from (glowColor).
+    const hued = (mt, hex) => {
+      mt.userData.hue = hex
+      return mt
+    }
+    const M = (c, o) => hued(new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, ...o }), c)
     const mk = (geo, mat, x, y, z, parent) => {
       const m = new THREE.Mesh(geo, mat)
       m.position.set(x || 0, y || 0, z || 0)
@@ -339,8 +366,12 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     base.add(pbtn)
     mk(new THREE.CylinderGeometry(0.065, 0.065, 0.03, 20), M(0xe8572a, { roughness: 0.4 }), 0, 0, 0, pbtn)
     const powerLED = mk(B(0.08, 0.025, 0.01), M(0x2a2a2a, { emissive: 0x000000 }), -1.1, 0.08, 1.052, base)
-    mk(B(0.012, 0.05, 0.58), M(0x1a222c), 1.506, 0.08, 0.55, base)
-    const driveLED = mk(B(0.01, 0.025, 0.08), M(0x2a2a2a, { emissive: 0x000000 }), 1.507, 0.08, 0.1, base)
+    // The floppy drive on the front face (R14): a bezel, the dark mouth the floppy slides into,
+    // an eject button and the drive LED.
+    mk(B(...SLOT.frame), M(0x9aa3ad), SLOT.x, SLOT.y, SLOT.z + 0.001, base)
+    mk(B(SLOT.w, SLOT.h, 0.008), M(0x05070a, { roughness: 1 }), SLOT.x, SLOT.y, SLOT.z + 0.006, base)
+    mk(B(0.06, 0.02, 0.01), M(0x6f7883), SLOT.eject[0], SLOT.eject[1], SLOT.z + 0.006, base)
+    const driveLED = mk(B(0.06, 0.018, 0.008), M(0x2a2a2a, { emissive: 0x000000 }), SLOT.led[0], SLOT.led[1], SLOT.z + 0.006, base)
     const note = canvasTex(256, 256, drawNote)
     const noteM = flat(note, 0.42, 0.42, 1.0, 0.17, 0.55, base)
     noteM.rotation.set(-Math.PI / 2, 0, 0.2)
@@ -387,23 +418,88 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     hinge.rotation.x = Math.PI / 2
 
     // ---------- floppies, mug, lamp, plant (L1162–1179) ----------
+    // Each floppy is a group (the insert tweens move it, and it carries the hotspot) holding its
+    // mesh, which the hover wiggle turns, so the two never write the same rotation.
     const floppies = FLOPPIES.map((f) => {
       const lab = canvasTex(256, 256, (x, w, h) => drawFloppyLabel(x, w, h, f))
       const side = M(f.col, { roughness: 0.5 })
-      const m = new THREE.Mesh(B(0.5, 0.03, 0.52), [side, side, new THREE.MeshStandardMaterial({ map: lab.t, roughness: 0.6 }), side, side, side])
-      m.castShadow = m.receiveShadow = true
-      m.position.set(f.home[0], f.home[1], f.home[2])
-      m.rotation.y = f.home[3]
-      rig.add(m)
-      return { ...f, m, lab }
+      const g = new THREE.Group()
+      g.position.set(f.home[0], f.home[1], f.home[2])
+      g.rotation.y = f.home[3]
+      rig.add(g)
+      const mesh = mk(B(0.5, 0.03, 0.52), [side, side, hued(new THREE.MeshStandardMaterial({ map: lab.t, roughness: 0.6 }), f.col), side, side, side], 0, 0, 0, g)
+      return { ...f, m: g, mesh, lab, wamp: 0 }
     })
     let driveBusy = 0
+    // The McGill mug (R16). The outer group stands at MUG.pos and the hop tween moves it; the
+    // inner `mugBody` takes the hover lift, holds the steam and turns the wordmark to the wide
+    // camera (faceMug: per aspect, as phones pull the camera somewhere else).
     const mug = new THREE.Group()
-    mug.position.set(-2.3, 0, 0.85)
+    mug.position.set(...MUG.pos)
     rig.add(mug)
-    mk(new THREE.CylinderGeometry(0.19, 0.17, 0.44, 28), M(0xed1b2f, { roughness: 0.4 }), 0, 0.22, 0, mug)
-    mk(new THREE.TorusGeometry(0.11, 0.03, 10, 20), M(0xed1b2f, { roughness: 0.4 }), 0.21, 0.23, 0, mug).rotation.y = Math.PI / 2
-    mk(new THREE.CylinderGeometry(0.165, 0.165, 0.01, 24), M(0x3b2314, { roughness: 0.2 }), 0, 0.4, 0, mug)
+    const mugBody = new THREE.Group()
+    mug.add(mugBody)
+    let mugAspect = NaN
+    const faceMug = (aspect) => {
+      if (aspect === mugAspect) return
+      mugAspect = aspect
+      const wp = widePose(aspect).wp
+      mugBody.rotation.y = faceAngle({ x: MUG.pos[0], z: MUG.pos[2] }, { x: wp[0], z: wp[2] })
+    }
+    faceMug(16 / 9)
+    const mugLabel = canvasTex(MUG.label.w, MUG.label.h, drawMugLabel)
+    // An open wall from θ π: the label's centre (u 0.5) lands on local +z, unmirrored.
+    mk(
+      new THREE.CylinderGeometry(MUG.rTop, MUG.rBot, MUG.h, MUG.segs, 1, true, Math.PI, Math.PI * 2),
+      hued(new THREE.MeshStandardMaterial({ map: mugLabel.t, color: 0xffffff, roughness: 0.35 }), MUG.color),
+      0,
+      MUG.h / 2,
+      0,
+      mugBody,
+    )
+    const { inner, handle } = MUG
+    const mugRed = M(MUG.color, { roughness: 0.35 })
+    mk(
+      new THREE.CylinderGeometry(inner.rTop, inner.rBot, inner.h, MUG.segs, 1, true),
+      // Double-sided: it is the inside face that shows over the rim.
+      M(inner.color, { roughness: 0.4, side: THREE.DoubleSide }),
+      0,
+      MUG.h - inner.h / 2,
+      0,
+      mugBody,
+    )
+    // A rounded lip over the gap between the walls, and the base under them.
+    const lipR = (MUG.rTop + inner.rTop) / 2
+    mk(new THREE.TorusGeometry(lipR, (MUG.rTop - inner.rTop) / 2, 8, MUG.segs), mugRed, 0, MUG.h, 0, mugBody).rotation.x = -Math.PI / 2
+    mk(new THREE.CylinderGeometry(MUG.rBot, MUG.rBot, 0.004, MUG.segs), mugRed, 0, 0.002, 0, mugBody)
+    mk(new THREE.CylinderGeometry(inner.rTop - 0.003, inner.rTop - 0.003, 0.004, 32), M(0x3b2314, { roughness: 0.2 }), 0, MUG.coffeeY, 0, mugBody)
+    // The C-handle: a half torus turned −π/2 about z so it bulges out to +x. After that turn the
+    // geometry's x runs up the mug, so `scale.x` is what stretches it vertically.
+    const handleM = mk(new THREE.TorusGeometry(handle.R, handle.tube, 12, 24, handle.arc), mugRed, ...handle.center, mugBody)
+    handleM.rotation.z = handle.rotZ
+    handleM.scale.x = handle.scaleY
+    // Steam: soft puffs rising from the coffee, hidden until the mug is hovered or refilled.
+    const steamPos = new Float32Array(STEAM_N * 3)
+    const steamV = new Float32Array(STEAM_N)
+    for (let i = 0; i < STEAM_N; i++) {
+      steamPos[i * 3] = (Math.random() - 0.5) * 0.12
+      steamPos[i * 3 + 1] = STEAM_Y0 + Math.random() * (STEAM_Y1 - STEAM_Y0)
+      steamPos[i * 3 + 2] = (Math.random() - 0.5) * 0.12
+      steamV[i] = 0.14 + Math.random() * 0.12
+    }
+    const steamG = new THREE.BufferGeometry()
+    const steamAttr = new THREE.BufferAttribute(steamPos, 3)
+    steamG.setAttribute('position', steamAttr)
+    const puff = canvasTex(64, 64, drawPuff)
+    const steamM = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, map: puff.t, transparent: true, opacity: 0, depthWrite: false })
+    const steam = new THREE.Points(steamG, steamM)
+    steam.visible = false
+    // Not a hit target: a Points raycast would catch everything within a unit of a puff.
+    steam.raycast = () => {}
+    mugBody.add(steam)
+    let mugLift = 0
+    let steamLevel = 0
+    let steamT = 0
     const lamp = new THREE.Group()
     lamp.position.set(3.0, 0, -1.3)
     rig.add(lamp)
@@ -426,6 +522,10 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     lampL.position.set(-1.15, 1.2, 0)
     lamp.add(lampL)
     let lampOn = true
+    // 1 lit, 0 dark: the frame eases it toward lampOn (instantly with reduced motion).
+    let lampLevel = 1
+    const BULB_ON = new THREE.Color(0xffe2b0)
+    const BULB_OFF = new THREE.Color(0x3a3328)
     const plant = new THREE.Group()
     plant.position.set(-2.4, 0, -1.2)
     rig.add(plant)
@@ -435,13 +535,8 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     )
 
     // ---------- tweens (L1182–1189) ----------
-    const tweens = []
-    const xyz = (v) => ({ x: v.x, y: v.y, z: v.z })
-    function tween(obj, to, dur, done) {
-      const fp = xyz(obj.position)
-      const fr = xyz(obj.rotation)
-      tweens.push({ obj, fp, tp: to.p ? xyz(to.p) : fp, fr, tr: to.r ? xyz(to.r) : fr, t: 0, dur: isReduced() ? 0.01 : dur, done })
-    }
+    const tweens = createTweenList((dur) => (isReduced() ? 0.01 : dur))
+    const { tween } = tweens
     const floppySeq = createFloppySequencer({
       tween,
       onSound: () => app.snd.floppy?.(),
@@ -456,11 +551,19 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
         os.openApp(f.app)
       },
     })
+    // The light, the room fill and the bulb follow lampLevel (applyLamp); the toggle itself (the
+    // achievement and the click) fires at once.
+    function applyLamp(lv) {
+      lampL.intensity = 1.5 * lv
+      hemi.intensity = 0.18 + (0.55 - 0.18) * lv
+      bulb.material.color.copy(BULB_OFF).lerp(BULB_ON, lv)
+    }
     function setLamp(v) {
       lampOn = v
-      lampL.intensity = v ? 1.5 : 0
-      bulb.material.color.set(v ? 0xffe2b0 : 0x3a3328)
-      hemi.intensity = v ? 0.55 : 0.18
+      if (isReduced()) {
+        lampLevel = v ? 1 : 0
+        applyLamp(lampLevel)
+      }
       if (!v) app.ach.unlock('lamp')
       app.snd.tone?.(v ? 1200 : 800, 0.04, 'square', 0.05)
       return v
@@ -475,7 +578,15 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
           tagT = 0
         },
         insertFloppy: (i) => floppySeq.insert(floppies[i]),
-        hopMug: () => tween(mug, { p: { x: -2.3, y: 0.25, z: 0.85 } }, 0.15, () => tween(mug, { p: { x: -2.3, y: 0, z: 0.85 } }, 0.2)),
+        hopMug: () => {
+          // One hop at a time: a click mid-hop would otherwise queue a second one.
+          if (tweens.busy(mug)) return
+          const [x, y, z] = MUG.pos
+          tween(mug, { p: { x, y: y + 0.25, z } }, 0.15, () => tween(mug, { p: { x, y, z } }, 0.2))
+        },
+        steam: (s) => {
+          steamT = Math.max(steamT, s)
+        },
         toggleLamp: () => setLamp(!lampOn),
         boostSnow: (s) => {
           snowBoost = s
@@ -507,14 +618,23 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     let yawT = 0
     let drag = null
     let hover = null
-    function pick(e) {
+    // Whether the pointer is on any part of the laptop (base, keys, lid), for the peek latch.
+    let overLaptop = false
+    let peekLatched = false
+    function aim(e) {
       const r = canvas.getBoundingClientRect()
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
       ray.setFromCamera(ndc, camera)
+    }
+    function pick(e) {
+      aim(e)
       const h = ray.intersectObjects(hot, true)[0]
       return h ? (hotspotOf(h.object)?.obj ?? null) : null
     }
-    const GLOW = new THREE.Color(0x2e4d6b)
+    const hueOf = (mt) => {
+      const h = mt.userData.hue ?? mt.color?.getHex?.()
+      return typeof h === 'number' ? h : 0x808080
+    }
     function glow(o, on) {
       if (!o) return
       o.traverse((m) => {
@@ -522,12 +642,19 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
         for (const mt of [].concat(m.material)) {
           if (!mt.emissive) continue
           if (!mt.userData.e0) mt.userData.e0 = mt.emissive.clone()
-          mt.emissive.copy(on ? GLOW : mt.userData.e0)
+          if (on) mt.emissive.setRGB(...glowColor(hueOf(mt), GLOW_K))
+          else mt.emissive.copy(mt.userData.e0)
         }
       })
     }
     const hideTip = () => {
       if (tipEl) tipEl.hidden = true
+    }
+    function clearHover() {
+      glow(hover, false)
+      hover = null
+      overLaptop = false
+      hideTip()
     }
     const listen = (target, type, fn) => {
       target.addEventListener(type, fn)
@@ -554,6 +681,9 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
         return
       }
       const o = ctrl.z < 0.9 ? pick(e) : null
+      // Any laptop part counts (the base body too, which is not a hotspot), checked only at the
+      // desk, where the lid can peek; `pick` has just aimed the ray.
+      overLaptop = ctrl.z < 0.02 && ray.intersectObjects([base], true).length > 0
       if (o !== hover) {
         glow(hover, false)
         hover = o
@@ -583,9 +713,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     })
     on('pointerleave', () => {
       drag = null
-      glow(hover, false)
-      hover = null
-      hideTip()
+      clearHover()
     })
 
     // ---------- mirror and the font gate (L1223–1232, D17) ----------
@@ -593,12 +721,15 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       osState = s
       mirror.redraw()
     }
-    const redrawText = () => [mirror, note, sticker, logo, ...floppies.map((f) => f.lab)].forEach((t) => t.redraw())
+    const redrawText = () => [mirror, note, sticker, logo, mugLabel, ...floppies.map((f) => f.lab)].forEach((t) => t.redraw())
+    // One redraw once every face has loaded (a face that fails to load is skipped) and the font
+    // set is ready, so a late face does not leave a label in its fallback.
     const fonts = globalThis.document?.fonts
     if (fonts) {
-      if (typeof fonts.load === 'function')
-        Promise.all(CANVAS_FONTS.map((f) => fonts.load(f))).then(redrawText, () => {})
-      fonts.ready?.then(redrawText, () => {})
+      const loads = typeof fonts.load === 'function' ? CANVAS_FONTS.map((f) => Promise.resolve(fonts.load(f)).catch(() => null)) : []
+      Promise.all(loads)
+        .then(() => fonts.ready)
+        .then(redrawText, () => {})
     }
 
     // ---------- resize (L1235; narrow mode is the stage's job) ----------
@@ -622,6 +753,47 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     const aPos = new THREE.Vector3()
     const aN = new THREE.Vector3()
     let discoT = 0
+    let peek = 0
+
+    // Hover play (R16): the mug lifts and steams, a floppy wiggles, the lamp eases. With reduced
+    // motion every target is applied at once and the lift, steam and wiggle stay at rest.
+    function stepProps(t, dt, reduced) {
+      const ease = (cur, target, rate) => (reduced ? target : approach(cur, target, dt, rate))
+      const mugHot = hover === mug
+      mugLift = ease(mugLift, mugHot && !reduced ? MUG.lift : 0, RATE.lift)
+      mugBody.position.y = mugLift
+      steamT = Math.max(0, steamT - dt)
+      steamLevel = ease(steamLevel, !reduced && (mugHot || steamT > 0) ? 1 : 0, RATE.steam)
+      if (steamLevel < 0.01 && !(mugHot || steamT > 0)) steamLevel = 0
+      steam.visible = steamLevel > 0.01
+      steamM.opacity = 0.35 * steamLevel
+      if (steam.visible) {
+        for (let i = 0; i < STEAM_N; i++) {
+          const y0 = steamPos[i * 3 + 1]
+          const y = stepSteam(y0, steamV[i], dt)
+          steamPos[i * 3 + 1] = y
+          steamPos[i * 3] += Math.sin(t / 500 + i * 1.7) * 0.0008
+          if (y < y0) {
+            steamPos[i * 3] = (Math.random() - 0.5) * 0.12
+            steamPos[i * 3 + 2] = (Math.random() - 0.5) * 0.12
+          }
+        }
+        steamAttr.needsUpdate = true
+      }
+      for (const f of floppies) {
+        const wiggles = !reduced && hover === f.m && floppySeq.inDrive !== f && !tweens.busy(f.m)
+        f.wamp = ease(f.wamp, wiggles ? WIGGLE_AMP : 0, RATE.wiggle)
+        if (f.wamp < 1e-4 && !wiggles) f.wamp = 0
+        // About y, not z: a roll would dip the edge of a stacked floppy into the one below.
+        f.mesh.rotation.y = f.wamp ? wiggle(t, f.wamp) : 0
+      }
+      const lt = lampOn ? 1 : 0
+      if (lampLevel !== lt) {
+        lampLevel = ease(lampLevel, lt, RATE.lamp)
+        if (Math.abs(lampLevel - lt) < 0.002) lampLevel = lt
+        applyLamp(lampLevel)
+      }
+    }
     // Style writes only on change, so a resting frame does not invalidate the holder's style.
     function setHolderStyle(prop, v) {
       if (holder.style[prop] !== v) holder.style[prop] = v
@@ -637,7 +809,15 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       const aspect = w / h
       // lid: the timeline opens it, then the camera dollies in
       const le = lidOf(z)
-      hinge.rotation.x = hingeAngle(le)
+      const reduced = isReduced()
+      // R16: the closed lid peeks open while hovered at the desk; the timeline (lidBoot, the
+      // holder fade) keeps using `le` alone.
+      // The dive clears the hover: no glow, tooltip or hover play once the camera is going in.
+      if (z >= 0.9 && hover) clearHover()
+      peekLatched = peekLatch(peekLatched, hover === hinge, overLaptop)
+      const pt = peekTarget({ hovered: peekLatched, z, reduce: reduced })
+      peek = reduced ? pt : approach(peek, pt, dt, RATE.peek)
+      hinge.rotation.x = hingeAngle(le) - peek
       const lb = lidBoot(le, lidWasClosed, os.state)
       lidWasClosed = lb.wasClosed
       if (lb.boot) os.boot()
@@ -659,6 +839,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
         if (holder.style.getPropertyValue('--vig') !== v) holder.style.setProperty('--vig', v)
       }
       const fog = fogFor(widePose(aspect).k)
+      faceMug(aspect)
       if (scene.fog.near !== fog.near || scene.fog.far !== fog.far) {
         scene.fog.near = fog.near
         scene.fog.far = fog.far
@@ -677,17 +858,15 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       anchor.getWorldPosition(aPos)
       anchor.getWorldQuaternion(tmpQ)
       aN.set(0, 0, 1).applyQuaternion(tmpQ)
-      const pose = cameraPose({ e, aspect, sp, aPos, aN, d, reduce: isReduced() })
+      const pose = cameraPose({ e, aspect, sp, aPos, aN, d, reduce: reduced })
       camera.position.set(pose.pos.x, pose.pos.y, pose.pos.z)
       look.set(pose.look.x, pose.look.y, pose.look.z)
       camera.lookAt(look)
-      for (let i = tweens.length - 1; i >= 0; i--) {
-        const q = tweens[i]
-        if (stepTween(q, dt)) tweens.splice(tweens.indexOf(q), 1)
-      }
+      tweens.step(dt)
+      stepProps(t, dt, reduced)
       tagT += dt
       tagSwing *= Math.pow(0.6, dt)
-      tags.rotation.z = tagAngle(tagT, tagSwing, isReduced())
+      tags.rotation.z = tagAngle(tagT, tagSwing, reduced)
       for (const k of keyList) {
         if (k.userData.p > 0) {
           const s = stepKey(k.userData.p, dt, k.userData.base)

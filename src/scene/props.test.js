@@ -3,7 +3,10 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { POLAROID } from './props.js'
+import { POLAROID, MUG, mugRadiusAt, handleEnds, handleBulgeX, faceAngle, SLOT } from './props.js'
+
+// handleEnds may return [x, y] pairs or {x, y} points; both are accepted here.
+const pt = (p) => (Array.isArray(p) ? { x: p[0], y: p[1] } : p)
 
 describe('scene/props POLAROID', () => {
   it('has the shape the scene builds from (pos, rotZ, scale, card, photo, photoY, tape)', () => {
@@ -45,5 +48,56 @@ describe('scene/props POLAROID', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/scene/props.js'), 'utf8')
     expect(src).not.toMatch(/from\s+['"]three/)
     expect(src).not.toMatch(/require\(\s*['"]three/)
+  })
+})
+
+// Round 2 Phase 4 TEST LIST 1 (R16, mug handle and facing; drive slot on the front face).
+describe('scene/props McGill mug and drive slot', () => {
+  it('the wall radius runs from rBot at the base to rTop at the rim', () => {
+    expect(mugRadiusAt(0)).toBeCloseTo(0.17, 10)
+    expect(mugRadiusAt(MUG.h)).toBeCloseTo(0.19, 10)
+  })
+
+  it('both handle ends are attached to the wall (within tube + 0.01 of the wall radius at their height)', () => {
+    for (const end of handleEnds(MUG.handle).map(pt)) {
+      expect(Math.abs(end.x - mugRadiusAt(end.y))).toBeLessThanOrEqual(MUG.handle.tube + 0.01)
+    }
+  })
+
+  it('the handle ends are at least 0.18 apart vertically and inside [0.05, h - 0.05]', () => {
+    const [a, b] = handleEnds(MUG.handle).map(pt)
+    expect(Math.abs(a.y - b.y)).toBeGreaterThanOrEqual(0.18)
+    for (const end of [a, b]) {
+      expect(end.y).toBeGreaterThanOrEqual(0.05)
+      expect(end.y).toBeLessThanOrEqual(MUG.h - 0.05)
+    }
+  })
+
+  it('the handle bulges out to +x by at least 0.08 past the wall at its centre height (a C on the right)', () => {
+    expect(handleBulgeX(MUG.handle)).toBeGreaterThanOrEqual(mugRadiusAt(MUG.handle.center[1]) + 0.08)
+  })
+
+  it('faceAngle turns the mug to the wide camera: (-2.3, 0.85) to (1.4, 10.2) is about 0.377 rad', () => {
+    expect(faceAngle({ x: -2.3, z: 0.85 }, { x: 1.4, z: 10.2 })).toBeCloseTo(0.377, 3)
+  })
+
+  it('faceAngle is 0 for a target straight along +z, and pi/2 for a target straight along +x', () => {
+    expect(faceAngle({ x: 0, z: 0 }, { x: 0, z: 1 })).toBe(0)
+    expect(faceAngle({ x: 0, z: 0 }, { x: 1, z: 0 })).toBeCloseTo(Math.PI / 2, 10)
+  })
+
+  it('the floppy slot is wide enough for a 0.5 floppy (w >= 0.54)', () => {
+    expect(SLOT.w).toBeGreaterThanOrEqual(0.5 + 0.04)
+  })
+
+  it('the slot mouth sits inside the base height (0 to 0.16)', () => {
+    expect(SLOT.y - SLOT.h / 2).toBeGreaterThanOrEqual(0)
+    expect(SLOT.y + SLOT.h / 2).toBeLessThanOrEqual(0.16)
+  })
+
+  it('the slot lies within the base width [-1.5, 1.5] and clear of the power LED at x -1.1', () => {
+    expect(SLOT.x - SLOT.w / 2).toBeGreaterThanOrEqual(-1.5)
+    expect(SLOT.x + SLOT.w / 2).toBeLessThanOrEqual(1.5)
+    expect(SLOT.x - SLOT.w / 2).toBeGreaterThan(-1.1 + 0.04)
   })
 })

@@ -11,7 +11,8 @@ import { AppProvider } from '../app/AppContext.jsx'
 import SceneMount from '../stage/SceneMount.jsx'
 
 const T = vi.hoisted(() => {
-  const state = { calls: [], created: [], failOn: null, seq: 0 }
+  // `hits`: what the raycaster reports for a pointer pick (round 2 phase 4 tests set it per case).
+  const state = { calls: [], created: [], failOn: null, seq: 0, hits: [] }
 
   const SKIP = (p) => typeof p === 'symbol' || p === 'then' || p === 'toJSON' || p === 'nodeType'
 
@@ -78,6 +79,7 @@ const T = vi.hoisted(() => {
         if (state.failOn === kind) throw new Error(`boom: ${kind}`)
         const extra = own ? own(args) : {}
         const proxy = makeProxy(kind, extra)
+        proxy.__args = args
         if (kind === 'Mesh' || kind === 'Points') {
           proxy.geometry = args[0]
           proxy.material = args[1]
@@ -118,7 +120,7 @@ const T = vi.hoisted(() => {
     Vector3: ctor('Vector3'),
     Quaternion: ctor('Quaternion'),
     Euler: ctor('Euler'),
-    Raycaster: ctor('Raycaster'),
+    Raycaster: ctor('Raycaster', () => ({ intersectObjects: () => state.hits })),
     TextureLoader: ctor('TextureLoader'),
     sRGBEncoding: 3001,
     PCFShadowMap: 2,
@@ -135,7 +137,8 @@ const T = vi.hoisted(() => {
 vi.mock('three', () => T.three)
 vi.mock('three/examples/jsm/renderers/CSS3DRenderer.js', () => T.css3d)
 
-import { createScene } from './createScene.js'
+import { createScene, CANVAS_FONTS } from './createScene.js'
+import { MUG } from './props.js'
 
 const { state } = T
 const RESOURCE_KINDS = new Set([
@@ -527,5 +530,265 @@ describe('scene/createScene lifecycle', () => {
     expect(callsOn('WebGLRenderer', 'dispose', renderers[0].__id)).toHaveLength(1)
     expect(document.querySelectorAll('canvas.gl')).toHaveLength(0)
     app.dispose()
+  })
+})
+
+// Round 2 Phase 4 TEST LIST 5 (R16): the McGill mug is an open cylinder with a half-torus handle,
+// its label is a 1024 × 400 canvas texture, and the font gate loads EB Garamond for it.
+describe('scene/createScene McGill mug and the font gate (round 2 phase 4)', () => {
+  beforeEach(() => {
+    state.calls = []
+    state.created = []
+    state.failOn = null
+    state.seq = 0
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  it('CANVAS_FONTS includes the 500 64px "EB Garamond" face the mug label uses', () => {
+    expect(CANVAS_FONTS).toContain('500 64px "EB Garamond"')
+  })
+
+  it('the font gate asks document.fonts to load that face', () => {
+    const original = Object.getOwnPropertyDescriptor(document, 'fonts')
+    const load = vi.fn(() => Promise.resolve([]))
+    Object.defineProperty(document, 'fonts', { configurable: true, writable: true, value: { ready: Promise.resolve(), load } })
+    try {
+      const env = setup()
+      const api = env.build()
+      expect(load).toHaveBeenCalledWith('500 64px "EB Garamond"')
+      api.dispose()
+    } finally {
+      if (original) Object.defineProperty(document, 'fonts', original)
+    }
+  })
+
+  it('the mug label is redrawn once the fonts have loaded (it shows McGill twice: at build, then after the load)', async () => {
+    const original = Object.getOwnPropertyDescriptor(document, 'fonts')
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      writable: true,
+      value: { ready: Promise.resolve(), load: () => Promise.resolve([]) },
+    })
+    try {
+      const env = setup()
+      const api = env.build()
+      const label = state.created.find((o) => o.__kind === 'CanvasTexture' && o.__args[0].width === 1024 && o.__args[0].height === 400)
+      expect(label, 'mug label canvas texture').toBeDefined()
+      const ctx = label.__args[0].getContext('2d')
+      const mcGillDraws = () => ctx.calls.filter((c) => c[0] === 'fillText' && c[1] === 'McGill').length
+      expect(mcGillDraws()).toBe(1)
+      await new Promise((r) => setTimeout(r, 0))
+      expect(mcGillDraws()).toBe(2)
+      api.dispose()
+    } finally {
+      if (original) Object.defineProperty(document, 'fonts', original)
+    }
+  })
+
+  it('the mug outer wall is an open-ended cylinder (openEnded, thetaStart π) with rTop 0.19 and rBot 0.17', () => {
+    const env = setup()
+    const api = env.build()
+    const outer = state.created.filter((o) => o.__kind === 'CylinderGeometry' && o.__args[0] === 0.19 && o.__args[1] === 0.17)
+    expect(outer.length).toBeGreaterThanOrEqual(1)
+    expect(outer.some((o) => o.__args[5] === true && o.__args[6] === Math.PI)).toBe(true)
+    api.dispose()
+  })
+
+  it('the mug handle is a half torus (TorusGeometry with arc π as its 5th argument)', () => {
+    const env = setup()
+    const api = env.build()
+    expect(state.created.some((o) => o.__kind === 'TorusGeometry' && o.__args[4] === Math.PI)).toBe(true)
+    api.dispose()
+  })
+
+  it('the mug label texture is disposed by dispose() like every other canvas texture', () => {
+    const env = setup()
+    const api = env.build()
+    const label = state.created.find((o) => o.__kind === 'CanvasTexture' && o.__args[0].width === 1024 && o.__args[0].height === 400)
+    expect(label).toBeDefined()
+    api.dispose()
+    expect(callsOn(undefined, 'dispose').some((c) => c.id === label.__id)).toBe(true)
+  })
+})
+
+// Round 2 Phase 4 decisions: hover glow keeps each part's hue, the dive clears the hover, the lid
+// peek latches while the pointer is on the laptop, and a mug click during its hop is not queued.
+// Picks are driven by `state.hits` (what the raycaster returns) and pointer events on the canvas.
+describe('scene/createScene hover, dive, peek latch and mug hop (round 2 phase 4 decisions)', () => {
+  beforeEach(() => {
+    state.calls = []
+    state.created = []
+    state.failOn = null
+    state.seq = 0
+    state.hits = []
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const WRITE_METHODS = new Set(['copy', 'set', 'setRGB', 'setHex', 'setStyle'])
+  const RED = 0xed1b2f
+  const REST_LID = Math.PI / 2
+  const PEEK = 7 * (Math.PI / 180)
+
+  /** The hotspot group carrying `label` (addHot sets userData.hot on it). */
+  const hotOf = (label) => state.created.find((o) => o.__kind === 'Group' && o.userData?.hot?.label === label)
+  const canvasOf = (env) => env.mount.querySelector('canvas.gl')
+  const pointer = (el, type, x = 10) => el.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: 10 }))
+  /** Points the pointer at `label`: the next pointermove picks that hotspot. */
+  const hoverOn = (env, label) => {
+    state.hits = [{ object: hotOf(label) }]
+    pointer(canvasOf(env), 'pointermove')
+  }
+  const sized = (env) => {
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+  }
+  /** Emissive writes recorded on one material (the mock records each call with its arguments). */
+  const emissiveWrites = (mat) => state.calls.filter((c) => c.kind === 'MeshStandardMaterial' && c.id === mat.__id && WRITE_METHODS.has(c.method))
+  /** The [r, g, b] a recorded write set, if it can be read: setRGB(r,g,b), setHex(n), or a Color(...) argument. */
+  function rgbOf(args) {
+    if (args.length === 3 && args.every((v) => typeof v === 'number')) return args
+    if (args.length === 1 && typeof args[0] === 'number') return [(args[0] >> 16) & 255, (args[0] >> 8) & 255, args[0] & 255].map((v) => v / 255)
+    if (args.length === 1 && Array.isArray(args[0]?.__args) && args[0].__kind === 'Color') return rgbOf(args[0].__args)
+    return null
+  }
+
+  it('hovering the red mug glows with its own hue: the emissive write has r > g and r > b (not the fixed bluish 0x2e4d6b)', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const mat = state.created.find((o) => o.__kind === 'MeshStandardMaterial' && o.__args[0]?.color === RED)
+    expect(mat, 'mug red material').toBeDefined()
+
+    hoverOn(env, 'McGill mug')
+
+    const writes = emissiveWrites(mat)
+    expect(writes.length, 'emissive written on hover').toBeGreaterThan(0)
+    const rgb = rgbOf(writes.at(-1).args)
+    expect(rgb, 'hover emissive is readable').not.toBeNull()
+    const [r, g, b] = rgb
+    expect(r).toBeGreaterThan(g)
+    expect(r).toBeGreaterThan(b)
+    api.dispose()
+  })
+
+  it('un-hovering restores the original emissive: the last write is a new value, not the glow', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const mat = state.created.find((o) => o.__kind === 'MeshStandardMaterial' && o.__args[0]?.color === RED)
+
+    hoverOn(env, 'McGill mug')
+    const glowWrite = emissiveWrites(mat).at(-1)
+    const before = emissiveWrites(mat).length
+    pointer(canvasOf(env), 'pointerleave')
+
+    const after = emissiveWrites(mat)
+    expect(after.length, 'a restore write on un-hover').toBeGreaterThan(before)
+    const restore = after.at(-1)
+    expect(restore.args[0]).not.toBe(glowWrite.args[0])
+    const rgb = rgbOf(restore.args)
+    if (rgb) expect(rgb[0] > rgb[1] && rgb[0] > rgb[2]).toBe(false)
+    api.dispose()
+  })
+
+  it('the dive clears the hover: at z 0.9 the lift settles to rest, the glow is restored and the tooltip is hidden', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const mat = state.created.find((o) => o.__kind === 'MeshStandardMaterial' && o.__args[0]?.color === RED)
+    const mugGroup = hotOf('McGill mug')
+    const mugBody = mugGroup.children.find((c) => c.__kind === 'Group')
+
+    env.app.ctrl.z = 0.5
+    hoverOn(env, 'McGill mug')
+    api.frame(0, 1)
+    expect(mugBody.position.y, 'lifted while hovered at the desk').toBeGreaterThan(0.05)
+
+    const before = emissiveWrites(mat).length
+    env.app.ctrl.z = 0.9
+    api.frame(16, 1)
+
+    expect(mugBody.position.y, 'lift target is rest once the dive starts').toBeLessThan(1e-3)
+    expect(emissiveWrites(mat).length, 'glow restored by the dive').toBeGreaterThan(before)
+    expect(env.tipEl.hidden).toBe(true)
+    api.dispose()
+  })
+
+  it('the lid peek latches: a lid hover opens it, a move onto the keyboard keeps it open, leaving the laptop eases it back', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const hinge = hotOf('Laptop · open me')
+    env.app.ctrl.z = 0
+
+    hoverOn(env, 'Laptop · open me')
+    api.frame(0, 1)
+    expect(hinge.rotation.x).toBeCloseTo(REST_LID - PEEK, 3)
+
+    hoverOn(env, 'Keyboard')
+    api.frame(16, 1)
+    expect(hinge.rotation.x, 'still peeked over the keyboard').toBeCloseTo(REST_LID - PEEK, 3)
+
+    pointer(canvasOf(env), 'pointerleave')
+    api.frame(32, 1)
+    expect(hinge.rotation.x, 'eased back once the pointer left the laptop').toBeCloseTo(REST_LID, 3)
+    api.dispose()
+  })
+
+  it('a base pick with no lid hover before it does not peek the lid', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const hinge = hotOf('Laptop · open me')
+    env.app.ctrl.z = 0
+
+    hoverOn(env, 'Keyboard')
+    api.frame(0, 1)
+    expect(hinge.rotation.x).toBeCloseTo(REST_LID, 3)
+    api.dispose()
+  })
+
+  it('a second click on the mug while its hop is running does not queue another hop (the mug is back at rest 0.4 s after the first click)', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.ctrl.z = 0
+    const mugGroup = hotOf('McGill mug')
+    // The mock does not store construction-time transforms, so the tween's start pose is set here.
+    Object.assign(mugGroup.position, { x: MUG.pos[0], y: 0, z: MUG.pos[2] })
+    Object.assign(mugGroup.rotation, { x: 0, y: 0, z: 0 })
+    state.hits = [{ object: mugGroup }]
+    const canvas = canvasOf(env)
+    const click = () => {
+      pointer(canvas, 'pointerdown')
+      pointer(canvas, 'pointerup')
+    }
+
+    // One hop is up 0.15 s then down 0.2 s, so it is at rest from 0.35 s. A queued second hop would
+    // hold the top for 0.15 s more and only then come down, so it is still above rest at 0.4 s.
+    let elapsed = 0
+    click()
+    for (let i = 0; i < 5; i++) {
+      elapsed += 0.01
+      api.frame(elapsed * 1000, 0.01)
+    }
+    click()
+    const late = []
+    for (let i = 0; i < 60; i++) {
+      elapsed += 0.01
+      api.frame(elapsed * 1000, 0.01)
+      if (elapsed >= 0.4) late.push(mugGroup.position.y)
+    }
+    expect(late.length).toBeGreaterThan(0)
+    for (const y of late) expect(Math.abs(y), 'mug at rest after 0.4 s').toBeLessThan(1e-3)
+    api.dispose()
   })
 })

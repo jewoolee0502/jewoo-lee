@@ -28,6 +28,7 @@ function setup(state = 'standby') {
     swingTags: vi.fn(),
     insertFloppy: vi.fn(),
     hopMug: vi.fn(),
+    steam: vi.fn(),
     toggleLamp: vi.fn(),
     boostSnow: vi.fn(),
   }
@@ -78,10 +79,12 @@ describe('scene/hotspots', () => {
     expect(os.openApp).toHaveBeenCalledWith('service')
   })
 
-  it('McGill mug calls local.hopMug, the refill toast, and snd.tone(300,.1,"sine",.06)', () => {
+  // Round 2 Phase 4 TEST LIST 6 (R16 fun extras): the mug also steams for 2.5 s.
+  it('McGill mug calls local.hopMug, local.steam(2.5), the refill toast, and snd.tone(300,.1,"sine",.06)', () => {
     const { actions, toasts, snd, local } = setup()
     actions.get('McGill mug')()
     expect(local.hopMug).toHaveBeenCalled()
+    expect(local.steam).toHaveBeenCalledWith(2.5)
     expect(toasts.toast).toHaveBeenCalledWith('McGill mug', 'Refilled. Productivity +10%.', 'info')
     expect(snd.tone).toHaveBeenCalledWith(300, 0.1, 'sine', 0.06)
   })

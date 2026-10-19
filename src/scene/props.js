@@ -15,3 +15,52 @@ export const POLAROID = {
   photoY: 0.06,
   tape: { size: [0.3, 0.08, 0.004], pos: [0, 0.38, 0.012], rotZ: 0.08, color: 0xffd15c, opacity: 0.85 },
 }
+
+const DEG = Math.PI / 180
+
+/**
+ * The McGill mug (R16) on the desk's left front, clear of the floppy lane and the screen. The
+ * outer wall is an open cylinder (so the coffee shows) carrying the `label` canvas; `inner` is the
+ * inside wall, `coffeeY` the coffee's height. The handle is a half torus of radius `R` turned so
+ * it bulges out to +x, its ends on the wall at `center` ± R·scaleY; `lift` is the hover lift.
+ */
+export const MUG = {
+  pos: [-2.3, 0, 0.85],
+  rTop: 0.19,
+  rBot: 0.17,
+  h: 0.44,
+  segs: 48,
+  inner: { rTop: 0.175, rBot: 0.158, h: 0.43, color: 0xc41526 },
+  coffeeY: 0.38,
+  color: 0xed1b2f,
+  handle: { R: 0.105, tube: 0.028, arc: Math.PI, center: [0.19, 0.225, 0], rotZ: -Math.PI / 2, scaleY: 1.05 },
+  lift: 0.06,
+  label: { w: 1024, h: 400 },
+}
+
+/** The outer wall's radius at height `y` above the mug's base. */
+export const mugRadiusAt = (y) => MUG.rBot + ((MUG.rTop - MUG.rBot) * y) / MUG.h
+
+/** The handle's two arc ends in mug-local (x, y) once turned upright: the bottom one, then the top. */
+export function handleEnds({ R, center, scaleY }) {
+  return [
+    [center[0], center[1] - R * scaleY],
+    [center[0], center[1] + R * scaleY],
+  ]
+}
+
+/** How far out in +x the handle's arc reaches. */
+export const handleBulgeX = ({ R, center }) => center[0] + R
+
+/** The rotation about y that turns an object's local +z from `from` toward `to` ({x, z}). */
+export const faceAngle = (from, to) => Math.atan2(to.x - from.x, to.z - from.z)
+
+/**
+ * The floppy drive slot on the front face of the base, in base-local coordinates (the base group
+ * sits at rig z 0.35, so its front face z 1.05 is rig z 1.4). `w`×`h` is the dark mouth, `frame`
+ * the bezel around it; `eject` and `led` are the (x, y) of the eject button and the drive LED.
+ */
+export const SLOT = { x: 0.95, y: 0.085, z: 1.05, w: 0.56, h: 0.036, frame: [0.62, 0.06, 0.012], eject: [1.32, 0.085], led: [0.6, 0.085] }
+
+/** How far the closed lid peeks open while it is hovered at the desk. */
+export const PEEK = 7 * DEG

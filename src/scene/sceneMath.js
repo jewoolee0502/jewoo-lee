@@ -2,6 +2,7 @@
 // Every value is the prototype's, including its per-frame (not dt-based) smoothing factors.
 import { clamp, ss, easeQuad } from '../core/math.js'
 import { OS_W, OS_H, CAM_NARROW_ASPECT } from '../core/constants.js'
+import { PEEK } from './props.js'
 
 const DEG = Math.PI / 180
 const SCREEN_W = 2.6
@@ -218,8 +219,74 @@ export function stepTween(tw, dt) {
   return true
 }
 
+/**
+ * The scene's tween list. `tween(obj, {p, r}, dur, done)` starts at once, unless `obj` already has
+ * a running or waiting tween: then it waits for those and starts (from wherever they left the
+ * object) when they finish, so a chain issued in one go plays leg by leg instead of fighting.
+ * `durFor(dur)` maps each duration when its tween starts (reduced motion shortens them all);
+ * `step(dt)` runs one frame and `busy(obj)` says whether `obj` has a tween running or waiting.
+ */
+export function createTweenList(durFor = (d) => d) {
+  const live = []
+  const waiting = new Map()
+  const xyz = (v) => ({ x: v.x, y: v.y, z: v.z })
+  function start(obj, to, dur, done) {
+    const fp = xyz(obj.position)
+    const fr = xyz(obj.rotation)
+    live.push({ obj, fp, tp: to.p ? xyz(to.p) : fp, fr, tr: to.r ? xyz(to.r) : fr, t: 0, dur: durFor(dur), done })
+  }
+  const busy = (obj) => waiting.has(obj) || live.some((q) => q.obj === obj && !q.finished)
+  function tween(obj, to, dur, done) {
+    if (!busy(obj)) return start(obj, to, dur, done)
+    const queue = waiting.get(obj) ?? []
+    queue.push([obj, to, dur, done])
+    waiting.set(obj, queue)
+  }
+  function step(dt) {
+    for (const q of live.slice()) {
+      if (!stepTween(q, dt)) continue
+      live.splice(live.indexOf(q), 1)
+      const queue = waiting.get(q.obj)
+      if (!queue) continue
+      const next = queue.shift()
+      if (!queue.length) waiting.delete(q.obj)
+      start(...next)
+    }
+  }
+  return { tween, step, busy }
+}
+
 /** Drag on the desk rotates the rig: .005 rad per px, clamped to ±.4 (L1216). */
 export const dragYaw = (yaw0, dx) => clamp(yaw0 + dx * 0.005, -0.4, 0.4)
 
 /** Pointer parallax damping: .08 of the remaining distance per frame (L1250). */
 export const stepParallax = (cur, target) => cur + (target - cur) * 0.08
+
+// ---------- hover play, lamp ease, steam and lid peek (round 2, R16) ----------
+
+/** Frame-rate independent ease of `cur` toward `target`: what is left decays at `rate` per second. */
+export const approach = (cur, target, dt, rate) => target + (cur - target) * Math.exp(-rate * dt)
+
+/** A hovered floppy's wiggle angle at `t` ms, at most `amp` either way. */
+export const wiggle = (t, amp) => amp * Math.sin(t * 0.014)
+
+export const STEAM_Y0 = 0.45
+export const STEAM_Y1 = 0.85
+
+/** One steam particle's rise above the mug's base; wraps back to just above the rim at the top. */
+export function stepSteam(y, v, dt) {
+  const ny = y + v * dt
+  return ny > STEAM_Y1 ? STEAM_Y0 : ny
+}
+
+/** How far the closed lid should peek open: PEEK while hovered at the desk (z < 0.02), unless reduced. */
+export const peekTarget = ({ hovered, z, reduce }) => (!reduce && hovered && z < 0.02 ? PEEK : 0)
+
+/** The hover glow for a material of colour `hex`: its own channels scaled by `k`, as 0..1 floats. */
+export const glowColor = (hex, k) => [((hex >> 16) & 255) / 255 * k, ((hex >> 8) & 255) / 255 * k, (hex & 255) / 255 * k]
+
+/**
+ * Whether the lid stays peeked: a lid pick starts it, and it holds while the pointer is anywhere
+ * on the laptop (so moving off the lifted front edge onto the base does not drop it and flicker).
+ */
+export const peekLatch = (prevPeeking, pickIsLid, pickIsLaptop) => pickIsLid || (prevPeeking && pickIsLaptop)
