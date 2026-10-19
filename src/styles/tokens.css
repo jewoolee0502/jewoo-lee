@@ -1,0 +1,37 @@
+/* Design tokens and base elements, verbatim from design/revamp-lab.html L8–40 and L270. */
+:root{
+  --bg:#EBF0F5; --paper:#F8FAFC; --ink:#122030; --muted:#566476; --line:#C8D2DD; --grid:rgba(22,119,201,.075);
+  --accent:#1677C9; --accent-ink:#FFFFFF; --signal:#D2501B; --ok:#1F8455; --gold:#B88600;
+  --shadow:5px 5px 0 rgba(18,32,48,.16);
+  --f-display:"Bricolage Grotesque","Avenir Next",system-ui,sans-serif;
+  --f-body:"Instrument Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --f-px:"Silkscreen","JetBrains Mono",ui-monospace,monospace;
+  --f-vt:"VT323","JetBrains Mono",ui-monospace,monospace;
+  --scene:#141C2E; --scene-ink:#EAF2FB; --scene-dim:#9FB2C8;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C141C; --paper:#121D28; --ink:#E4ECF4; --muted:#93A4B5; --line:#26374A; --grid:rgba(110,175,235,.06);
+    --accent:#4AA6EE; --accent-ink:#06121C; --signal:#FF7D4F; --ok:#4CC38A; --gold:#FFD15C;
+    --shadow:5px 5px 0 rgba(0,0,0,.5); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C141C; --paper:#121D28; --ink:#E4ECF4; --muted:#93A4B5; --line:#26374A; --grid:rgba(110,175,235,.06);
+  --accent:#4AA6EE; --accent-ink:#06121C; --signal:#FF7D4F; --ok:#4CC38A; --gold:#FFD15C;
+  --shadow:5px 5px 0 rgba(0,0,0,.5); color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;color:var(--ink);font:16px/1.6 var(--f-body)}
+h1,h2,h3{font-family:var(--f-display);line-height:1.08;text-wrap:balance;margin:0}
+p{margin:0}
+/* Addition: the prototype ran inside a host page with no body margin; the sticky stage is full bleed. */
+body{margin:0}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1160px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.eyebrow{font:600 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

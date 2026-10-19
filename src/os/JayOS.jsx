@@ -2,6 +2,7 @@
 // JSX, owns that element's classes and data-state (D2), synced here from the stores.
 import { useEffect } from 'react'
 import { useApp } from '../app/AppContext.jsx'
+import { bindHostClasses } from './hostClasses.js'
 import StandbyLayer from './StandbyLayer.jsx'
 import BootLayer from './BootLayer.jsx'
 import Desktop from './Desktop.jsx'
@@ -12,24 +13,7 @@ export function JayOS() {
   const { os, host } = app
   const sceneStore = app.scene?.store
 
-  useEffect(() => {
-    const sync = () => {
-      const s = os.store.get()
-      host.syncClasses({
-        state: s.state,
-        collapsing: s.collapsing,
-        disco: s.disco,
-        fallback: sceneStore?.get().status === 'unavailable',
-      })
-    }
-    sync()
-    const offOs = os.store.subscribe(sync)
-    const offScene = sceneStore?.subscribe(sync)
-    return () => {
-      offOs()
-      offScene?.()
-    }
-  }, [os, host, sceneStore])
+  useEffect(() => bindHostClasses({ os, host, sceneStore }), [os, host, sceneStore])
 
   // L726
   function onGlass() {

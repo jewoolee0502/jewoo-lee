@@ -1,0 +1,54 @@
+/* Stage, HUD, cue, toasts and recruiter view, verbatim from design/revamp-lab.html L42–84,
+   with the plan’s phase 3 changes marked below. */
+/* ---------- scene ---------- */
+.track{position:relative;height:220vh}
+.stage{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;background:var(--scene);color:var(--scene-ink);touch-action:pan-y}
+.stage .gl{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage .css3d{position:absolute!important;inset:0;pointer-events:none}
+.stage .css3d > div{pointer-events:none}
+#os-holder{width:900px;height:675px}
+.flat-host{position:absolute;inset:0;display:none;z-index:15;overflow:hidden;background:#04070A}
+/* phase 3 (B10): the touch trap only applies while the OS is interactive. */
+.flat-host.on{display:block;animation:fsIn .18s ease-out}
+.flat-host.on.trap{touch-action:none;overscroll-behavior:contain}
+.os:not(.live) .wb,.os:not(.live) .t-out{overflow:hidden}
+.wb,.t-out{touch-action:pan-y}
+#mb-exit{background:#FFD15C;border:2px solid #122030;padding:3px 9px;margin-right:6px}
+#mb-exit:hover{background:#122030;color:#FFD15C}
+.pcard.on{outline:4px solid #FFD15C;outline-offset:2px}
+@keyframes fsIn{from{opacity:0}}
+.park{position:absolute;left:-99999px;top:0}
+
+.cue{position:absolute;left:50%;bottom:max(22px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:10;pointer-events:none;color:var(--scene-ink);opacity:.8;display:flex;flex-direction:column;align-items:center;gap:4px}
+.cue svg{display:block}
+.cue .wheel{animation:wheel 1.6s ease-in-out infinite}
+.cue .chev{animation:chev 1.6s ease-in-out infinite}
+@keyframes wheel{0%{transform:translateY(0);opacity:1}70%{transform:translateY(7px);opacity:0}100%{opacity:0}}
+@keyframes chev{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(4px);opacity:1}}
+.hud{position:absolute;top:max(14px,env(safe-area-inset-top,0px));right:max(14px,env(safe-area-inset-right,0px));display:flex;gap:8px;z-index:20}
+.hud{flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 28px)}
+@media (max-width:520px){.hud button{padding:7px 8px!important;font-size:11px!important}}
+.hud button{font:12px var(--f-px);background:rgba(10,16,28,.72);color:#EAF2FB;border:1.5px solid rgba(234,242,251,.35);padding:8px 10px;cursor:pointer}
+.hud button:hover{border-color:#EAF2FB}
+.hud .exit{display:none}
+.stage.zoomed .hud{display:none}
+.tip3d{position:absolute;left:0;top:0;pointer-events:none;background:#FFD15C;color:#122030;font:11px var(--f-px);padding:5px 8px;z-index:30;box-shadow:3px 3px 0 rgba(0,0,0,.4);white-space:nowrap}
+.toasts{position:absolute;top:max(62px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:40;pointer-events:none;width:min(400px,calc(100% - 32px))}
+.toast{background:#0F1726;color:#EAF2FB;border:2px solid #FFD15C;box-shadow:4px 4px 0 rgba(0,0,0,.5);padding:10px 14px;font:13px/1.4 var(--f-mono);animation:toastIn .3s ease-out}
+.toast b{display:block;font:11px var(--f-px);color:#FFD15C;letter-spacing:.06em;margin-bottom:2px}
+.toast.info{border-color:#4AA6EE}.toast.info b{color:#4AA6EE}
+@keyframes toastIn{from{transform:translateY(-10px);opacity:0}}
+.rec{position:absolute;inset:0;z-index:45;background:rgba(6,10,18,.7);display:grid;place-items:center;padding:16px}
+.rec-card{background:var(--paper);color:var(--ink);border:2px solid var(--ink);box-shadow:8px 8px 0 #4AA6EE;padding:24px;width:min(520px,100%);max-height:100%;overflow:auto}
+.rec-card h2{font-size:30px}
+.rec-card ul{margin:12px 0 0;padding-left:20px;font-size:15px}
+.rec-card .row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;align-items:center}
+.rec-card button{font:12px var(--f-px);padding:9px 12px;border:2px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer}
+
+/* ---------- phase 3 additions ---------- */
+.scene-layer{position:absolute;inset:0}
+/* B17: there is no laptop to close in the flat fallback. */
+.os.fallback #mb-exit{display:none}
+/* Skip link: visually hidden until focused. */
+.skip{position:absolute;left:8px;top:8px;z-index:100;padding:8px 12px;background:#FFD15C;color:#122030;font:12px var(--f-px);border:2px solid #122030;text-decoration:none;transform:translateY(-200%)}
+.skip:focus,.skip:focus-visible{transform:none}
