@@ -269,3 +269,17 @@ describe('Paint app', () => {
     expect(app.ach.store.get().got.has('paint')).toBe(false)
   })
 })
+
+describe('Paint stroke interpolation', () => {
+  it('a fast drag from cell (0,0) to cell (6,6) paints every cell along the line, not just the endpoints', () => {
+    const { app } = bootedApp()
+    const { win, canvas } = openPaint(app)
+    down(canvas, 0, 0)
+    move(canvas, 6 * 14 + 1, 6 * 14 + 1)
+    up(canvas, 6 * 14 + 1, 6 * 14 + 1)
+    fireEvent.click(button(win, 'Save to desktop'))
+    const cells = opaqueCells(decodePng(app.os.store.get().art[0]))
+    // Diagonal cells (k,k) sit at index k * 24 + k.
+    expect(cells).toEqual(expect.arrayContaining([0, 25, 50, 75, 100, 125, 150]))
+  })
+})

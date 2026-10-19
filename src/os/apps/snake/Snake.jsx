@@ -69,7 +69,7 @@ export default function Snake() {
         x.fillRect(0, 0, 380, 300)
         x.fillStyle = '#fff'
         x.font = '16px Silkscreen, monospace'
-        x.fillText(g.eaten.length ? 'GAME OVER · ' + g.eaten.length + ' SKILLS' : 'PRESS START', 190, 150)
+        x.fillText(played ? 'GAME OVER · ' + g.eaten.length + ' SKILLS' : 'PRESS START', 190, 150)
       }
       x.textAlign = 'left'
     }

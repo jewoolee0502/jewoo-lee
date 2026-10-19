@@ -14,12 +14,16 @@ function Grid({ items, onTakeDown }) {
     <div className="pgrid wall-grid">
       {items.map((it) => (
         <div key={it.id} className="pcard wall-card">
-          <img alt="Visitor drawing" src={it.dataUrl} />
+          <div className="wall-img">
+            <img alt="Visitor drawing" src={it.dataUrl} />
+          </div>
           {it.example && <span className="ex">example</span>}
           {onTakeDown && (
-            <button type="button" className="btn wall-down" onClick={() => onTakeDown(it.id)}>
-              Take down
-            </button>
+            <div className="wall-act">
+              <button type="button" className="btn wall-down" onClick={() => onTakeDown(it.id)}>
+                Take down
+              </button>
+            </div>
           )}
         </div>
       ))}

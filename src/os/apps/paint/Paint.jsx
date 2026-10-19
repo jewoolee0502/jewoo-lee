@@ -1,10 +1,11 @@
 // Paint (L986–1004): a 24×24 pixel canvas. Save to the desktop, or pin to the Visitor Wall.
 // The grid lives in a ref and is drawn straight to the canvas (no React state per stroke).
-// A stroke ends on pointerup, pointercancel or lostpointercapture (B3); the canvas has
+// Each move paints every cell between the previous and current cell, so fast strokes stay
+// continuous. A stroke ends on pointerup, pointercancel or lostpointercapture (B3); the canvas has
 // touch-action:none in apps.css so painting never scrolls the page.
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../../../app/AppContext.jsx'
-import { N, COLS, cellFromPoint, emptyGrid, exportPng, isEmpty } from './paintLogic.js'
+import { N, COLS, cellFromPoint, cellsBetween, emptyGrid, exportPng, isEmpty } from './paintLogic.js'
 
 const SZ = 14
 const PX = N * SZ
@@ -33,6 +34,7 @@ export default function Paint() {
     const x = cv.getContext('2d')
     const grid = gridRef.current
     let down = false
+    let last = null
 
     function draw() {
       if (!x) return
@@ -56,15 +58,25 @@ export default function Paint() {
 
     function paint(e) {
       const cell = cellFromPoint(cv.getBoundingClientRect(), e.clientX, e.clientY)
-      if (!cell) return
-      const i = cell.y * N + cell.x
-      if (grid[i] === curRef.current) return
-      grid[i] = curRef.current
-      draw()
+      if (!cell) {
+        last = null // left the canvas: re-entering starts a new segment instead of bridging the gap
+        return
+      }
+      const from = last ?? cell
+      last = cell
+      let changed = false
+      for (const c of cellsBetween(from, cell)) {
+        const i = c.y * N + c.x
+        if (grid[i] === curRef.current) continue
+        grid[i] = curRef.current
+        changed = true
+      }
+      if (changed) draw()
     }
 
     const onDown = (e) => {
       down = true
+      last = null
       try {
         cv.setPointerCapture?.(e.pointerId)
       } catch {
@@ -77,6 +89,7 @@ export default function Paint() {
     }
     const onEnd = () => {
       down = false
+      last = null
     }
 
     cv.addEventListener('pointerdown', onDown)

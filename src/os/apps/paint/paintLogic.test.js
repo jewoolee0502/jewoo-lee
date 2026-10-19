@@ -1,7 +1,7 @@
 // Pure Paint helpers: the 24×24 grid, cell hit-testing, the PNG export and emptiness.
 import { describe, it, expect } from 'vitest'
 import { inflateSync } from 'node:zlib'
-import { N, COLS, cellFromPoint, exportPng, isEmpty } from './paintLogic.js'
+import { N, COLS, cellFromPoint, cellsBetween, exportPng, isEmpty } from './paintLogic.js'
 import { validateDrawingDataUrl, PNG_PREFIX } from '../../../lib/png.js'
 
 // Decodes an indexed PNG data URL into per-pixel {hex, a} (a = alpha, 0..255).
@@ -71,5 +71,32 @@ describe('paint logic', () => {
     expect(isEmpty(grid)).toBe(true)
     grid[100] = '#4AA6EE'
     expect(isEmpty(grid)).toBe(false)
+  })
+
+  it('cellsBetween returns every Bresenham cell of a diagonal line, including both endpoints', () => {
+    expect(cellsBetween({ x: 0, y: 0 }, { x: 6, y: 6 })).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+      { x: 3, y: 3 },
+      { x: 4, y: 4 },
+      { x: 5, y: 5 },
+      { x: 6, y: 6 },
+    ])
+  })
+
+  it('cellsBetween fills a steep line so every row between the endpoints has a cell', () => {
+    const cells = cellsBetween({ x: 0, y: 0 }, { x: 2, y: 7 })
+    expect(cells[0]).toEqual({ x: 0, y: 0 })
+    expect(cells.at(-1)).toEqual({ x: 2, y: 7 })
+    expect(cells.map((c) => c.y)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+  })
+
+  it('cellsBetween of one cell to itself is that cell alone, and reversed lines cover the same cells', () => {
+    expect(cellsBetween({ x: 4, y: 9 }, { x: 4, y: 9 })).toEqual([{ x: 4, y: 9 }])
+    const forward = cellsBetween({ x: 1, y: 2 }, { x: 8, y: 5 })
+    const backward = cellsBetween({ x: 8, y: 5 }, { x: 1, y: 2 })
+    const key = (c) => `${c.x},${c.y}`
+    expect(new Set(backward.map(key))).toEqual(new Set(forward.map(key)))
   })
 })

@@ -17,6 +17,30 @@ export function cellFromPoint(rect, clientX, clientY) {
   return { x, y }
 }
 
+/** Every grid cell on the Bresenham line from a to b, both ends included, so fast strokes leave no gaps. */
+export function cellsBetween(a, b) {
+  const dx = Math.abs(b.x - a.x)
+  const dy = -Math.abs(b.y - a.y)
+  const sx = a.x < b.x ? 1 : -1
+  const sy = a.y < b.y ? 1 : -1
+  let { x, y } = a
+  let err = dx + dy
+  const cells = [{ x, y }]
+  while (x !== b.x || y !== b.y) {
+    const e2 = 2 * err
+    if (e2 >= dy) {
+      err += dy
+      x += sx
+    }
+    if (e2 <= dx) {
+      err += dx
+      y += sy
+    }
+    cells.push({ x, y })
+  }
+  return cells
+}
+
 /** 24×24 indexed PNG data URL; empty and erased cells are transparent. */
 export function exportPng(grid) {
   return gridToPngDataUrl(grid, N, COLOURS)

@@ -198,3 +198,14 @@ describe('Snake game over and reset', () => {
     expect(ctx.calls.length).toBe(calls)
   })
 })
+
+describe('Snake game over with no skills eaten', () => {
+  it('after a 0-skill death the canvas overlay reads GAME OVER, not PRESS START', () => {
+    const { ctx } = renderSnake()
+    fireEvent.click(startButton())
+    vi.advanceTimersByTime(120 * 14) // runs into the right wall without eating
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    const overlays = ctx.calls.filter((c) => c[0] === 'fillText' && c[2] === 190 && c[3] === 150).map((c) => c[1])
+    expect(overlays.at(-1)).toMatch(/^GAME OVER/)
+  })
+})

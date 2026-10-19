@@ -204,3 +204,23 @@ describe('Visitor Wall app', () => {
     expect(refresh).toHaveBeenCalled()
   })
 })
+
+describe('Visitor Wall moderation layout', () => {
+  it('Take down is rendered outside the element that holds the drawing image, not over it', async () => {
+    history.replaceState(null, '', '/?mod')
+    const { wall } = mount()
+    await act(async () => {
+      await wall.submit(drawing(0))
+    })
+    await act(async () => {
+      await wall.signIn('jay@example.com')
+    })
+    await screen.findByText('Waiting for approval (1)')
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    await screen.findByText('On the wall (1)')
+    const img = document.querySelector('.wall-card img')
+    const takeDown = screen.getByRole('button', { name: 'Take down' })
+    expect(img).not.toBeNull()
+    expect(img.parentElement.contains(takeDown)).toBe(false)
+  })
+})

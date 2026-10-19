@@ -40,6 +40,7 @@
 .t-line{display:flex;gap:8px;align-items:baseline}
 .t-ps{color:#FFB86B;flex:none}
 .t-in{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#E6FFEE;font:inherit;caret-color:#7CFFA0;padding:0}
+.t-in:focus,.t-in:focus-visible{outline:0}
 .win[data-app="term"] .wb{padding:0}
 .game-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;font:13px var(--f-px)}
 .snake-cv,.paint-cv{display:block;border:2px solid #122030;image-rendering:pixelated;touch-action:none;max-width:100%}
@@ -75,7 +76,8 @@
 .wall-card{cursor:default;padding:6px}
 .wall-card:hover{transform:none;box-shadow:3px 3px 0 #122030}
 .wall-card img{aspect-ratio:1;image-rendering:pixelated;border:0;object-fit:contain;background:#fff}
-.wb .btn.wall-down{margin-top:6px;padding:4px 8px;font-size:11px;background:#fff}
+.wall-act{margin-top:6px}
+.wb .btn.wall-down{padding:4px 8px;font-size:11px;background:#fff}
 .wall-h{margin:16px 0 8px}
 .wall-row{display:flex;gap:12px;align-items:center;border:2px solid #122030;padding:8px;margin-bottom:8px;background:#fff}
 .wall-row img{width:64px;height:64px;image-rendering:pixelated;border:1px solid #c9d2db}
