@@ -89,3 +89,11 @@ describe('PROFILE', () => {
     )
   })
 })
+
+describe('SKILLS usedIn copy', () => {
+  it('Tailwind is listed as used in the previous version of this site, not in this website', () => {
+    const tailwind = SKILLS.find((s) => s.name === 'Tailwind')
+    expect(tailwind.usedIn).toEqual(['the previous version of this site'])
+    expect(tailwind.usedIn).not.toContain('this website')
+  })
+})

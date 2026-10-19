@@ -17,7 +17,7 @@ export const SKILLS = [
   ['Nuxt', 'Framework', 'fw', ['WhenAreYouFree', 'Wholesale Express']],
   ['React', 'Framework', 'fw', ['RecycleWise', 'HTTP', 'this website', 'Joblog']],
   ['Spring Boot', 'Backend framework', 'fw', ['HTTP']],
-  ['Tailwind', 'CSS framework', 'fw', ['this website']],
+  ['Tailwind', 'CSS framework', 'fw', ['the previous version of this site']],
   ['Firebase', 'Realtime database', 'data', ['Wholesale Express']],
   ['PostgreSQL', 'Relational database', 'data', ['RecycleWise', 'WhenAreYouFree', 'Container Foam', 'Joblog']],
   ['MongoDB', 'Document database', 'data', []],
