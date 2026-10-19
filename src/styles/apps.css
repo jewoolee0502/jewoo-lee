@@ -70,3 +70,16 @@
 .notice{display:flex;gap:12px;align-items:center;border:2px dashed #C98A1B;background:#FFF6D8;padding:10px;margin:10px 0;font-size:15px}
 .notice img{width:56px;height:56px;image-rendering:pixelated;border:1px solid #c9d2db;background:#fff}
 .ex{font:10px var(--f-px);color:#566476;display:block;margin-top:4px}
+/* Visitor Wall (L839–861 inline styles, as classes) */
+.wall-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.wall-card{cursor:default;padding:6px}
+.wall-card:hover{transform:none;box-shadow:3px 3px 0 #122030}
+.wall-card img{aspect-ratio:1;image-rendering:pixelated;border:0;object-fit:contain;background:#fff}
+.wb .btn.wall-down{margin-top:6px;padding:4px 8px;font-size:11px;background:#fff}
+.wall-h{margin:16px 0 8px}
+.wall-row{display:flex;gap:12px;align-items:center;border:2px solid #122030;padding:8px;margin-bottom:8px;background:#fff}
+.wall-row img{width:64px;height:64px;image-rendering:pixelated;border:1px solid #c9d2db}
+.wall-row span{flex:1;font-size:14px}
+.wall-go{margin-top:14px}
+.wall-mod{margin-top:16px;border-top:2px dashed #c9d2db;padding-top:10px}
+.wall-email{flex:1;min-width:180px;font:15px var(--f-body);border:2px solid #122030;padding:8px;background:#fff;color:#122030}

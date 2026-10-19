@@ -1,6 +1,5 @@
 // App registry: {title, color, w, h, x?, y?, Component} per id (L788–866).
 // Lookups never touch inherited Object.prototype members (fix B1).
-// Phase 6 adds paint and wall.
 import { PROJECTS } from '../content/index.js'
 import { own } from '../core/own.js'
 import ProjectDetail from './apps/ProjectDetail.jsx'
@@ -19,6 +18,8 @@ import Terminal from './apps/terminal/Terminal.jsx'
 import Display from './apps/Display.jsx'
 import BugHunt from './apps/bughunt/BugHunt.jsx'
 import Snake from './apps/snake/Snake.jsx'
+import Paint from './apps/paint/Paint.jsx'
+import VisitorWall from './apps/VisitorWall.jsx'
 
 export const registry = new Map([
   ['about', { title: 'About.txt', color: '#4AA6EE', w: 640, h: 470, Component: About }],
@@ -30,6 +31,8 @@ export const registry = new Map([
   ['mail', { title: 'Mail · say hi', color: '#C9A7FF', w: 500, h: 470, Component: Mail }],
   ['bugs', { title: 'BugHunt.exe', color: '#E8452E', w: 340, h: 250, x: 520, y: 50, Component: BugHunt }],
   ['snake', { title: 'Snake.exe · eat the skills', color: '#3BB273', w: 440, h: 530, Component: Snake }],
+  ['paint', { title: 'Paint', color: '#FFD15C', w: 440, h: 530, Component: Paint }],
+  ['wall', { title: 'Visitor Wall', color: '#C8955E', w: 660, h: 540, Component: VisitorWall }],
   ['service', { title: 'Service.txt', color: '#B9C3CD', w: 580, h: 430, Component: Service }],
   ['display', { title: 'Desktop Background', color: '#5FCDE4', w: 620, h: 470, Component: Display }],
   ['ach', { title: 'Trophies', color: '#FFD15C', w: 500, h: 500, Component: Trophies }],

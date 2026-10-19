@@ -13,6 +13,7 @@ import { createStore } from '../core/store.js'
 import { createController } from '../stage/controller.js'
 import { scrollToResume } from '../stage/scrollToResume.js'
 import { loadScene } from '../scene/loadScene.js'
+import { createWallStore } from '../wall/wallStore.js'
 
 const NO_RECT = { top: 0, height: 0, bottom: 0, left: 0, right: 0, width: 0 }
 
@@ -63,6 +64,8 @@ export function createApp(overrides = {}) {
   )
 
   app.scene = pick('scene', () => createSceneSlot())
+  // Visitor Wall: Supabase when both env vars are set (lazy chunk), otherwise the in-tab mock.
+  app.wall = pick('wall', () => createWallStore({ toast: (...args) => app.toasts.toast(...args) }))
   app.ui = pick('ui', () => ({ store: createStore({ recOpen: false, stageVisible: false }) }))
   app.loadScene = pick('loadScene', () => loadScene)
   app.wallpaperEngine = pick('wallpaperEngine', () => null)
@@ -109,15 +112,36 @@ export function createApp(overrides = {}) {
   /** Starts app-level background work. Returns a stop function. */
   app.start = () => {
     const stopWp = app.wallpaper.start?.(app.timers)
-    return () => stopWp?.()
+    const stopWall = startWallTriggers(app)
+    return () => {
+      stopWp?.()
+      stopWall()
+    }
   }
 
   /** Tears everything down: timers, media listeners. */
   app.dispose = () => {
     app.os?.dispose?.()
+    app.wall?.dispose?.()
     app.timers.clearAll?.()
     app.motion.dispose?.()
   }
 
   return app
+}
+
+/**
+ * The wall loads on first need: `?mod` in the URL (moderator sign-in), or the scene becoming
+ * ready (the corkboard shows approved drawings). The app and Paint also init it on use.
+ */
+function startWallTriggers(app) {
+  const init = () => app.wall?.ensureInit?.()
+  if (new URLSearchParams(globalThis.location?.search ?? '').has('mod')) init()
+  const sceneStore = app.scene?.store
+  if (!sceneStore?.subscribe) return () => {}
+  if (sceneStore.get().status === 'ready') init()
+  const unsubscribe = sceneStore.subscribe((s) => {
+    if (s.status === 'ready') init()
+  })
+  return () => unsubscribe()
 }
