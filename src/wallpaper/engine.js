@@ -1,10 +1,11 @@
 // The living wallpaper (L483–602 runtime). It has no loop of its own: the shared stage ticker
 // calls tick(now) every frame (D6), and tick decides whether to draw (L596–598):
 //   - never while the tab is hidden or the OS is not 'on';
-//   - during a camera tween, or with reduced motion, only when something changed (dirty);
+//   - while the camera moves (`isTweening`: the dive, or a programmatic glide), or with reduced
+//     motion, only when something changed (dirty);
 //   - otherwise at most every 70 ms (about 14 fps).
-// A width change (OS resize) is applied only after it has been stable for 200 ms and never during
-// a camera tween (B4). The layout is a pure function of W with stable seeds, so a rebuild reflows
+// A width change (OS resize) is applied only after it has been stable for 200 ms and never while
+// the camera moves (B4). The layout is a pure function of W with stable seeds, so a rebuild reflows
 // the city instead of re-rolling it.
 import { CITY_H, clampWidth, isMode } from './modes.js'
 import { buildLayout, fitRaccoon, createWallState } from './layout.js'

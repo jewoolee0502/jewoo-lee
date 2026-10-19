@@ -325,6 +325,61 @@ describe('scene/createScene lifecycle', () => {
     api.dispose()
   })
 
+  // Round 2 Phase 2 TEST LIST item 11 (R4): while the OS is interactive it is flat, so the 3D pass is skipped.
+  it('frame() skips the WebGL and CSS3D render while the OS is interactive, and renders again when it is not', () => {
+    const env = setup()
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+    const api = env.build()
+
+    env.app.ctrl.store.set({ interactive: true })
+    state.calls = []
+    api.frame(0, 0.016)
+    expect(callsOn('WebGLRenderer', 'render')).toHaveLength(0)
+    expect(callsOn('CSS3DRenderer', 'render')).toHaveLength(0)
+
+    env.app.ctrl.store.set({ interactive: false })
+    state.calls = []
+    api.frame(0, 0.016)
+    expect(callsOn('WebGLRenderer', 'render').length).toBeGreaterThan(0)
+    expect(callsOn('CSS3DRenderer', 'render').length).toBeGreaterThan(0)
+    api.dispose()
+  })
+
+  // Round 2 Phase 2 TEST LIST item 11 (R4): inside, the OS is flat, so the mirror (the 3D laptop's
+  // screen) is not redrawn either; the first frame after leaving redraws it once.
+  it('frame() skips the mirror redraw while the OS is interactive, and redraws it once on the first frame after leaving', () => {
+    const env = setup()
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+    const api = env.build()
+    env.app.os.store.set({ state: 'on' })
+    // The wallpaper engine's canvas is the mirror's source; a sized canvas makes a redraw due.
+    const wallCanvas = document.createElement('canvas')
+    wallCanvas.width = 800
+    wallCanvas.height = 600
+    env.app.wallpaperEngine = { canvas: wallCanvas }
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
+    const mirrorDraws = () => getContext.mock.calls.filter(([type]) => type === '2d').length
+
+    env.app.ctrl.store.set({ interactive: true })
+    getContext.mockClear()
+    api.frame(0, 0.016)
+    api.frame(16, 0.016)
+    expect(mirrorDraws()).toBe(0)
+
+    env.app.ctrl.store.set({ interactive: false })
+    getContext.mockClear()
+    api.frame(32, 0.016)
+    expect(mirrorDraws()).toBe(1)
+    getContext.mockClear()
+    api.frame(48, 0.016)
+    expect(mirrorDraws()).toBe(0)
+
+    getContext.mockRestore()
+    api.dispose()
+  })
+
   it('dispose() disconnects its ResizeObserver and unsubscribes from every store', () => {
     const env = setup()
     const api = env.build()

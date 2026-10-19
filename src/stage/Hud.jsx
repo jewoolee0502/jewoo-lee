@@ -1,4 +1,5 @@
-// Stage HUD (L275–280, without the dead #hud-exit, B12) plus the "Résumé ↓" button (D11).
+// Stage HUD (L275–280, without the prototype's dead #hud-exit, B12; round 2's #hud-exit is
+// ExitPill.jsx) plus the "Résumé ↓" button (D11).
 import { useApp } from '../app/AppContext.jsx'
 import { useStore } from '../core/store.js'
 

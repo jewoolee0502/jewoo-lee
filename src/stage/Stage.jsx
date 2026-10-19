@@ -1,10 +1,11 @@
-// The page shell (L273–308): scroll track, sticky stage, HUD, cue, toasts, recruiter view,
+// The page shell (L273–308): scroll track, sticky stage, HUD, exit pill, cue, toasts, recruiter view,
 // the scene mount and the flat-host fallback. React renders the flat host, the park and the
 // scene layer empty; the host and the scene own what goes inside them (D2).
 import { useRef } from 'react'
 import { useApp } from '../app/AppContext.jsx'
 import { useStore } from '../core/store.js'
 import Hud from './Hud.jsx'
+import ExitPill from './ExitPill.jsx'
 import Cue from './Cue.jsx'
 import Toasts from './Toasts.jsx'
 import RecruiterView from './RecruiterView.jsx'
@@ -38,6 +39,7 @@ export default function Stage() {
           <div className="scene-layer" ref={sceneLayerRef} />
           <div className="flat-host" id="flat-host" ref={flatHostRef} style={unavailable ? FLAT_FALLBACK : undefined} />
           <Hud recButtonRef={recButtonRef} />
+          <ExitPill />
           <Cue ref={cueRef} />
           <Toasts />
           <div className="tip3d" id="tip3d" hidden ref={tipRef} />

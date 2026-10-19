@@ -41,6 +41,7 @@ export function createOsController({ host, registry, ach, snd, motion, timers, s
     flat: false,
     compact: false,
     live: false,
+    scale: 1,
   })
 
   let z = 20
@@ -200,7 +201,17 @@ export function createOsController({ host, registry, ach, snd, motion, timers, s
   function setFlat(v, compact) {
     // The host reports what it actually did (it stays out of flat mode without a flat host).
     const flat = host.setFlat(v, compact)
-    store.set({ flat, compact: Boolean(compact) })
+    const scale = flat && !compact ? host.fitFlat() : 1
+    store.set({ flat, compact: Boolean(compact), scale })
+  }
+
+  /** After a resize while flat: re-fit the 2D scale, then pull windows back inside the desk. */
+  function refit() {
+    if (!get().flat) return
+    const scale = host.fitFlat()
+    const wins = get().wins
+    const next = fitWindows(wins, host.size())
+    store.set(next !== wins ? { scale, wins: next } : { scale })
   }
 
   function setLive(v) {
@@ -233,6 +244,7 @@ export function createOsController({ host, registry, ach, snd, motion, timers, s
     stopFx,
     setSize,
     setFlat,
+    refit,
     setLive,
     size: () => host.size(),
     dispose,

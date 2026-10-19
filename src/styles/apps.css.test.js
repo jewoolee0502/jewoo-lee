@@ -13,4 +13,11 @@ describe('styles/apps.css terminal input focus', () => {
     expect(focusRule).toBeDefined()
     expect(focusRule.body).toMatch(/outline:\s*(0|none)\b/)
   })
+
+  // Round 2 Phase 2 TEST LIST item 9: the terminal output lets the page scroll at its edge.
+  it('.t-out does not declare overscroll-behavior', () => {
+    const tOut = rules.filter((r) => r.selector.split(',').some((p) => /\.t-out(?![\w-])/.test(p)))
+    expect(tOut.length).toBeGreaterThan(0)
+    for (const r of tOut) expect(r.body, r.selector).not.toMatch(/overscroll-behavior/)
+  })
 })

@@ -11,6 +11,7 @@ import { createOsController } from '../os/osController.js'
 import { registry } from '../os/registry.js'
 import { createStore } from '../core/store.js'
 import { createController } from '../stage/controller.js'
+import { createGlide } from '../stage/glide.js'
 import { scrollToResume } from '../stage/scrollToResume.js'
 import { loadScene } from '../scene/loadScene.js'
 
@@ -66,16 +67,29 @@ export function createApp(overrides = {}) {
   app.wallpaperEngine = pick('wallpaperEngine', () => null)
 
   // Stage elements, registered by <Stage/> while it is mounted. The controller writes the
-  // per-frame cue opacity and the `zoomed` class straight to them (no React state per frame).
+  // per-frame cue opacity, the `zoomed` class and `flat-runway` straight to them (no React state
+  // per frame).
   app.dom = pick('dom', () => ({ track: null, stage: null, cue: null }))
+  // Programmatic page scrolls at our own pace (R7); the bindings cancel it on user input.
+  app.glide = pick('glide', () =>
+    createGlide({
+      getY: () => globalThis.scrollY,
+      scrollTo: (o) => globalThis.scrollTo(o),
+      raf: (cb) => globalThis.requestAnimationFrame(cb),
+      caf: (id) => globalThis.cancelAnimationFrame(id),
+      now: () => performance.now(),
+      reduce: () => app.motion.reduce(),
+    }),
+  )
   let cueEl = null
   let cueOpacity = null
   app.ctrl = pick('ctrl', () =>
     createController({
       getTrackRect: () => app.dom.track?.getBoundingClientRect() ?? NO_RECT,
-      innerHeight: () => globalThis.innerHeight,
+      getStageHeight: () => app.dom.stage?.clientHeight || globalThis.innerHeight,
       scrollY: () => globalThis.scrollY,
       scrollTo: (opts) => globalThis.scrollTo(opts),
+      glide: app.glide,
       reduce: () => app.motion.reduce(),
       sceneStatus: () => app.scene.store.get().status,
       os: app.os,
@@ -88,10 +102,9 @@ export function createApp(overrides = {}) {
           el.style.opacity = String(v)
         },
         setZoomed: (v) => app.dom.stage?.classList.toggle('zoomed', Boolean(v)),
-        setTrap: (v) => app.host.setTrap(v),
+        setRunway: (flat) => app.dom.track?.classList.toggle('flat-runway', Boolean(flat)),
       },
       scrollToResume: (behavior) => scrollToResume(behavior),
-      timers: app.timers.child(),
     }),
   )
   app.nav = pick('nav', () => ({
@@ -112,6 +125,7 @@ export function createApp(overrides = {}) {
 
   /** Tears everything down: timers, media listeners. */
   app.dispose = () => {
+    app.glide?.cancel?.()
     app.os?.dispose?.()
     app.timers.clearAll?.()
     app.motion.dispose?.()

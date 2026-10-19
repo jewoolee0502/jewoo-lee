@@ -61,7 +61,7 @@
 .tb-t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tb-x{flex:none;width:24px;height:24px;border:2px solid #122030;background:#fff;font:700 13px var(--f-mono);cursor:pointer;display:grid;place-items:center;padding:0;color:#122030}
 .tb-x:hover{background:#E8452E;color:#fff}
-.wb{flex:1;overflow:auto;overscroll-behavior:contain;padding:18px;user-select:text;-webkit-user-select:text;min-height:0;color:#122030}
+.wb{flex:1;overflow:auto;padding:18px;user-select:text;-webkit-user-select:text;min-height:0;color:#122030}
 .wb h2{font:800 28px/1.1 var(--f-display);margin:0 0 8px;color:#122030}
 .wb h3{font:700 18px var(--f-display);margin:0}
 .wb p{margin:0 0 10px}
@@ -76,7 +76,7 @@
 .os.compact .win{left:6px!important;top:38px!important;width:calc(100% - 12px)!important;height:calc(100% - 44px)!important;box-shadow:none}
 .os.compact .icons{grid-template-rows:repeat(auto-fill,92px);grid-auto-columns:84px}
 .os.compact .ic img{width:44px;height:44px}
-.os.compact .mb-sel,.os.compact .wallmark,.os.flat #mb-snd{display:none}
+.os.compact .mb-sel,.os.compact .wallmark,.os.compact #mb-snd,.os.fallback #mb-snd{display:none}
 .os.compact .about,.os.compact .inv{grid-template-columns:minmax(0,1fr)}
 .os.compact .pol{max-width:180px}
 .os.compact .log summary{grid-template-columns:minmax(0,1fr)}

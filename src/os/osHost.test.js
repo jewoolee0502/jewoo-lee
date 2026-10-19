@@ -1,3 +1,4 @@
+// Round 2 Phase 2 TEST LIST item 7 (osHost): live toggles keep scroll offsets, no trap, fade class, fitFlat returns k.
 import { describe, it, expect, vi } from 'vitest'
 import { createOsHost } from './osHost.js'
 
@@ -129,7 +130,7 @@ describe('createOsHost', () => {
     expect(osWidthSet).not.toHaveBeenCalled()
   })
 
-  it('setLive(false) resets scrollTop of .wb and .t-out inside the OS element', () => {
+  it('setLive(false) keeps the scrollTop of .wb and .t-out (R9: a live flip must not reset the windows)', () => {
     const host = createOsHost()
     const wb = document.createElement('div')
     wb.className = 'wb'
@@ -141,8 +142,46 @@ describe('createOsHost', () => {
 
     host.setLive(false)
 
-    expect(wb.scrollTop).toBe(0)
-    expect(tOut.scrollTop).toBe(0)
+    expect(host.osEl.classList.contains('live')).toBe(false)
+    expect(wb.scrollTop).toBe(50)
+    expect(tOut.scrollTop).toBe(50)
+  })
+
+  it('has no setTrap (the touch trap is gone with the wheel hijack)', () => {
+    const host = createOsHost()
+
+    expect(host).not.toHaveProperty('setTrap')
+  })
+
+  it('setFlat(true, true) adds the fade class to the flat host; setFlat(true, false) removes it', () => {
+    const host = createOsHost()
+    const flatHost = makeFlatHost(1440, 900)
+    host.bindFlatHost(flatHost)
+
+    host.setFlat(true, true)
+    expect(flatHost.classList.contains('fade')).toBe(true)
+
+    host.setFlat(true, false)
+    expect(flatHost.classList.contains('fade')).toBe(false)
+  })
+
+  it('fitFlat returns the scale k = min(W/900, H/675) for a non-compact flat host and sizes the OS to 1080px wide at 1440x900', () => {
+    const host = createOsHost()
+    host.bindFlatHost(makeFlatHost(1440, 900))
+    host.setFlat(true, false)
+
+    const k = host.fitFlat()
+
+    expect(k).toBeCloseTo(4 / 3, 6)
+    expect(host.osEl.style.width).toBe('1080px')
+  })
+
+  it('fitFlat returns 1 for the compact layout', () => {
+    const host = createOsHost()
+    host.bindFlatHost(makeFlatHost(450, 675))
+    host.setFlat(true, true)
+
+    expect(host.fitFlat()).toBe(1)
   })
 
   it('syncClasses toggles the classes and sets dataset.state', () => {

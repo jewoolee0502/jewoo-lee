@@ -1,142 +1,193 @@
-// Scroll / camera controller: a port of Ctrl (L1011–1031) with fixes B8 (armed starts null),
-// B9 (goToResume suppresses auto-enter until p > .6), B10 (touch trap only while interactive)
-// and B12 (no `ease`, no zoomIn/zoomOut aliases).
+// Scroll / camera controller (plan-r2 section 2, R1–R8).
 //
-// A little scroll (or a click on the laptop) starts one eased timeline: the lid opens, then the
-// camera dives. Scrolling never scrubs the camera directly, so wheel notches can't make it lurch
-// or stop half-way. The store holds only the discrete fields React reads; p, z and tw are plain
-// properties written every frame.
+// The camera pose is a pure function of the page scroll (R1): every frame measures the track,
+// builds the runway layout from the measured pinned range (R3) and reads z off it, so wheel,
+// trackpad momentum, touch, keys, the scrollbar and hash jumps all drive the dive the same way.
+// Nothing here animates z. Programmatic moves (enter, exit, the idle settle) are page scrolls
+// through `glide` (R7); the only wheel interception is the plateau detent (R5).
+//
+// The store holds only the discrete fields React and the bindings read; z, seg and layout are
+// plain properties written every frame. `detent` says whether the plateau detent can act (the page
+// is in the dive, or a stopped burst is still being held), so the bindings attach the non-passive
+// #stage wheel listener only then.
 import { createStore } from '../core/store.js'
-import { clamp, ss, easeIO } from '../core/math.js'
+import { ss } from '../core/math.js'
+import { REMAP_THRESHOLD } from '../core/constants.js'
+import {
+  runwayLayout,
+  poseAt,
+  nextInteractive,
+  settleTarget,
+  remapScroll,
+  wheelPixels,
+  createDetent,
+} from './runway.js'
 
 export function createController({
   getTrackRect,
-  innerHeight,
+  getStageHeight,
   scrollY,
   scrollTo,
+  glide,
   reduce,
   sceneStatus,
   os,
   ui,
   scrollToResume,
-  timers,
+  now = () => globalThis.performance?.now() ?? Date.now(),
 }) {
-  const store = createStore({ mode: 'desk', interactive: false, narrow: false })
+  // `detent` starts true: the page starts at the top, in the dive; the first frame measures it.
+  const store = createStore({ phase: 'desk', interactive: false, narrow: false, detent: true })
   const isReduced = () => Boolean(reduce?.())
-  const behavior = () => (isReduced() ? 'auto' : 'smooth')
+  const detent = createDetent()
+  let runwayFlat = false
+  let fallbackBooted = false
   let fallbackLive = false
+
+  function setDetent(v) {
+    if (v !== store.get().detent) store.set({ detent: v })
+  }
+
+  /** Measures the track: its layout, the track-relative scroll `s` and the track's document top. */
+  function measure() {
+    const r = getTrackRect()
+    const L = runwayLayout({ trackH: r.height, stageH: getStageHeight() })
+    return { L, s: -r.top, trackTopDoc: scrollY() + r.top }
+  }
+
+  function setInteractive(v) {
+    if (v === store.get().interactive) return
+    store.set({ interactive: v })
+    ui.setZoomed(v)
+    os.setLive(v)
+    ctrl.applyFlat()
+  }
 
   const ctrl = {
     store,
-    p: 0,
     z: 0,
-    tw: null,
-    armed: null,
-    suppress: false,
+    seg: 'top',
+    layout: null,
 
-    update(dt) {
-      const r = getTrackRect()
-      const max = Math.max(1, r.height - innerHeight())
-      ctrl.p = clamp(-r.top / max, 0, 1)
+    update() {
+      const m = measure()
+      let { s } = m
+      const prev = ctrl.layout
       const status = sceneStatus()
+      // A big resize (rotation, window snap) keeps the reader in the same segment and fraction.
+      // Small ones (the mobile toolbar) are left alone: the invariant holds at any R. The
+      // fallback has no runway to keep, and an unmeasured track (R 1) is not a layout.
+      if (
+        status !== 'unavailable' &&
+        prev &&
+        prev.R > 1 &&
+        m.L.R > 1 &&
+        Math.abs(m.L.R - prev.R) / prev.R > REMAP_THRESHOLD
+      ) {
+        s = remapScroll(s, prev, m.L)
+        glide.cancel()
+        scrollTo({ top: m.trackTopDoc + s, behavior: 'instant' })
+      }
+      ctrl.layout = m.L
+
       if (status === 'unavailable') {
+        // R10: no scene, no runway. The flat compact OS is live from the first frame.
+        if (!fallbackBooted) {
+          fallbackBooted = true
+          if (os.state === 'standby') os.boot()
+        }
         if (!fallbackLive) ctrl.applyFlat()
-        ui.setCue(1 - ss(0.01, 0.2, ctrl.p))
-        if (ctrl.p > 0.1 && os.state === 'standby') os.boot()
+        setDetent(false)
+        ui.setCue(0)
         return
       }
-      if (ctrl.armed === null) ctrl.armed = ctrl.p < 0.01
-      else if (ctrl.p < 0.01 && !ctrl.suppress) ctrl.armed = true
-      else if (ctrl.p > 0.6) {
-        ctrl.armed = false
-        ctrl.suppress = false
-      }
+      setDetent(s < m.L.diveEnd || detent.holding(now()))
       if (status === 'loading') {
+        ctrl.z = 0
+        ctrl.seg = 'top'
+        if (store.get().phase !== 'desk') store.set({ phase: 'desk' })
         ui.setCue(0.8)
         return
       }
-      const { mode } = store.get()
-      if (mode === 'desk' && ctrl.armed && !ctrl.tw && ctrl.p > 0.02 && !ctrl.suppress) ctrl.enter()
-      if (ctrl.tw) {
-        const t = ctrl.tw
-        t.t = Math.min(1, t.t + dt / t.dur)
-        ctrl.z = t.from + (t.to - t.from) * easeIO(t.t)
-        if (t.t >= 1) {
-          ctrl.tw = null
-          t.done?.()
-        }
-      }
-      ui.setCue(0.8 * (1 - ss(0, 0.15, ctrl.z)))
-      const inter = store.get().mode === 'inside' && !ctrl.tw
-      if (inter !== store.get().interactive) {
-        store.set({ interactive: inter })
-        ui.setZoomed(inter)
-        os.setLive(inter)
-        ui.setTrap(inter)
-        ctrl.applyFlat()
-      }
+
+      const pose = poseAt(s, m.L)
+      ctrl.z = pose.z
+      ctrl.seg = pose.seg
+      setInteractive(nextInteractive(store.get().interactive, pose.z))
+      const interactive = store.get().interactive
+      const phase = interactive ? 'inside' : pose.z > 0 ? 'dive' : 'desk'
+      if (phase !== store.get().phase) store.set({ phase })
+      ui.setCue(0.8 * (1 - ss(0, 0.15, pose.z)))
     },
 
-    /** The fallback (no scene) is always flat and compact (L1280). It is also always live, so
-     *  window bodies scroll (the prototype left them overflow:hidden). The touch trap (B10) stays
-     *  off: `interactive` never turns on without a scene, so visitors can still scroll the page. */
+    /** Inside is always flat (R4): compact on narrow screens, scaled to fill otherwise. The
+     *  fallback (no scene) is flat, compact and live (L1280), and its runway collapses at once,
+     *  without waiting for a frame. */
     applyFlat() {
       const { interactive, narrow } = store.get()
       const unavailable = sceneStatus() === 'unavailable'
-      os.setFlat((interactive && narrow) || unavailable, unavailable ? true : narrow)
+      if (unavailable && !runwayFlat) {
+        runwayFlat = true
+        ui.setRunway?.(true)
+      }
+      os.setFlat(interactive || unavailable, unavailable ? true : narrow)
       if (unavailable) os.setLive(true)
       else if (fallbackLive) os.setLive(interactive)
       fallbackLive = unavailable
     },
 
     setNarrow(n) {
-      store.set({ narrow: Boolean(n) })
+      n = Boolean(n)
+      if (n === store.get().narrow) return
+      store.set({ narrow: n })
       ctrl.applyFlat()
     },
 
+    /** Glide to the plateau start from wherever the page is (the laptop, a hotspot, ★, #top). */
     enter() {
-      if (sceneStatus() !== 'ready' || store.get().mode === 'inside') return
-      store.set({ mode: 'inside' })
-      ctrl.armed = false
-      os.boot()
-      ctrl.tw = { from: ctrl.z, to: 1, t: 0, dur: isReduced() ? 0.01 : Math.max(0.5, 1.9 * (1 - ctrl.z)) }
-      const top = getTrackRect().top
-      if (top > 1) scrollTo({ top: scrollY() + top + 2, behavior: behavior() })
-    },
-
-    exit() {
-      if (sceneStatus() !== 'ready' || store.get().mode === 'desk') return
-      startExit()
-      if (ctrl.p > 0.005) scrollTo({ top: getTrackRect().top + scrollY(), behavior: behavior() })
-    },
-
-    /** Bug K: focus moved out of the stage (Tab onto the résumé) while inside the laptop. Tween
-     *  out like exit(), but never scroll and never move focus; suppress auto-enter like
-     *  goToResume() (cleared once the page passes p .6) so it does not re-enter at once. */
-    leave() {
-      if (sceneStatus() !== 'ready' || store.get().mode !== 'inside') return
-      ctrl.suppress = true
-      ctrl.armed = false
-      startExit()
-    },
-
-    /** D11: leave the laptop (if inside) and go to the résumé without re-triggering auto-enter. */
-    goToResume() {
-      ctrl.suppress = true
-      ctrl.armed = false
-      const b = behavior()
-      if (store.get().mode === 'inside' && sceneStatus() === 'ready') {
-        startExit()
-        ctrl.tw.done = () => timers.timeout(() => scrollToResume(b), 100)
-      } else {
-        scrollToResume(b)
+      const status = sceneStatus()
+      if (status === 'unavailable') {
+        scrollTo({ top: measure().trackTopDoc, behavior: isReduced() ? 'auto' : 'smooth' })
+        return
       }
+      if (status !== 'ready' || store.get().interactive) return
+      const m = measure()
+      glide.to(m.trackTopDoc + m.L.diveEnd)
     },
-  }
 
-  function startExit() {
-    store.set({ mode: 'desk' })
-    ctrl.tw = { from: ctrl.z, to: 0, t: 0, dur: isReduced() ? 0.01 : Math.max(0.5, 1.5 * ctrl.z) }
+    /** Esc, ⏏ Close laptop, Shut Down…: glide back to the closed laptop. */
+    exit() {
+      if (sceneStatus() !== 'ready' || store.get().phase === 'desk') return
+      glide.to(measure().trackTopDoc)
+    },
+
+    /** D11: the résumé is a long way down; the browser's own smooth scroll takes it there. */
+    goToResume() {
+      glide.cancel()
+      scrollToResume(isReduced() ? 'auto' : 'smooth')
+    },
+
+    /** R6: called once the page is at rest; finishes a half-open dive or a half-closed exit. */
+    settle(dir) {
+      if (sceneStatus() !== 'ready' || glide.active) return
+      const m = measure()
+      const t = settleTarget(m.s, m.L, dir)
+      if (t !== null) glide.to(m.trackTopDoc + t)
+    },
+
+    /** R5: the plateau detent. Returns true when the wheel event should be prevented. */
+    onWheel({ deltaY, deltaMode, timeStamp }) {
+      if (sceneStatus() !== 'ready' || !ctrl.layout) return false
+      const m = measure()
+      const r = detent.onWheel({
+        t: timeStamp,
+        dy: wheelPixels(deltaY, deltaMode, m.L.stageH),
+        s: m.s,
+        diveEnd: m.L.diveEnd,
+      })
+      if (r.snapTo != null) scrollTo({ top: m.trackTopDoc + r.snapTo, behavior: 'instant' })
+      return r.block
+    },
   }
 
   return ctrl

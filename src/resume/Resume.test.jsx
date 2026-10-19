@@ -171,13 +171,14 @@ describe('resume/Resume', () => {
     container.remove()
   })
 
-  it('10. "Open the laptop ↑" scrolls to the top and calls nav.openLaptop', async () => {
+  it('10. "Open the laptop ↑" calls nav.openLaptop once, synchronously, and does not call window.scrollTo', () => {
     const openLaptop = vi.fn()
     const goToResume = vi.fn()
     renderWithApp(<Resume />, { nav: { openLaptop, goToResume } })
+    window.scrollTo.mockClear()
     fireEvent.click(screen.getByText('Open the laptop ↑'))
-    expect(window.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }))
-    await waitFor(() => expect(openLaptop).toHaveBeenCalledTimes(1))
+    expect(openLaptop).toHaveBeenCalledTimes(1)
+    expect(window.scrollTo).not.toHaveBeenCalled()
   })
 
   it('11. experience dates read "Aug 2025 – Dec 2025" for Wholesale Express; raw "2025-08" is not in the résumé text', () => {

@@ -25,7 +25,7 @@ export function createKeyHandler({ app }) {
     }
     if (key === 'Escape') {
       if (app.ui.store.get().recOpen) app.ui.store.set({ recOpen: false })
-      else if (app.ctrl.store.get().interactive && app.scene?.store.get().status === 'ready') app.ctrl.exit()
+      else if (app.scene?.store.get().status === 'ready' && app.ctrl.store.get().phase !== 'desk') app.ctrl.exit()
     }
   }
 }

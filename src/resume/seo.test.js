@@ -77,7 +77,7 @@ describe('SEO head (index.html through Vite)', () => {
     expect(doc.querySelector('link[href*="fonts.googleapis.com/css2"]')).not.toBeNull()
   })
 
-  it('no-JS: a <noscript> block neutralises the #app:empty 220vh reservation so the résumé shows at once', () => {
+  it('no-JS: a <noscript> block neutralises the #app:empty track height token reservation so the résumé shows at once', () => {
     const blocks = [...RAW.matchAll(/<noscript>([\s\S]*?)<\/noscript>/g)].map((m) => m[1])
     expect(blocks.length).toBeGreaterThan(0)
     const rule = blocks

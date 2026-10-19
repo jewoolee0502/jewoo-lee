@@ -1,11 +1,15 @@
-// Phase 3 TEST LIST: stage/Stage.test.jsx. Rendered through renderWithApp with loadScene overridable.
+// Round 2 Phase 2 TEST LIST: stage/Stage.test.jsx. Rendered through renderWithApp with loadScene overridable.
+// Native scroll: the only non-passive listener is #stage wheel; the window carries the idle settle.
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { StrictMode } from 'react'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { triggerIntersection } from '../test/setup.js'
 import { renderWithApp } from '../test/renderWithApp.jsx'
 import Stage from './Stage.jsx'
 import OsPortal from '../os/OsPortal.jsx'
 import { PROJECTS } from '../content/index.js'
+import { IDLE_MS, SETTLE_GRACE_MS } from '../core/constants.js'
+import { runwayLayout } from './runway.js'
 
 const pending = () => new Promise(() => {})
 const NOTICE = '3D is unavailable in this browser, so JAY-OS runs flat. Everything still works.'
@@ -199,7 +203,7 @@ describe('stage/Stage', () => {
     expect(cue).toBeInTheDocument()
   })
 
-  it('9. unmount removes the window keydown and stage wheel listeners it added', () => {
+  it('9. unmount removes every listener it added: #stage wheel and the window scroll, key, touch and pointer listeners', () => {
     const added = []
     const removed = []
     const origAdd = EventTarget.prototype.addEventListener
@@ -224,28 +228,61 @@ describe('stage/Stage', () => {
       removed.push({ target: window, type, fn })
       return winRemove.call(this, type, fn, opts)
     }
+    const WINDOW_TYPES = ['keydown', 'scroll', 'touchstart', 'touchend', 'touchcancel', 'pointerdown', 'pointerup', 'pointercancel']
     let unmount
     try {
       ;({ unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) }))
       const stageEl = added.find((a) => a.type === 'wheel' && a.target.id === 'stage')?.target
       expect(stageEl).toBeDefined()
-      const keydowns = added.filter((a) => a.type === 'keydown' && a.target === window)
-      const wheels = added.filter((a) => a.type === 'wheel' && a.target === stageEl)
-      expect(keydowns.length).toBeGreaterThan(0)
-      expect(wheels.length).toBeGreaterThan(0)
+      const ours = added.filter(
+        (a) => (a.target === window && WINDOW_TYPES.includes(a.type)) || (a.target === stageEl && a.type === 'wheel'),
+      )
+      for (const type of WINDOW_TYPES) {
+        expect(ours.some((a) => a.target === window && a.type === type), `window ${type} added`).toBe(true)
+      }
+      expect(ours.some((a) => a.target === stageEl && a.type === 'wheel')).toBe(true)
 
       unmount()
 
-      const removedKeydowns = removed.filter((r) => r.type === 'keydown' && r.target === window)
-      const removedWheels = removed.filter((r) => r.type === 'wheel' && r.target === stageEl)
-      expect(removedKeydowns.length).toBe(keydowns.length)
-      expect(removedWheels.length).toBe(wheels.length)
+      for (const a of ours) {
+        expect(
+          removed.some((r) => r.target === a.target && r.type === a.type && r.fn === a.fn),
+          `${a.target === window ? 'window' : '#stage'} ${a.type} removed`,
+        ).toBe(true)
+      }
     } finally {
       EventTarget.prototype.addEventListener = origAdd
       EventTarget.prototype.removeEventListener = origRemove
       window.addEventListener = winAdd
       window.removeEventListener = winRemove
       unmount?.()
+    }
+  })
+
+  it('9b. with onscrollend defined, the window scrollend listener is added and removed too', () => {
+    Object.defineProperty(window, 'onscrollend', { configurable: true, writable: true, value: null })
+    const added = []
+    const removed = []
+    const winAdd = window.addEventListener
+    const winRemove = window.removeEventListener
+    window.addEventListener = function (type, fn, opts) {
+      added.push({ type, fn })
+      return winAdd.call(this, type, fn, opts)
+    }
+    window.removeEventListener = function (type, fn, opts) {
+      removed.push({ type, fn })
+      return winRemove.call(this, type, fn, opts)
+    }
+    try {
+      const { unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      const scrollend = added.filter((a) => a.type === 'scrollend')
+      expect(scrollend).toHaveLength(1)
+      unmount()
+      expect(removed.some((r) => r.type === 'scrollend' && r.fn === scrollend[0].fn)).toBe(true)
+    } finally {
+      window.addEventListener = winAdd
+      window.removeEventListener = winRemove
+      delete window.onscrollend
     }
   })
 
@@ -262,24 +299,6 @@ describe('stage/Stage', () => {
     }
   })
 
-  // Bug K: Tab from inside the laptop onto the résumé leaves the laptop, without stealing focus.
-  it('11. with mode inside, focusin outside #stage calls ctrl.leave; focusin inside #stage does not', () => {
-    const { container, app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-    app.ctrl.store.set({ mode: 'inside' })
-    const leave = vi.spyOn(app.ctrl, 'leave')
-    const outside = document.createElement('button')
-    document.body.appendChild(outside)
-    try {
-      fireEvent.focusIn(outside)
-      expect(leave).toHaveBeenCalledTimes(1)
-      leave.mockClear()
-      fireEvent.focusIn(within(container).getByRole('button', { name: 'Résumé ↓' }))
-      expect(leave).not.toHaveBeenCalled()
-    } finally {
-      outside.remove()
-    }
-  })
-
   // Regression guard: pinScroll targets only the overflow:hidden containers, never window bodies.
   it('12. a .wb window body inside app.host.osEl keeps its scroll offset', () => {
     const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
@@ -290,39 +309,304 @@ describe('stage/Stage', () => {
     wb.dispatchEvent(new Event('scroll'))
     expect(wb.scrollTop).toBe(120)
   })
+  // Round 2: the pill that leaves the laptop for the résumé (shown only while the stage is zoomed).
+  it('15. the Go to résumé ↓ pill is #hud-exit and calls nav.goToResume on click', () => {
+    const { container, app } = renderWithApp(<Stage />, {
+      loadScene: vi.fn(pending),
+      nav: { goToResume: vi.fn(), openLaptop: vi.fn() },
+    })
+    const pill = within(container).getByRole('button', { name: 'Go to résumé ↓' })
+    expect(pill).toHaveAttribute('id', 'hud-exit')
+    fireEvent.click(pill)
+    expect(app.nav.goToResume).toHaveBeenCalledTimes(1)
+  })
 
-  // Regression guard: Bug K only applies in 'inside' mode; a desk-mode focus move must not leave.
-  it('13. with mode desk, focusin on a button outside #stage does not call ctrl.leave', () => {
-    const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-    app.ctrl.store.set({ mode: 'desk' })
-    const leave = vi.spyOn(app.ctrl, 'leave')
-    const outside = document.createElement('button')
-    document.body.appendChild(outside)
+  // Round 2 (R5): #stage is the only non-passive wheel listener; it asks the controller.
+  it('16. a #stage wheel the controller takes is cancelled, and cancels any running glide first', () => {
+    const { container, app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+    const onWheel = vi.fn(() => true)
+    app.ctrl.onWheel = onWheel
+    app.glide.cancel = vi.fn()
+    const ev = new WheelEvent('wheel', { deltaY: 50, cancelable: true, bubbles: true })
+    container.querySelector('#stage').dispatchEvent(ev)
+    expect(app.glide.cancel).toHaveBeenCalled()
+    expect(onWheel).toHaveBeenCalledTimes(1)
+    expect(ev.defaultPrevented).toBe(true)
+  })
+
+  it('16b. when the controller does not take the wheel, the event is not prevented', () => {
+    const { container, app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+    app.ctrl.onWheel = vi.fn(() => false)
+    const ev = new WheelEvent('wheel', { deltaY: 50, cancelable: true, bubbles: true })
+    container.querySelector('#stage').dispatchEvent(ev)
+    expect(ev.defaultPrevented).toBe(false)
+  })
+
+  it('16c. the #stage wheel listener is added with passive: false', () => {
+    const origAdd = EventTarget.prototype.addEventListener
+    const calls = []
+    EventTarget.prototype.addEventListener = function (type, fn, opts) {
+      if (type === 'wheel' && this.id === 'stage') calls.push(opts)
+      return origAdd.call(this, type, fn, opts)
+    }
     try {
-      fireEvent.focusIn(outside)
-      expect(leave).not.toHaveBeenCalled()
+      const { unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      expect(calls.length).toBeGreaterThan(0)
+      expect(calls.every((o) => o && o.passive === false)).toBe(true)
+      unmount()
     } finally {
-      outside.remove()
+      EventTarget.prototype.addEventListener = origAdd
     }
   })
 
-  // Regression guard: unmount removes the focusin listener and the pinScroll listeners.
-  it('14. after unmount, focusin outside #stage does not call ctrl.leave and #stage scroll is not reset', () => {
-    const { app, container, unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-    const stageEl = container.querySelector('#stage')
-    app.ctrl.store.set({ mode: 'inside' })
-    const leave = vi.spyOn(app.ctrl, 'leave')
-    unmount()
-    const outside = document.createElement('button')
-    document.body.appendChild(outside)
+  // Round 2 (R6): the window scroll feeds the idle settle; a touch hold defers it.
+  it('17. two scroll events (0 then 40) settle downward after 200 ms; a touch hold defers the settle until touchend', () => {
+    vi.useFakeTimers()
+    Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: 0 })
+    const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+    const settle = vi.spyOn(app.ctrl, 'settle')
+
+    window.scrollY = 0
+    window.dispatchEvent(new Event('scroll'))
+    window.scrollY = 40
+    window.dispatchEvent(new Event('scroll'))
+    vi.advanceTimersByTime(200)
+    expect(settle).toHaveBeenCalledWith(1)
+    expect(settle).toHaveBeenCalledTimes(1)
+
+    settle.mockClear()
+    window.dispatchEvent(new Event('touchstart'))
+    window.scrollY = 0
+    window.dispatchEvent(new Event('scroll'))
+    window.scrollY = 40
+    window.dispatchEvent(new Event('scroll'))
+    vi.advanceTimersByTime(200)
+    expect(settle).not.toHaveBeenCalled()
+    window.dispatchEvent(new Event('touchend'))
+    vi.advanceTimersByTime(200)
+    expect(settle).toHaveBeenCalledTimes(1)
+    expect(settle).toHaveBeenCalledWith(1)
+    delete window.scrollY
+  })
+
+  // Round 2 (R10): with no scene the track collapses to the flat runway once the stage is in view.
+  it('18. no-WebGL: once the stage intersects the viewport, #track has class flat-runway', async () => {
+    const { app, container } = renderWithApp(<Stage />, { loadScene: vi.fn(async () => null) })
+    await waitFor(() => expect(app.scene.store.get().status).toBe('unavailable'))
+    triggerIntersection(container.querySelector('#stage'), true)
+    const track = container.querySelector('#track')
+    await waitFor(() => expect(track).toHaveClass('flat-runway'))
+  })
+
+  // Round 2 (R10): the page may load scrolled to #resume, where the stage is not intersecting and
+  // the ticker is stopped. The runway collapse must not wait for a frame.
+  it('18b. no-WebGL without a frame: setting the scene to unavailable adds flat-runway synchronously', () => {
+    const { app, container } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+    const track = container.querySelector('#track')
+    expect(track).not.toHaveClass('flat-runway')
+    app.scene.store.set({ status: 'unavailable' })
+    expect(track).toHaveClass('flat-runway')
+  })
+
+  // Round 2 Phase 2 (keys): the keyboard scroll keys hold the idle settle exactly like the wheel
+  // grace, so the settle cannot fire between two key repeats.
+  describe('keyboard scroll keys hold the idle settle', () => {
+    function withScrollend() {
+      Object.defineProperty(window, 'onscrollend', { configurable: true, writable: true, value: null })
+      Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: 0 })
+      return () => {
+        delete window.onscrollend
+        delete window.scrollY
+      }
+    }
+
+    it('an ArrowDown keydown then scrollend at a mid-dive position: the settle waits for SETTLE_GRACE_MS, then IDLE_MS', () => {
+      vi.useFakeTimers()
+      const restore = withScrollend()
+      try {
+        const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+        const settle = vi.spyOn(app.ctrl, 'settle')
+
+        window.scrollY = 300
+        window.dispatchEvent(new Event('scroll'))
+        fireEvent.keyDown(window, { key: 'ArrowDown' })
+        window.dispatchEvent(new Event('scrollend'))
+        expect(settle).not.toHaveBeenCalled()
+
+        vi.advanceTimersByTime(SETTLE_GRACE_MS - 1)
+        expect(settle).not.toHaveBeenCalled()
+
+        vi.advanceTimersByTime(IDLE_MS + 1)
+        expect(settle).toHaveBeenCalledTimes(1)
+        expect(settle).toHaveBeenCalledWith(1)
+      } finally {
+        vi.useRealTimers()
+        restore()
+      }
+    })
+
+    it('the same holds for PageDown, Space, Home and End (not only ArrowDown)', () => {
+      vi.useFakeTimers()
+      const restore = withScrollend()
+      try {
+        const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+        const settle = vi.spyOn(app.ctrl, 'settle')
+        for (const key of ['PageDown', ' ', 'Home', 'End']) {
+          settle.mockClear()
+          window.scrollY = 300
+          window.dispatchEvent(new Event('scroll'))
+          fireEvent.keyDown(window, { key })
+          window.dispatchEvent(new Event('scrollend'))
+          expect(settle, key).not.toHaveBeenCalled()
+          vi.advanceTimersByTime(SETTLE_GRACE_MS - 1)
+          expect(settle, key).not.toHaveBeenCalled()
+          vi.advanceTimersByTime(IDLE_MS + SETTLE_GRACE_MS)
+          expect(settle, key).toHaveBeenCalledTimes(1)
+        }
+      } finally {
+        vi.useRealTimers()
+        restore()
+      }
+    })
+
+    it('a keydown inside an <input> does not hold the settle, so scrollend settles at once', () => {
+      vi.useFakeTimers()
+      const restore = withScrollend()
+      const input = document.createElement('input')
+      document.body.append(input)
+      try {
+        const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+        const settle = vi.spyOn(app.ctrl, 'settle')
+
+        window.scrollY = 0
+        window.dispatchEvent(new Event('scroll'))
+        window.scrollY = 300
+        window.dispatchEvent(new Event('scroll'))
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+        window.dispatchEvent(new Event('scrollend'))
+        expect(settle).toHaveBeenCalledTimes(1)
+        expect(settle).toHaveBeenCalledWith(1)
+      } finally {
+        input.remove()
+        vi.useRealTimers()
+        restore()
+      }
+    })
+
+    it('Space on a focused <a href> is a page-scroll key: it holds the settle for the grace window', () => {
+      vi.useFakeTimers()
+      const restore = withScrollend()
+      const link = document.createElement('a')
+      link.href = '#resume'
+      document.body.append(link)
+      try {
+        const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+        const settle = vi.spyOn(app.ctrl, 'settle')
+
+        window.scrollY = 300
+        window.dispatchEvent(new Event('scroll'))
+        fireEvent.keyDown(link, { key: ' ' })
+        window.dispatchEvent(new Event('scrollend'))
+        expect(settle).not.toHaveBeenCalled()
+
+        vi.advanceTimersByTime(SETTLE_GRACE_MS - 1)
+        expect(settle).not.toHaveBeenCalled()
+
+        vi.advanceTimersByTime(IDLE_MS + 1)
+        expect(settle).toHaveBeenCalledTimes(1)
+      } finally {
+        link.remove()
+        vi.useRealTimers()
+        restore()
+      }
+    })
+
+    it('Space on a focused <button>, [role=button] or <summary> is not a page-scroll key: scrollend settles at once', () => {
+      vi.useFakeTimers()
+      const restore = withScrollend()
+      const els = ['button', 'div', 'summary'].map((tag, i) => {
+        const el = document.createElement(tag)
+        if (tag === 'div') el.setAttribute('role', 'button')
+        el.id = `space-target-${i}`
+        document.body.append(el)
+        return el
+      })
+      try {
+        const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+        const settle = vi.spyOn(app.ctrl, 'settle')
+
+        for (const el of els) {
+          settle.mockClear()
+          window.scrollY = 0
+          window.dispatchEvent(new Event('scroll'))
+          window.scrollY = 300
+          window.dispatchEvent(new Event('scroll'))
+          fireEvent.keyDown(el, { key: ' ' })
+          window.dispatchEvent(new Event('scrollend'))
+          expect(settle, el.tagName).toHaveBeenCalledTimes(1)
+          expect(settle, el.tagName).toHaveBeenCalledWith(1)
+        }
+      } finally {
+        els.forEach((el) => el.remove())
+        vi.useRealTimers()
+        restore()
+      }
+    })
+  })
+
+  // Round 2 (R5, plan-r2): the non-passive #stage wheel listener is only needed for the detent near
+  // the dive -> plateau boundary. It is attached while s < diveEnd and detached otherwise.
+  it('19. the non-passive #stage wheel listener is attached only in the dive (s < diveEnd) and re-attached on the way back', async () => {
+    const counter = { created: 0, disposed: 0 }
+    const live = new Set()
+    const origAdd = EventTarget.prototype.addEventListener
+    const origRemove = EventTarget.prototype.removeEventListener
+    EventTarget.prototype.addEventListener = function (type, fn, opts) {
+      if (type === 'wheel' && this.id === 'stage' && opts?.passive === false) live.add(fn)
+      return origAdd.call(this, type, fn, opts)
+    }
+    EventTarget.prototype.removeEventListener = function (type, fn, opts) {
+      if (type === 'wheel' && this.id === 'stage') live.delete(fn)
+      return origRemove.call(this, type, fn, opts)
+    }
     try {
-      fireEvent.focusIn(outside)
-      expect(leave).not.toHaveBeenCalled()
-      stageEl.scrollTop = 120
-      stageEl.dispatchEvent(new Event('scroll'))
-      expect(stageEl.scrollTop).toBe(120)
+      const { app, container, unmount } = renderWithApp(<Stage />, {
+        loadScene: vi.fn(async () => fakeScene(counter)),
+      })
+      await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
+
+      // The track rect drives the scroll position s = -track.top; the controller reads it per frame.
+      const TRACK_H = 6000
+      const L = runwayLayout({ trackH: TRACK_H, stageH: window.innerHeight })
+      let trackTop = 0
+      const track = container.querySelector('#track')
+      track.getBoundingClientRect = () => ({ top: trackTop, height: TRACK_H, bottom: TRACK_H + trackTop, left: 0, right: 0, width: 0, x: 0, y: trackTop })
+      const place = (s, seg) => {
+        trackTop = -s
+        act(() => app.ctrl.update())
+        expect(app.ctrl.seg).toBe(seg)
+      }
+
+      place(0, 'top')
+      expect(live.size, 'at the top').toBeGreaterThan(0)
+      place(L.diveEnd / 2, 'dive')
+      expect(live.size, 'mid-dive').toBeGreaterThan(0)
+      place((L.diveEnd + L.insideEnd) / 2, 'inside')
+      expect(live.size, 'plateau').toBe(0)
+      place((L.insideEnd + L.outEnd) / 2, 'out')
+      expect(live.size, 'out').toBe(0)
+      place((L.outEnd + L.R) / 2, 'tail')
+      expect(live.size, 'tail').toBe(0)
+      place(L.R + 200, 'past')
+      expect(live.size, 'résumé').toBe(0)
+      place(L.diveEnd / 2, 'dive')
+      expect(live.size, 'back in the dive').toBeGreaterThan(0)
+
+      unmount()
+      expect(live.size, 'after unmount').toBe(0)
     } finally {
-      outside.remove()
+      EventTarget.prototype.addEventListener = origAdd
+      EventTarget.prototype.removeEventListener = origRemove
     }
   })
 })

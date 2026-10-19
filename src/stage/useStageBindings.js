@@ -1,11 +1,28 @@
 // Attaches the stage's listeners, observers and the frame loop; every one is removed on cleanup (B5).
+// Scrolling is native (plan-r2 R1): the window listeners are passive and only feed the glide's
+// cancel and the idle settle. The one non-passive listener is the #stage wheel detent (R5), and it
+// is attached only while the controller says the detent can act (the dive), so wheel scrolling
+// everywhere else stays on the compositor.
 import { useEffect, useLayoutEffect } from 'react'
-import { NARROW_PX } from '../core/constants.js'
+import { NARROW_PX, SETTLE_GRACE_MS } from '../core/constants.js'
 import { createTicker } from './ticker.js'
-import { createWheelHandler } from './wheel.js'
 import { createKeyHandler } from './keys.js'
+import { createScrollIdle } from './scrollIdle.js'
 import { bindHostClasses } from '../os/hostClasses.js'
 import { pinScroll } from './pinScroll.js'
+
+const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta'])
+const SCROLL_KEYS = new Set([' ', 'Spacebar', 'PageUp', 'PageDown', 'ArrowUp', 'ArrowDown', 'Home', 'End'])
+
+/** Whether a keydown is the page scrolling: not typed into a field, not a focused button's Space. */
+function scrollsPage(e) {
+  if (e.defaultPrevented || !SCROLL_KEYS.has(e.key)) return false
+  const t = e.target
+  if (!(t instanceof Element)) return true
+  if (t.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return false
+  if ((e.key === ' ' || e.key === 'Spacebar') && t.closest('button, [role="button"], summary')) return false
+  return true
+}
 
 export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef, parkRef }) {
   // Elements first (layout effect), so the controller and host can use them in the same commit.
@@ -57,35 +74,94 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
     )
     io.observe(stage)
 
-    const ro = new ResizeObserver(() => ctrl.setNarrow(stage.clientWidth < NARROW_PX))
+    const ro = new ResizeObserver(() => {
+      ctrl.setNarrow(stage.clientWidth < NARROW_PX)
+      app.os.refit?.()
+    })
     ro.observe(stage)
 
-    const onWheel = createWheelHandler({
-      ctrl,
-      sceneStatus: () => scene.store.get().status,
-      toast: (...args) => app.toasts.toast(...args),
+    const timers = app.timers.child()
+    const idle = createScrollIdle({ timers, onIdle: (dir) => ctrl.settle(dir), y: window.scrollY })
+    // The wheel and the scroll keys come in bursts (momentum, key repeat) with gaps where the page
+    // can look at rest; each one holds the settle until SETTLE_GRACE_MS after its last event.
+    const graceEnds = {}
+    const graceHold = (kind) => {
+      idle.hold(kind, true)
+      graceEnds[kind]?.()
+      graceEnds[kind] = timers.timeout(() => {
+        graceEnds[kind] = null
+        idle.hold(kind, false)
+      }, SETTLE_GRACE_MS)
+    }
+    const passive = { passive: true }
+    const on = []
+    const listen = (target, type, fn, opts = passive) => {
+      target.addEventListener(type, fn, opts)
+      on.push([target, type, fn, opts])
+    }
+
+    // Passive and on the window, so a wheel anywhere (the résumé too) cancels a glide and holds
+    // the settle whether or not the detent listener is attached.
+    listen(window, 'wheel', () => {
+      app.glide.cancel()
+      graceHold('wheel')
     })
-    stage.addEventListener('wheel', onWheel, { passive: false })
+    // R5: the detent, only while it can act (see controller `detent`). It runs before the window
+    // listener, so it cancels a running glide itself before it may snap.
+    const detentWheel = (e) => {
+      app.glide.cancel()
+      if (ctrl.onWheel(e)) e.preventDefault()
+    }
+    const blocking = { passive: false }
+    let detentOn = false
+    const syncDetent = () => {
+      const want = Boolean(ctrl.store.get().detent)
+      if (want === detentOn) return
+      detentOn = want
+      if (want) stage.addEventListener('wheel', detentWheel, blocking)
+      else stage.removeEventListener('wheel', detentWheel, blocking)
+    }
+    syncDetent()
+    const offDetent = ctrl.store.subscribe(syncDetent)
+    listen(window, 'scroll', () => {
+      app.glide.onScroll(window.scrollY)
+      idle.scroll(window.scrollY)
+    })
+    if ('onscrollend' in window) listen(window, 'scrollend', () => idle.scrollEnd())
+    for (const [kind, down, ups] of [
+      ['touch', 'touchstart', ['touchend', 'touchcancel']],
+      ['pointer', 'pointerdown', ['pointerup', 'pointercancel']],
+    ]) {
+      listen(window, down, () => {
+        app.glide.cancel()
+        idle.hold(kind, true)
+      })
+      for (const up of ups) listen(window, up, () => idle.hold(kind, false))
+    }
     const onKey = createKeyHandler({ app })
-    window.addEventListener('keydown', onKey)
+    listen(
+      window,
+      'keydown',
+      (e) => {
+        if (!MODIFIER_KEYS.has(e.key)) app.glide.cancel()
+        if (scrollsPage(e)) graceHold('key')
+        onKey(e)
+      },
+      false,
+    )
 
     // Bug J: keep the overflow:hidden containers that hold the OS from keeping a scroll offset.
     const unpins = [stage, flatHostRef.current, host.osEl].map(pinScroll)
 
-    // Bug K: focus leaving the stage (Tab onto the résumé) while inside the laptop leaves it.
-    const onFocusIn = (e) => {
-      if (ctrl.store.get().mode !== 'inside') return
-      const t = e.target
-      if (t instanceof Node && stage.contains(t)) return
-      ctrl.leave()
-    }
-    document.addEventListener('focusin', onFocusIn)
-
     return () => {
-      document.removeEventListener('focusin', onFocusIn)
       unpins.forEach((off) => off())
-      window.removeEventListener('keydown', onKey)
-      stage.removeEventListener('wheel', onWheel, { passive: false })
+      for (const [target, type, fn, opts] of on.splice(0)) target.removeEventListener(type, fn, opts)
+      offDetent()
+      if (detentOn) stage.removeEventListener('wheel', detentWheel, blocking)
+      detentOn = false
+      idle.dispose()
+      timers.clearAll()
+      app.glide.cancel()
       ro.disconnect()
       io.disconnect()
       ticker.stop()

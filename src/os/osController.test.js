@@ -417,4 +417,62 @@ describe('osController', () => {
       expect(c.store.get().wins).toBe(before)
     })
   })
+
+  // Round 2 Phase 2 TEST LIST item 8: the flat scale is stored, and refit() re-fits after a resize.
+  describe('flat scale and refit (round 2)', () => {
+    function flatController({ scale = 1.5 } = {}) {
+      const parts = makeDeps()
+      let size = { w: 900, h: 675 }
+      const host = {
+        ...createOsHost(),
+        setFlat: vi.fn((v) => Boolean(v)),
+        fitFlat: vi.fn(() => scale),
+        size: () => size,
+      }
+      parts.deps.host = host
+      const c = createOsController(parts.deps)
+      return {
+        c,
+        host,
+        resize(next) {
+          size = next
+        },
+      }
+    }
+
+    it('setFlat(true, false) stores the scale returned by fitFlat (1.5)', () => {
+      const { c, host } = flatController({ scale: 1.5 })
+
+      c.setFlat(true, false)
+
+      expect(host.fitFlat).toHaveBeenCalled()
+      expect(c.store.get().scale).toBe(1.5)
+    })
+
+    it('setFlat(false) resets the stored scale to 1', () => {
+      const { c } = flatController({ scale: 1.5 })
+      c.setFlat(true, false)
+
+      c.setFlat(false)
+
+      expect(c.store.get().scale).toBe(1)
+    })
+
+    it('refit() re-measures the host and moves an out-of-bounds window back inside host.size()', () => {
+      const { c, host, resize } = flatController({ scale: 1 })
+      bootToOn(c)
+      c.setFlat(true, false)
+      c.openApp('a')
+      c.openApp('b')
+      host.fitFlat.mockClear()
+
+      resize({ w: 600, h: 500 })
+      c.refit()
+
+      expect(host.fitFlat).toHaveBeenCalled()
+      const b = c.store.get().wins.find((w) => w.id === 'b')
+      // fitWindows: x = clamp(520, 8, 600 - 340 - 8) = 252
+      expect(b.x).toBe(252)
+    })
+  })
 })

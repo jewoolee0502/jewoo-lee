@@ -1,279 +1,168 @@
-// Phase 3 TEST LIST: stage/controller.test.js. Port of L1011–1031 plus fixes B8, B9, B10.
-// Harness: innerHeight H=1000, track height 2200 (max = 1200), rect.top = -scrollY.
-// `at(y)` sets scrollY and runs one update with dt 0 (position only, no tween time).
-// `step(sec)` runs update(.05) for sec / .05 frames.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+// Round 2 Phase 2 TEST LIST: stage/controller.test.js (rewrite). The camera pose is a pure
+// function of the scroll position (R1): no tween, no armed/suppress, no leave().
+// Harness: stage H = 1000, track 2900 (R 1900), rect.top = −scrollY unless env.trackTop is set.
+// `at(y)` sets scrollY and runs one update(). `glide` is a fake { to, cancel, active }.
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createController } from './controller.js'
-import { createTimers } from '../core/timers.js'
-import { ss } from '../core/math.js'
 
-const H = 1000
-const TRACK_H = 2200
-
-function setup() {
-  const env = { scrollY: 0, status: 'ready', reduce: false, trackTop: null }
+function setup({ now } = {}) {
+  const env = { scrollY: 0, status: 'ready', reduce: false, trackTop: null, trackH: 2900, stageH: 1000 }
   const os = { state: 'standby', boot: vi.fn(), setFlat: vi.fn(), setLive: vi.fn() }
-  const ui = { setCue: vi.fn(), setZoomed: vi.fn(), setTrap: vi.fn() }
+  const ui = { setCue: vi.fn(), setZoomed: vi.fn(), setRunway: vi.fn() }
   const scrollTo = vi.fn()
   const scrollToResume = vi.fn()
+  const glide = { to: vi.fn(), cancel: vi.fn(), active: false }
   const ctrl = createController({
-    getTrackRect: () => ({ top: env.trackTop ?? -env.scrollY, height: TRACK_H, bottom: 0, left: 0, right: 0, width: 0 }),
-    innerHeight: () => H,
+    getTrackRect: () => ({
+      top: env.trackTop ?? -env.scrollY,
+      height: env.trackH,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      width: 0,
+    }),
+    getStageHeight: () => env.stageH,
     scrollY: () => env.scrollY,
     scrollTo,
+    glide,
     reduce: () => env.reduce,
     sceneStatus: () => env.status,
     os,
     ui,
     scrollToResume,
-    timers: createTimers(),
+    now,
   })
   const at = (y) => {
     env.scrollY = y
     ctrl.update(0)
   }
-  const step = (sec) => {
-    const n = Math.round(sec / 0.05)
-    for (let i = 0; i < n; i++) ctrl.update(0.05)
-  }
-  const mode = () => ctrl.store.get().mode
-  return { env, os, ui, scrollTo, scrollToResume, ctrl, at, step, mode }
+  const phase = () => ctrl.store.get().phase
+  const lastTo = () => glide.to.mock.calls.at(-1)?.[0]
+  return { env, os, ui, scrollTo, scrollToResume, glide, ctrl, at, phase, lastTo }
 }
 
 describe('stage/controller', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
-  afterEach(() => {
-    vi.useRealTimers()
-  })
 
-  it('1. at scrollY 0: p is 0, mode is desk, and the cue is .8', () => {
-    const { ctrl, ui, at, mode } = setup()
+  it('1. at scrollY 0: z 0, phase desk, and the cue is .8', () => {
+    const { ctrl, ui, at, phase } = setup()
     at(0)
-    expect(ctrl.p).toBe(0)
-    expect(mode()).toBe('desk')
+    expect(ctrl.z).toBe(0)
+    expect(phase()).toBe('desk')
     expect(ui.setCue).toHaveBeenLastCalledWith(0.8)
   })
 
-  it('2. B8: a restored mid-track position does not auto-enter until the page passes back through the top', () => {
-    const { ctrl, os, at, mode } = setup()
-    at(360) // p .3 on the first update: armed starts null, so armed = (p < .01) = false
-    expect(ctrl.armed).toBe(false)
-    expect(mode()).toBe('desk')
-    at(36)
-    expect(mode()).toBe('desk')
-    expect(os.boot).not.toHaveBeenCalled()
-    at(0) // p < .01 re-arms
-    expect(ctrl.armed).toBe(true)
-    at(36)
-    expect(mode()).toBe('inside')
-    expect(os.boot).toHaveBeenCalledTimes(1)
+  it('2. at 500: z .5, phase dive, not interactive, the OS never goes live, cue 0', () => {
+    const { ctrl, ui, os, at, phase } = setup()
+    at(500)
+    expect(ctrl.z).toBe(0.5)
+    expect(phase()).toBe('dive')
+    expect(ctrl.store.get().interactive).toBe(false)
+    expect(os.setLive).not.toHaveBeenCalledWith(true)
+    expect(ui.setCue).toHaveBeenLastCalledWith(0)
   })
 
-  it('3. p .02 does not enter; p .03 enters with boot once and a 1.9 s tween', () => {
-    const { ctrl, os, at, mode } = setup()
-    at(0)
-    at(24) // p .02, not > .02
-    expect(mode()).toBe('desk')
-    at(36) // p .03
-    expect(mode()).toBe('inside')
-    expect(os.boot).toHaveBeenCalledTimes(1)
-    expect(ctrl.tw.dur).toBe(1.9)
-  })
-
-  it('4. the eased tween reaches z .5 at .95 s, then z 1 with the tween cleared and inside interactive', () => {
-    const { ctrl, ui, os, at, step, mode } = setup()
-    at(0)
-    at(36)
-    step(0.95)
-    expect(ctrl.z).toBeCloseTo(0.5, 1)
-    expect(Math.abs(ctrl.z - 0.5)).toBeLessThanOrEqual(0.01)
-    // 1.9 s total. Stepped in .05 s frames, 38 frames can land just short of t = 1
-    // because of float rounding, so one extra frame is taken to reach the clamped end.
-    step(1.0)
-    expect(ctrl.z).toBe(1)
-    expect(ctrl.tw).toBeNull()
+  it('3. at 1000: phase inside, zoomed on, the OS live, and the last setFlat is (true, false)', () => {
+    const { ctrl, ui, os, at, phase } = setup()
+    at(1000)
+    expect(phase()).toBe('inside')
     expect(ctrl.store.get().interactive).toBe(true)
     expect(ui.setZoomed).toHaveBeenLastCalledWith(true)
     expect(os.setLive).toHaveBeenLastCalledWith(true)
-    expect(ui.setTrap).toHaveBeenLastCalledWith(true)
-    expect(os.setFlat).toHaveBeenLastCalledWith(false, false)
-    expect(mode()).toBe('inside')
+    expect(os.setFlat).toHaveBeenLastCalledWith(true, false)
   })
 
-  it('5. with narrow set first, the last setFlat call is (true, true) once interactive', () => {
-    const { ctrl, os, at, step } = setup()
+  it('4. hysteresis: 990 stays inside, 984 drops back to dive and turns the OS off', () => {
+    const { ui, os, at, phase } = setup()
+    at(1000)
+    at(990)
+    expect(phase()).toBe('inside')
+    at(984)
+    expect(phase()).toBe('dive')
+    expect(ui.setZoomed).toHaveBeenLastCalledWith(false)
+    expect(os.setLive).toHaveBeenLastCalledWith(false)
+    expect(os.setFlat).toHaveBeenLastCalledWith(false, false)
+  })
+
+  it('5. out segment: 1420 is z .5 in dive, 1720 is z 0 at desk, 2500 stays desk', () => {
+    const { ctrl, at, phase } = setup()
+    at(1420)
+    expect(ctrl.z).toBe(0.5)
+    expect(phase()).toBe('dive')
+    at(1720)
+    expect(ctrl.z).toBe(0)
+    expect(phase()).toBe('desk')
+    at(2500)
+    expect(phase()).toBe('desk')
+  })
+
+  it('6. narrow: with setNarrow(true), the last setFlat once inside is (true, true)', () => {
+    const { os, ctrl, at } = setup()
     ctrl.setNarrow(true)
-    expect(os.setFlat).toHaveBeenLastCalledWith(false, true)
-    at(0)
-    at(36)
-    step(2)
-    expect(ctrl.z).toBe(1)
+    at(1000)
     expect(os.setFlat).toHaveBeenLastCalledWith(true, true)
   })
 
-  it('6. exit from z 1 goes to desk with a 1.5 s tween and smooth-scrolls to the track top', () => {
-    const { ctrl, ui, os, scrollTo, at, step, mode } = setup()
-    at(0)
-    at(36)
-    step(2)
-    ctrl.exit()
-    expect(mode()).toBe('desk')
-    expect(ctrl.tw.dur).toBe(1.5)
-    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
-    step(1.55)
-    expect(ctrl.z).toBe(0)
-    expect(ctrl.store.get().interactive).toBe(false)
-    expect(ui.setZoomed).toHaveBeenLastCalledWith(false)
-    expect(os.setLive).toHaveBeenLastCalledWith(false)
-  })
-
-  it('7. duration formulas: exit from .4 gives .6, exit from .3 gives .5, enter from .6 gives .76', () => {
+  it('7. enter() glides to trackTopDoc + diveEnd from wherever the page is, and does nothing when inside or loading', () => {
     const a = setup()
     a.at(0)
-    a.ctrl.z = 0.6
     a.ctrl.enter()
-    expect(a.ctrl.tw.dur).toBeCloseTo(0.76, 9)
+    expect(a.lastTo()).toBe(1000)
+
+    const b = setup()
+    b.at(3000)
+    b.ctrl.enter()
+    expect(b.lastTo()).toBe(1000)
+
+    const c = setup()
+    c.env.trackTop = 200
+    c.at(50)
+    c.ctrl.enter()
+    expect(c.lastTo()).toBe(1250)
+
+    const d = setup()
+    d.at(1000)
+    d.glide.to.mockClear()
+    d.ctrl.enter()
+    expect(d.glide.to).not.toHaveBeenCalled()
+
+    const e = setup()
+    e.env.status = 'loading'
+    e.at(0)
+    e.ctrl.enter()
+    expect(e.glide.to).not.toHaveBeenCalled()
+  })
+
+  it('7b. enter() with no scene (unavailable) scrolls the track top into view and never glides', () => {
+    const { env, scrollTo, glide, ctrl, at } = setup()
+    env.status = 'unavailable'
+    at(300)
+    ctrl.enter()
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }))
+    expect(glide.to).not.toHaveBeenCalled()
+  })
+
+  it('8. exit() from inside glides to the track top; from desk it does nothing', () => {
+    const a = setup()
+    a.at(1000)
+    a.ctrl.exit()
+    expect(a.lastTo()).toBe(0)
 
     const b = setup()
     b.at(0)
-    b.at(36)
-    b.ctrl.z = 0.4
     b.ctrl.exit()
-    expect(b.ctrl.tw.dur).toBeCloseTo(0.6, 9)
-
-    const c = setup()
-    c.at(0)
-    c.at(36)
-    c.ctrl.z = 0.3
-    c.ctrl.exit()
-    expect(c.ctrl.tw.dur).toBeCloseTo(0.5, 9)
+    expect(b.glide.to).not.toHaveBeenCalled()
   })
 
-  it('8. reduced motion: enter tween .01 and scrollTo behavior auto, both for enter and exit', () => {
-    const { env, ctrl, scrollTo, at } = setup()
-    env.reduce = true
-    at(0)
-    env.trackTop = 200
-    env.scrollY = 50
-    ctrl.enter()
-    expect(ctrl.tw.dur).toBe(0.01)
-    expect(scrollTo).toHaveBeenCalledWith({ top: 252, behavior: 'auto' })
-    env.trackTop = null
-    at(36)
-    ctrl.exit()
-    expect(ctrl.tw.dur).toBe(0.01)
-    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: 'auto' })
-  })
-
-  it('9. armed: p .67 disarms; then p .005 re-arms and p .03 enters', () => {
-    const { ctrl, at, mode } = setup()
-    at(0)
-    at(800)
-    expect(ctrl.armed).toBe(false)
-    at(36)
-    expect(mode()).toBe('desk')
-    at(6)
-    expect(ctrl.armed).toBe(true)
-    at(36)
-    expect(mode()).toBe('inside')
-  })
-
-  it('10. enter() twice: the second call keeps the same tween object', () => {
-    const { ctrl, at } = setup()
-    at(0)
-    ctrl.enter()
-    const tw = ctrl.tw
-    ctrl.enter()
-    expect(ctrl.tw).toBe(tw)
-  })
-
-  it('11. exit during the enter tween at z about .3 starts from .3 and goes to 0', () => {
-    const { ctrl, at, step, mode } = setup()
-    at(0)
-    at(36)
-    while (ctrl.z < 0.3) step(0.05)
-    // One .05 s frame moves z by up to ~.06 around here, so the first z >= .3 lands in [.3, .4).
-    const z = ctrl.z
-    expect(z).toBeGreaterThanOrEqual(0.3)
-    expect(z).toBeLessThan(0.4)
-    ctrl.exit()
-    expect(mode()).toBe('desk')
-    expect(ctrl.tw.from).toBe(z)
-    expect(ctrl.tw.to).toBe(0)
-  })
-
-  it('12. enter() with the page above the track (rect.top 200, scrollY 50) scrolls to 252', () => {
-    const { env, ctrl, scrollTo, at } = setup()
-    at(0)
-    env.scrollY = 50
-    env.trackTop = 200
-    ctrl.enter()
-    expect(scrollTo).toHaveBeenCalledWith({ top: 252, behavior: 'smooth' })
-  })
-
-  it('13. status loading: no enter and cue .8; once status is ready the next update enters', () => {
-    const { env, ui, os, at, mode } = setup()
-    env.status = 'loading'
-    at(0)
-    at(36)
-    expect(mode()).toBe('desk')
-    expect(ui.setCue).toHaveBeenLastCalledWith(0.8)
-    expect(os.boot).not.toHaveBeenCalled()
-    env.status = 'ready'
-    at(36)
-    expect(mode()).toBe('inside')
-  })
-
-  it('14. status unavailable: cue is 1 - ss(.01,.2,p), boot at p > .1 when standby, enter is a no-op, applyFlat forces (true, true)', () => {
-    const { env, ui, os, ctrl, at, mode } = setup()
-    env.status = 'unavailable'
-    at(120) // p .1
-    expect(ui.setCue).toHaveBeenLastCalledWith(1 - ss(0.01, 0.2, 0.1))
-    expect(os.boot).not.toHaveBeenCalled()
-    at(132) // p .11
-    expect(os.boot).toHaveBeenCalledTimes(1)
-    ctrl.enter()
-    expect(mode()).toBe('desk')
-    expect(ctrl.tw).toBeNull()
-    expect(os.boot).toHaveBeenCalledTimes(1)
-    ctrl.applyFlat()
-    expect(os.setFlat).toHaveBeenLastCalledWith(true, true)
-  })
-
-  it('15. goToResume while inside at z 1: desk, no scrollTo, then scrollToResume after 1.5 s + 100 ms, and no re-enter until p > .6', () => {
-    const { env, ctrl, os, scrollTo, scrollToResume, at, step, mode } = setup()
-    at(0)
-    at(36)
-    step(2)
-    expect(ctrl.z).toBe(1)
-    ctrl.goToResume()
-    expect(mode()).toBe('desk')
-    expect(scrollTo).not.toHaveBeenCalled()
-    expect(scrollToResume).not.toHaveBeenCalled()
-    step(1.55)
-    vi.advanceTimersByTime(100)
-    expect(scrollToResume).toHaveBeenCalledWith('smooth')
-    at(0)
-    at(12)
-    at(36)
-    at(400)
-    expect(mode()).toBe('desk')
-    expect(os.boot).toHaveBeenCalledTimes(1)
-    at(800) // p .67 clears suppress
-    at(0)
-    at(36)
-    expect(mode()).toBe('inside')
-    expect(env.scrollY).toBe(36)
-  })
-
-  it('16. goToResume in desk mode calls scrollToResume at once, with auto under reduced motion', () => {
+  it('9. goToResume() cancels any glide first, then scrolls to the résumé (smooth, or auto with reduced motion)', () => {
     const a = setup()
-    a.at(0)
+    a.at(1000)
     a.ctrl.goToResume()
-    expect(a.scrollToResume).toHaveBeenCalledTimes(1)
+    expect(a.glide.cancel).toHaveBeenCalledTimes(1)
     expect(a.scrollToResume).toHaveBeenCalledWith('smooth')
+    expect(a.glide.cancel.mock.invocationCallOrder[0]).toBeLessThan(a.scrollToResume.mock.invocationCallOrder[0])
 
     const b = setup()
     b.env.reduce = true
@@ -282,85 +171,146 @@ describe('stage/controller', () => {
     expect(b.scrollToResume).toHaveBeenLastCalledWith('auto')
   })
 
-  it('17. no-WebGL fallback: applyFlat gives the OS the live class so window bodies scroll', () => {
-    const { env, os, ctrl } = setup()
+  it('10. settle(+1) glides to diveEnd at 400 and to 0 at 200; not on plateau or past; not while a glide is active', () => {
+    const a = setup()
+    a.at(400)
+    a.ctrl.settle(1)
+    expect(a.lastTo()).toBe(1000)
+
+    const b = setup()
+    b.at(200)
+    b.ctrl.settle(1)
+    expect(b.lastTo()).toBe(0)
+
+    const c = setup()
+    c.at(1060)
+    c.ctrl.settle(1)
+    expect(c.glide.to).not.toHaveBeenCalled()
+
+    const d = setup()
+    d.at(2000)
+    d.ctrl.settle(1)
+    expect(d.glide.to).not.toHaveBeenCalled()
+
+    const e = setup()
+    e.at(400)
+    e.glide.active = true
+    e.ctrl.settle(1)
+    expect(e.glide.to).not.toHaveBeenCalled()
+  })
+
+  it('11. loading: at 1000 is desk with no flat-on call and cue .8; once ready, the same position is inside', () => {
+    const { env, os, ui, at, phase } = setup()
+    env.status = 'loading'
+    at(1000)
+    expect(phase()).toBe('desk')
+    expect(os.setFlat).not.toHaveBeenCalledWith(true, expect.anything())
+    expect(ui.setCue).toHaveBeenLastCalledWith(0.8)
+    env.status = 'ready'
+    at(1000)
+    expect(phase()).toBe('inside')
+  })
+
+  it('12. unavailable: setRunway(true) once over three updates, flat compact live, boot once while standby, cue 0', () => {
+    const { env, os, ui, at } = setup()
     env.status = 'unavailable'
-    ctrl.applyFlat()
+    at(0)
+    at(100)
+    at(200)
+    expect(ui.setRunway).toHaveBeenCalledTimes(1)
+    expect(ui.setRunway).toHaveBeenCalledWith(true)
+    expect(os.setFlat).toHaveBeenLastCalledWith(true, true)
     expect(os.setLive).toHaveBeenLastCalledWith(true)
-  })
-
-  it('18. no-WebGL fallback: update() while p is past the top also gives the OS the live class', () => {
-    const { env, os, at } = setup()
-    env.status = 'unavailable'
-    at(0)
-    at(120)
-    expect(os.setLive).toHaveBeenLastCalledWith(true)
-  })
-})
-
-// Bug K: focus moving to the résumé while inside the laptop leaves the laptop without scrolling.
-describe('stage/controller leave()', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('K1. leave() from z 1 tweens z to 0 over max(.5, 1.5 * z) s and sets mode desk', () => {
-    const { ctrl, at, step, mode } = setup()
-    at(0)
-    at(36)
-    step(2)
-    expect(ctrl.z).toBe(1)
-    ctrl.leave()
-    expect(mode()).toBe('desk')
-    expect(ctrl.tw).toMatchObject({ from: 1, to: 0, dur: 1.5 })
-    step(1.55)
-    expect(ctrl.z).toBe(0)
-    expect(ctrl.tw).toBeNull()
-  })
-
-  it('K2. leave() never scrolls, even when the page is below the top of the track', () => {
-    const { scrollTo, scrollToResume, at, step, ctrl } = setup()
-    at(0)
-    at(36)
-    step(2)
-    at(600) // p .3, well past the .005 threshold that exit() scrolls at
-    ctrl.leave()
-    step(2)
-    expect(scrollTo).not.toHaveBeenCalled()
-    expect(scrollToResume).not.toHaveBeenCalled()
-  })
-
-  it('K3. after leave(), update() at the same p does not re-enter the laptop', () => {
-    const { os, at, step, ctrl, mode } = setup()
-    at(0)
-    at(36)
-    step(2)
-    ctrl.leave()
-    step(2)
-    at(36)
-    expect(ctrl.suppress).toBe(true)
-    expect(ctrl.armed).toBe(false)
-    expect(mode()).toBe('desk')
     expect(os.boot).toHaveBeenCalledTimes(1)
+    os.state = 'on'
+    at(300)
+    expect(os.boot).toHaveBeenCalledTimes(1)
+    expect(ui.setCue).toHaveBeenLastCalledWith(0)
   })
 
-  it('K4. after leave(), returning to the top does not re-enter until the page passes p .6 again', () => {
-    const { os, at, step, ctrl, mode } = setup()
+  it('13. resize remap: a stage/track change over 15 % scrolls to the remapped position; a 5 % change does not', () => {
+    const a = setup()
+    a.at(1000)
+    a.env.stageH = 600
+    a.env.trackH = 1740
+    a.ctrl.update(0)
+    expect(a.scrollTo).toHaveBeenCalledWith({ top: 600, behavior: 'instant' })
+
+    const b = setup()
+    b.at(1000)
+    b.env.trackH = 2800 // R 1800 against 1900: 5 %
+    b.ctrl.update(0)
+    expect(b.scrollTo).not.toHaveBeenCalled()
+  })
+
+  it('14. invariant through the controller: z > 0 implies the stage is still pinned, at three viewport sizes', () => {
+    const sizes = [
+      { H: 1000, trackH: 2900 },
+      { H: 600, trackH: 1740 },
+      { H: 844, trackH: 2448 },
+    ]
+    for (const { H, trackH } of sizes) {
+      const { env, ctrl, at } = setup()
+      env.stageH = H
+      env.trackH = trackH
+      const R = trackH - H
+      for (let y = 0; y <= trackH; y += 5) {
+        at(y)
+        if (ctrl.z > 0) {
+          expect(y, `H ${H} y ${y}`).toBeLessThan(R)
+          expect(y, `H ${H} y ${y}`).toBeLessThanOrEqual(R - 0.15 * H)
+        }
+      }
+    }
+  })
+
+  it('14b. the H 1000 case: z > 0 only for y ≤ 1750', () => {
+    const { ctrl, at } = setup()
+    for (let y = 0; y <= 3000; y += 10) {
+      at(y)
+      if (ctrl.z > 0) expect(y).toBeLessThanOrEqual(1750)
+    }
+  })
+
+  it('15. onWheel: a burst crossing the plateau returns true and snaps to 1000; the next event returns true with no extra scroll', () => {
+    const { at, ctrl, scrollTo } = setup()
+    at(800)
+    expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })).toBe(true)
+    expect(scrollTo).toHaveBeenCalledWith({ top: 1000, behavior: 'instant' })
+    scrollTo.mockClear()
+    expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 16 })).toBe(true)
+    expect(scrollTo).not.toHaveBeenCalled()
+  })
+
+  it('15c. an exact landing on the plateau (800 + 200 = 1000) holds the detent: events < DETENT_GAP_MS apart keep the flag true', () => {
+    const clock = { t: 0 }
+    const { at, ctrl, scrollTo } = setup({ now: () => clock.t })
+    at(800)
+    expect(ctrl.onWheel({ deltaY: 200, deltaMode: 0, timeStamp: 0 })).toBe(true)
+    expect(scrollTo).toHaveBeenCalledWith({ top: 1000, behavior: 'instant' })
+    at(1000)
+    expect(ctrl.store.get().detent).toBe(true)
+    for (let t = 16; t <= 96; t += 16) {
+      clock.t = t
+      ctrl.onWheel({ deltaY: 50, deltaMode: 0, timeStamp: t })
+      at(1000)
+      expect(ctrl.store.get().detent, `t ${t}`).toBe(true)
+    }
+  })
+
+  it('15b. onWheel while loading returns false (the event is left alone)', () => {
+    const { env, ctrl, at } = setup()
+    env.status = 'loading'
+    at(800)
+    expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })).toBe(false)
+  })
+
+  it('16. the controller never boots the OS when the scene is ready (the lid does)', () => {
+    const { os, ctrl, at } = setup()
     at(0)
-    at(36)
-    step(2)
-    ctrl.leave()
-    step(2)
-    at(0)
-    at(36)
-    expect(mode()).toBe('desk')
-    at(800) // p .67 clears suppress
-    at(0)
-    at(36)
-    expect(mode()).toBe('inside')
-    expect(os.boot).toHaveBeenCalledTimes(2)
+    at(1000)
+    ctrl.enter()
+    at(1000)
+    expect(os.boot).not.toHaveBeenCalled()
   })
 })

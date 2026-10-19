@@ -34,4 +34,24 @@ describe('createApp', () => {
     expect(app.os.size()).toEqual({ w: 900, h: 675 })
     app.dispose()
   })
+
+  it('gains the scroll glide (round 2 Phase 2): to, cancel and onScroll', () => {
+    const app = createApp()
+
+    expect(typeof app.glide.to).toBe('function')
+    expect(typeof app.glide.cancel).toBe('function')
+    expect(typeof app.glide.onScroll).toBe('function')
+    app.dispose()
+  })
+
+  it('with no scene, the controller marks the track flat-runway on its first update (no runway in the fallback)', () => {
+    const app = createApp()
+    app.dom.track = document.createElement('section')
+    app.scene.setStatus('unavailable')
+
+    app.ctrl.update(0)
+
+    expect(app.dom.track.classList.contains('flat-runway')).toBe(true)
+    app.dispose()
+  })
 })

@@ -1,4 +1,5 @@
-// Phase 3 TEST LIST: stage/keys.test.js. Konami (L1039), key handler (L1040–1042), Escape.
+// Round 2 Phase 2 TEST LIST: stage/keys.test.js. Konami (L1039), key handler (L1040–1042), Escape.
+// Escape exits whenever the laptop is open (phase inside or dive), not on the interactive flag.
 import { describe, it, expect, vi } from 'vitest'
 import { pushKonami, createKeyHandler } from './keys.js'
 import { createStore } from '../core/store.js'
@@ -13,7 +14,7 @@ function feed(buf, keys) {
   return { buf, matched }
 }
 
-function makeApp({ osState = 'on', reduce = false, status = 'ready', interactive = true, recOpen = false, sndOn = false, api = true } = {}) {
+function makeApp({ osState = 'on', reduce = false, status = 'ready', phase = 'inside', recOpen = false, sndOn = false, api = true } = {}) {
   return {
     ach: { unlock: vi.fn() },
     toasts: { toast: vi.fn() },
@@ -25,7 +26,7 @@ function makeApp({ osState = 'on', reduce = false, status = 'ready', interactive
       api: api ? { pressKey: vi.fn(), disco: vi.fn() } : null,
     },
     ctrl: {
-      store: createStore({ mode: 'inside', interactive, narrow: false }),
+      store: createStore({ phase, interactive: phase === 'inside', narrow: false }),
       exit: vi.fn(),
     },
     ui: { store: createStore({ recOpen, stageVisible: true }) },
@@ -80,19 +81,31 @@ describe('stage/keys', () => {
     expect(reduced.os.disco).not.toHaveBeenCalled()
   })
 
-  it('5. Escape: with recOpen it closes the recruiter view and does not exit; interactive and ready exits; not interactive does nothing', () => {
-    const recOpen = makeApp({ recOpen: true })
-    createKeyHandler({ app: recOpen })({ key: 'Escape' })
-    expect(recOpen.ui.store.get().recOpen).toBe(false)
-    expect(recOpen.ctrl.exit).not.toHaveBeenCalled()
+  it('5. Escape: with recOpen it closes the recruiter view and does not exit', () => {
+    const app = makeApp({ recOpen: true, phase: 'inside', status: 'ready' })
+    createKeyHandler({ app })({ key: 'Escape' })
+    expect(app.ui.store.get().recOpen).toBe(false)
+    expect(app.ctrl.exit).not.toHaveBeenCalled()
+  })
 
-    const interactive = makeApp({ recOpen: false, interactive: true, status: 'ready' })
-    createKeyHandler({ app: interactive })({ key: 'Escape' })
-    expect(interactive.ctrl.exit).toHaveBeenCalledTimes(1)
+  it('5b. Escape exits from phase inside (ready) and from phase dive (ready), once each', () => {
+    const inside = makeApp({ phase: 'inside', status: 'ready' })
+    createKeyHandler({ app: inside })({ key: 'Escape' })
+    expect(inside.ctrl.exit).toHaveBeenCalledTimes(1)
 
-    const idle = makeApp({ recOpen: false, interactive: false, status: 'ready' })
-    createKeyHandler({ app: idle })({ key: 'Escape' })
-    expect(idle.ctrl.exit).not.toHaveBeenCalled()
+    const dive = makeApp({ phase: 'dive', status: 'ready' })
+    createKeyHandler({ app: dive })({ key: 'Escape' })
+    expect(dive.ctrl.exit).toHaveBeenCalledTimes(1)
+  })
+
+  it('5c. Escape does nothing at phase desk, and does nothing while the scene is loading', () => {
+    const desk = makeApp({ phase: 'desk', status: 'ready' })
+    createKeyHandler({ app: desk })({ key: 'Escape' })
+    expect(desk.ctrl.exit).not.toHaveBeenCalled()
+
+    const loading = makeApp({ phase: 'inside', status: 'loading' })
+    createKeyHandler({ app: loading })({ key: 'Escape' })
+    expect(loading.ctrl.exit).not.toHaveBeenCalled()
   })
 
   it('6. every key calls scene.api.pressKey(key); with sound on, a single character clicks and Shift does not', () => {

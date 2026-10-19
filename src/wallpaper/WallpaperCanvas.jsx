@@ -21,7 +21,8 @@ export default function WallpaperCanvas() {
       canvas,
       getOsSize: () => app.host.size(),
       getOsState: () => app.os.state,
-      isTweening: () => Boolean(app.ctrl?.tw),
+      // The camera moves during the dive and during a programmatic glide (enter, exit, settle).
+      isTweening: () => app.ctrl?.store.get().phase === 'dive' || Boolean(app.glide?.active),
       reduce: () => Boolean(app.motion.reduce()),
       snd: app.snd,
       tracker,

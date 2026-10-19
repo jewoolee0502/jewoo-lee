@@ -59,28 +59,32 @@ export function createOsHost({ doc = globalThis.document } = {}) {
     return { shrunk }
   }
 
-  /** L747–750: full screen keeps the zoomed-in scale and grows the desk to fill the host. */
+  /** L747–750: full screen keeps the zoomed-in scale and grows the desk to fill the host.
+   *  Returns the 2D scale it applied (1 for the compact layout, or when not flat). */
   function fitFlat() {
-    if (!osEl.classList.contains('flat')) return
+    if (!osEl.classList.contains('flat')) return 1
     if (osEl.classList.contains('compact')) {
       osEl.style.width = osEl.style.height = osEl.style.transform = ''
-      return
+      return 1
     }
-    if (!flatHost) return
+    if (!flatHost) return 1
     const W = flatHost.clientWidth
     const H = flatHost.clientHeight
     const k = Math.min(W / OS_W, H / OS_H)
-    if (!(k > 0)) return
+    if (!(k > 0)) return 1
     osEl.style.transformOrigin = '0 0'
     osEl.style.transform = 'scale(' + k + ')'
     osEl.style.width = W / k + 'px'
     osEl.style.height = H / k + 'px'
+    return k
   }
 
-  /** L757–761. Returns whether the OS is now flat. */
+  /** L757–761. Returns whether the OS is now flat. The flat host fades in only for the compact
+   *  layout: the scaled one replaces the 3D screen at the same size and place (R4). */
   function setFlat(v, compact) {
     v = Boolean(v)
     osEl.classList.toggle('compact', Boolean(compact))
+    flatHost?.classList.toggle('fade', Boolean(compact))
     if (v !== osEl.classList.contains('flat')) {
       if (v) {
         if (!flatHost) return false
@@ -100,10 +104,9 @@ export function createOsHost({ doc = globalThis.document } = {}) {
     return osEl.classList.contains('flat')
   }
 
-  /** L756 */
+  /** L756. Window scroll offsets survive (R9): `.os:not(.live) .wb` is overflow:hidden. */
   function setLive(v) {
     osEl.classList.toggle('live', Boolean(v))
-    if (!v) osEl.querySelectorAll('.wb,.t-out').forEach((e) => (e.scrollTop = 0))
   }
 
   function syncClasses({ state, collapsing, disco, fallback }) {
@@ -111,11 +114,6 @@ export function createOsHost({ doc = globalThis.document } = {}) {
     osEl.classList.toggle('collapsing', Boolean(collapsing))
     osEl.classList.toggle('disco', Boolean(disco))
     osEl.classList.toggle('fallback', Boolean(fallback))
-  }
-
-  /** B10: only trap touch scrolling in the flat host while the OS is interactive. */
-  function setTrap(v) {
-    flatHost?.classList.toggle('trap', Boolean(v))
   }
 
   return {
@@ -131,6 +129,5 @@ export function createOsHost({ doc = globalThis.document } = {}) {
     setFlat,
     setLive,
     syncClasses,
-    setTrap,
   }
 }

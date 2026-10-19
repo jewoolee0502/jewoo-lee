@@ -21,4 +21,28 @@ describe('styles/os.css desktop icon columns', () => {
     expect(right).not.toBeNull()
     expect(Number(right[1])).toBeGreaterThanOrEqual(16)
   })
+
+  // Round 2 Phase 2 TEST LIST item 9: the window bodies let the page scroll (no overscroll containment).
+  const rulesMentioning = (text, cls) =>
+    [...text.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map((m) => ({ selector: m[1].trim(), body: m[2] }))
+      .filter((r) => r.selector.split(',').some((part) => new RegExp(cls.replace('.', '\\.') + '(?![\\w-])').test(part)))
+
+  it('.wb does not declare overscroll-behavior, so the page scrolls when a window reaches its edge', () => {
+    const rules = rulesMentioning(css, '.wb')
+    expect(rules.length).toBeGreaterThan(0)
+    for (const r of rules) expect(r.body, r.selector).not.toMatch(/overscroll-behavior/)
+  })
+
+  // The menubar sound button is hidden on phones (compact) and in the no-WebGL fallback, and kept
+  // in the desktop flat inside view (.os.flat).
+  it('#mb-snd is hidden under .os.compact and .os.fallback, and no rule hides it under plain .os.flat', () => {
+    const hidingSelectors = [...css.matchAll(/([^{}]+)\{([^{}]*display:\s*none[^{}]*)\}/g)]
+      .flatMap((m) => m[1].split(',').map((s) => s.trim()))
+      .filter((sel) => sel.includes('#mb-snd'))
+    expect(hidingSelectors.some((sel) => /\.os\.compact\s+#mb-snd(?![\w-])/.test(sel))).toBe(true)
+    expect(hidingSelectors.some((sel) => /\.os\.fallback\s+#mb-snd(?![\w-])/.test(sel))).toBe(true)
+    for (const sel of hidingSelectors) expect(sel, sel).toMatch(/\.os\.(compact|fallback)\s+#mb-snd/)
+    expect(css).not.toMatch(/\.os\.flat\s+#mb-snd/)
+  })
 })

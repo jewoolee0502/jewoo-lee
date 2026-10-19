@@ -349,6 +349,9 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     // `mirrorSrc` is the wallpaper canvas the mirror last drew (null: the blue fallback), so
     // the frame loop can redraw once the engine mounts or gets a size.
     let mirrorSrc = null
+    // Set while the OS is interactive (the mirror is hidden behind the flat OS and not redrawn),
+    // so the first frame after leaving redraws it once.
+    let mirrorStale = false
     const wallCanvas = () => {
       const c = app.wallpaperEngine?.canvas
       return c && c.width > 0 && c.height > 0 ? c : null
@@ -618,8 +621,10 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       lidWasClosed = lb.wasClosed
       if (lb.boot) os.boot()
       holder.style.visibility = le > 0.5 ? '' : 'hidden'
-      holder.style.willChange = ctrl.tw ? 'transform' : ''
-      if (!ctrl.store.get().narrow) {
+      // Inside, the OS is flat in the flat host (R4): no 3D pass, and no size writes that would
+      // fight its 2D fit. The cheap state below (LEDs, keys, snow, tweens) keeps running.
+      const flatInside = ctrl.store.get().interactive
+      if (!flatInside && !ctrl.store.get().narrow) {
         const s = widenSize(z, w, h)
         os.setSize(s.w, s.h)
       }
@@ -668,13 +673,18 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       powerLED.material.emissive.setHex(ledPower(osState, t))
       driveBusy = Math.max(0, driveBusy - dt)
       driveLED.material.emissive.setHex(ledDrive(driveBusy, osState, t))
-      if (osState === 'on' && wallCanvas() !== mirrorSrc) mirror.redraw()
+      if (flatInside) mirrorStale = true
+      else if (mirrorStale || (osState === 'on' && wallCanvas() !== mirrorSrc)) {
+        mirrorStale = false
+        mirror.redraw()
+      }
       screenL.intensity += (screenLightTarget(osState, le) - screenL.intensity) * 0.08
       if (discoT > 0) {
         discoT -= dt
         lampL.color.setHSL((t / 700) % 1, 0.85, 0.6)
         if (discoT <= 0) lampL.color.setHex(0xffc27a)
       }
+      if (flatInside) return
       renderer.render(scene, camera)
       if (css) {
         anchor.matrixWorld.decompose(cssObj.position, cssObj.quaternion, tmpS)

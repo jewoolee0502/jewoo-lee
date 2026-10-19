@@ -24,7 +24,7 @@ footer{padding-block:56px 64px;color:var(--muted);font-size:13.5px}
 
 /* ---------- phase 8 additions ---------- */
 /* Until the stage mounts, reserve its track (stage.css .track) so the prerendered résumé does not jump down (CLS). */
-#app:empty{height:220vh;background:var(--scene)}
+#app:empty{height:var(--track-h);background:var(--scene)}
 #resume{display:block}
 #resume-title:focus:not(:focus-visible){outline:none}
 .r-head{padding-block:72px 8px}

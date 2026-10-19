@@ -1,8 +1,11 @@
 # Jewoo (Jay) Lee · portfolio
 
 A late-night Montréal dorm room in 3D. Scroll and the 90s laptop on the desk flips open, boots
-**JAY-OS** and the camera dives into the screen: draggable windows, a terminal (`jaysh`), a living
-pixel-art Montréal wallpaper, BugHunt and Snake. Below the scene sits a plain, prerendered HTML
+**JAY-OS** and you dive into the screen: draggable windows, a terminal (`jaysh`), a living
+pixel-art Montréal wallpaper, BugHunt and Snake. Keep scrolling, press Esc or click
+**Go to résumé ↓** to step out. Wheel, trackpad, touch, keys and the scrollbar all drive the
+same native page scroll, and the camera follows it; a fast mouse or trackpad fling pauses once at
+the open laptop instead of flying past it. Below the scene sits a plain, prerendered HTML
 résumé for recruiters, crawlers and no-JS readers.
 
 Live: https://jewoo-lee.vercel.app · CV: [public/files/JEWOOLEE_CV.pdf](public/files/JEWOOLEE_CV.pdf)
@@ -66,7 +69,7 @@ scripts/             asset scripts and the prerender (prerender.mjs + pure prere
 src/app              composition root (createApp) and React context
 src/core             stores, timers, sound, achievements, motion
 src/content          single content source: profile, projects, roles, skills, site URL
-src/stage            scroll track, HUD, controller, recruiter view, scene mount
+src/stage            scroll track and runway, glide, HUD, controller, recruiter view, scene mount
 src/scene            three.js room (lazy chunk)
 src/os               JAY-OS shell and apps (terminal, games …)
 src/wallpaper        living Montréal wallpaper

@@ -1,16 +1,19 @@
 /* Stage, HUD, cue, toasts and recruiter view, verbatim from design/revamp-lab.html L42–84,
    with the plan’s phase 3 changes marked below. */
 /* ---------- scene ---------- */
-.track{position:relative;height:220vh}
+.track{position:relative;height:var(--track-h)}
+/* plan-r2 R10: no scene, no runway. The flat OS sits in a plain, unpinned stage. */
+.track.flat-runway{height:auto}
+.track.flat-runway .stage{position:relative}
 .stage{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;background:var(--scene);color:var(--scene-ink);touch-action:pan-y}
 .stage .gl{position:absolute;inset:0;width:100%;height:100%;display:block}
 .stage .css3d{position:absolute!important;inset:0;pointer-events:none}
 .stage .css3d > div{pointer-events:none}
 #os-holder{width:900px;height:675px}
 .flat-host{position:absolute;inset:0;display:none;z-index:15;overflow:hidden;background:#04070A}
-/* phase 3 (B10): the touch trap only applies while the OS is interactive. */
-.flat-host.on{display:block;animation:fsIn .18s ease-out}
-.flat-host.on.trap{touch-action:none;overscroll-behavior:contain}
+.flat-host.on{display:block}
+/* plan-r2 R4: only the compact layout fades in; the scaled one replaces the 3D screen in place. */
+.flat-host.on.fade{animation:fsIn .18s ease-out}
 .os:not(.live) .wb,.os:not(.live) .t-out{overflow:hidden}
 .wb,.t-out{touch-action:pan-y}
 #mb-exit{background:#FFD15C;border:2px solid #122030;padding:3px 9px;margin-right:6px}
@@ -32,6 +35,10 @@
 .hud button:hover{border-color:#EAF2FB}
 .hud .exit{display:none}
 .stage.zoomed .hud{display:none}
+/* plan-r2 phase 2: "Go to résumé ↓", shown only while inside the laptop. */
+.exit-pill{display:none;position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:20;font:12px var(--f-px);background:rgba(10,16,28,.82);color:#EAF2FB;border:1.5px solid #FFD15C;padding:9px 12px;cursor:pointer;box-shadow:3px 3px 0 rgba(0,0,0,.45)}
+.exit-pill:hover,.exit-pill:focus-visible{background:#FFD15C;color:#122030}
+.stage.zoomed .exit-pill{display:inline-flex}
 .tip3d{position:absolute;left:0;top:0;pointer-events:none;background:#FFD15C;color:#122030;font:11px var(--f-px);padding:5px 8px;z-index:30;box-shadow:3px 3px 0 rgba(0,0,0,.4);white-space:nowrap}
 .toasts{position:absolute;top:max(62px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:40;pointer-events:none;width:min(400px,calc(100% - 32px))}
 .toast{background:#0F1726;color:#EAF2FB;border:2px solid #FFD15C;box-shadow:4px 4px 0 rgba(0,0,0,.5);padding:10px 14px;font:13px/1.4 var(--f-mono);animation:toastIn .3s ease-out}
@@ -52,3 +59,4 @@
 /* Skip link: visually hidden until focused. */
 .skip{position:absolute;left:8px;top:8px;z-index:100;padding:8px 12px;background:#FFD15C;color:#122030;font:12px var(--f-px);border:2px solid #122030;text-decoration:none;transform:translateY(-200%)}
 .skip:focus,.skip:focus-visible{transform:none}
+@media (prefers-reduced-motion:reduce){.flat-host.on.fade{animation:none}}

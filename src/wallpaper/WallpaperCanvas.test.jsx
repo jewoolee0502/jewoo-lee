@@ -76,4 +76,49 @@ describe('WallpaperCanvas', () => {
     app.wallpaperEngine.tick(2000)
     expect(canvas.getContext('2d').calls.filter((c) => c[0] === 'drawImage')).toHaveLength(0)
   })
+
+  // The engine skips idle frames while the camera is moving (isTweening). The camera moves while
+  // the phase is 'dive' (z strictly between 0 and 1) or a programmatic glide runs; on the desk and
+  // inside the wallpaper is not tweening.
+  describe('isTweening follows the camera', () => {
+    function settled() {
+      const { app, canvas } = mount()
+      app.wallpaperEngine.tick(1000)
+      const drawn = () => canvas.getContext('2d').calls.filter((c) => c[0] === 'drawImage').length
+      return { app, drawn }
+    }
+
+    it('on the desk the wallpaper keeps drawing its idle frames', () => {
+      const { app, drawn } = settled()
+      app.ctrl.store.set({ phase: 'desk' })
+      const before = drawn()
+      app.wallpaperEngine.tick(5000)
+      expect(drawn()).toBeGreaterThan(before)
+    })
+
+    it('during the dive (phase dive) the engine treats the camera as tweening and draws nothing while idle', () => {
+      const { app, drawn } = settled()
+      app.ctrl.store.set({ phase: 'dive' })
+      const before = drawn()
+      app.wallpaperEngine.tick(5000)
+      expect(drawn()).toBe(before)
+    })
+
+    it('during a programmatic glide the engine treats the camera as tweening', () => {
+      const { app, drawn } = settled()
+      Object.defineProperty(app.glide, 'active', { configurable: true, get: () => true })
+      app.ctrl.store.set({ phase: 'desk' })
+      const before = drawn()
+      app.wallpaperEngine.tick(5000)
+      expect(drawn()).toBe(before)
+    })
+
+    it('inside the laptop (phase inside) the camera is not tweening, so the wallpaper draws', () => {
+      const { app, drawn } = settled()
+      app.ctrl.store.set({ phase: 'inside', interactive: true })
+      const before = drawn()
+      app.wallpaperEngine.tick(5000)
+      expect(drawn()).toBeGreaterThan(before)
+    })
+  })
 })

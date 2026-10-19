@@ -79,6 +79,26 @@ describe('phase 8 structure', () => {
   })
 })
 
+// Round 2 Phase 2 TEST LIST item 10: the wheel hijack, the tween flags and the focus-leave are gone.
+describe('phase 2 removals (round 2)', () => {
+  it('src/stage/wheel.js does not exist', () => {
+    expect(existsSync(abs('src/stage/wheel.js'))).toBe(false)
+  })
+
+  it('no non-test source imports wheel.js or references WHEEL_EXIT or WHEEL_GAP_MS', () => {
+    expect(filesImporting(/wheel\.js|WHEEL_EXIT|WHEEL_GAP_MS/)).toEqual([])
+  })
+
+  it('no non-test source references ctrl.tw or ctrl?.tw, armed, suppress or .leave(', () => {
+    expect(filesImporting(/\bctrl\??\.tw\b|\barmed\b|\bsuppress\b|\.leave\(/)).toEqual([])
+  })
+
+  it('createScene.js has no willChange assignment other than the reset to empty', () => {
+    const text = readFileSync(abs('src/scene/createScene.js'), 'utf8')
+    expect(text.match(/willChange\s*=(?!\s*'')/g) ?? []).toEqual([])
+  })
+})
+
 // Phase 1 TEST LIST (round 2): Paint, the Visitor Wall, Supabase, the corkboard and the edh.dev credit are gone.
 describe('phase 1 removals', () => {
   const pkg = () => JSON.parse(readFileSync(abs('package.json'), 'utf8'))

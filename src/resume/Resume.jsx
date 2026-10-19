@@ -93,13 +93,10 @@ function TrophyCount() {
 export default function Resume() {
   const app = useApp()
 
-  // A plain link to #top without JS; with JS it also opens the laptop.
+  // A plain link to #top without JS; with JS it glides up and into the open laptop.
   function openLaptop(e) {
     e.preventDefault()
-    const reduce = app.motion?.reduce?.()
-    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
-    const later = app.timers?.timeout ?? ((fn, ms) => setTimeout(fn, ms))
-    later(() => app.nav.openLaptop(), 50)
+    app.nav.openLaptop()
   }
 
   const cvLink = (
