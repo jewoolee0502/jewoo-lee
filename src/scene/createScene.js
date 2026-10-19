@@ -6,7 +6,7 @@
 import * as THREE from 'three'
 import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
 import { pinScroll } from '../stage/pinScroll.js'
-import { OS_W } from '../core/constants.js'
+import { OS_W, OS_H } from '../core/constants.js'
 import {
   lidT as lidOf,
   hingeAngle,
@@ -25,6 +25,10 @@ import {
   stepTween,
   dragYaw,
   stepParallax,
+  widePose,
+  fogFor,
+  holderAlpha,
+  vignetteAlpha,
 } from './sceneMath.js'
 import { drawSky, drawNote, drawSticker, drawLogo, drawFloppyLabel, drawMirror } from './textures.js'
 import { FLOPPIES, createFloppySequencer } from './floppy.js'
@@ -103,13 +107,17 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
   function dispose() {
     if (disposed) return
     disposed = true
-    for (const [type, fn] of listeners.splice(0)) canvas?.removeEventListener(type, fn)
+    for (const [target, type, fn] of listeners.splice(0)) target?.removeEventListener(type, fn)
     ro?.disconnect()
     offs.splice(0).forEach((off) => off())
     // r128's CSS3DObject `removed` handler detaches the holder from the CSS3D layer.
     if (cssScene && cssObj) cssScene.remove(cssObj)
     if (holder) {
       holder.style.visibility = ''
+      holder.style.opacity = ''
+      holder.style.removeProperty('--vig')
+      // The widened size goes back to the host's 900×675, unless the OS is flat (sized by its fit).
+      if (!app.os?.store?.get?.().flat) app.os?.setSize?.(OS_W, OS_H)
       holder.style.willChange = ''
       holder.style.transform = ''
       if (park) park.appendChild(holder)
@@ -521,14 +529,24 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     const hideTip = () => {
       if (tipEl) tipEl.hidden = true
     }
-    const on = (type, fn) => {
-      canvas.addEventListener(type, fn)
-      listeners.push([type, fn])
+    const listen = (target, type, fn) => {
+      target.addEventListener(type, fn)
+      listeners.push([target, type, fn])
     }
-    on('pointermove', (e) => {
-      const r = canvas.getBoundingClientRect()
+    const on = (type, fn) => listen(canvas, type, fn)
+    // The parallax target follows the cursor over the whole stage, the DOM screen included, so
+    // crossing onto the screen no longer snaps the camera back to centre.
+    listen(stage, 'pointermove', (e) => {
+      const r = stage.getBoundingClientRect()
+      if (!r.width || !r.height) return
       pointer.x = (e.clientX - r.left) / r.width - 0.5
       pointer.y = (e.clientY - r.top) / r.height - 0.5
+    })
+    listen(stage, 'pointerleave', () => {
+      pointer.x = pointer.y = 0
+    })
+    on('pointermove', (e) => {
+      const r = canvas.getBoundingClientRect()
       if (drag) {
         const dx = e.clientX - drag.x
         if (Math.abs(dx) > 5) drag.moved = true
@@ -568,7 +586,6 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       glow(hover, false)
       hover = null
       hideTip()
-      pointer.x = pointer.y = 0
     })
 
     // ---------- mirror and the font gate (L1223–1232, D17) ----------
@@ -605,6 +622,10 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     const aPos = new THREE.Vector3()
     const aN = new THREE.Vector3()
     let discoT = 0
+    // Style writes only on change, so a resting frame does not invalidate the holder's style.
+    function setHolderStyle(prop, v) {
+      if (holder.style[prop] !== v) holder.style[prop] = v
+    }
 
     function frame(t, dt) {
       if (disposed) return
@@ -620,13 +641,27 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       const lb = lidBoot(le, lidWasClosed, os.state)
       lidWasClosed = lb.wasClosed
       if (lb.boot) os.boot()
-      holder.style.visibility = le > 0.5 ? '' : 'hidden'
+      // The DOM screen fades in over the drawn mirror while the lid opens, instead of a hard cut.
+      const a = holderAlpha(le)
+      setHolderStyle('opacity', a === 1 ? '' : String(Math.round(a * 1000) / 1000))
+      setHolderStyle('visibility', a > 0 ? '' : 'hidden')
       // Inside, the OS is flat in the flat host (R4): no 3D pass, and no size writes that would
       // fight its 2D fit. The cheap state below (LEDs, keys, snow, tweens) keeps running.
       const flatInside = ctrl.store.get().interactive
-      if (!flatInside && !ctrl.store.get().narrow) {
-        const s = widenSize(z, w, h)
-        os.setSize(s.w, s.h)
+      if (!flatInside) {
+        if (!ctrl.store.get().narrow) {
+          // R12: the screen grows out of the bezel to the full view late in the dive.
+          const s = widenSize(z, w, h)
+          os.setSize(s.w, s.h)
+        }
+        const vig = vignetteAlpha(z)
+        const v = vig === 1 ? '' : String(Math.round(vig * 1000) / 1000)
+        if (holder.style.getPropertyValue('--vig') !== v) holder.style.setProperty('--vig', v)
+      }
+      const fog = fogFor(widePose(aspect).k)
+      if (scene.fog.near !== fog.near || scene.fog.far !== fog.far) {
+        scene.fog.near = fog.near
+        scene.fog.far = fog.far
       }
       const fov = camFov(aspect)
       if (camera.fov !== fov) {

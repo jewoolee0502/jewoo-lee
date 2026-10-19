@@ -27,12 +27,22 @@ export function lidBoot(t, wasClosed, osState) {
   return { wasClosed, boot }
 }
 
-/** The desktop widens to fill the stage over the last 14 % of the dive (L1245). */
+/** R12: the holder widens over the last 3 % of the dive. */
+export const WIDEN_FROM = 0.97
+/** R12: the desktop widens to fill the stage late in the dive. At z = 1 it is exactly the flat
+ *  layout (w/k, h/k with k = min(w/900, h/675)), so the swap to the flat OS is invisible (R4). */
 export function widenSize(z, w, h) {
-  const g = ss(0.86, 1, z)
-  const k = Math.min(w / OS_W, h / OS_H) * 0.994
+  const g = ss(WIDEN_FROM, 1, z)
+  const k = Math.min(w / OS_W, h / OS_H)
   return { w: OS_W + (w / k - OS_W) * g, h: OS_H + (h / k - OS_H) * g }
 }
+
+/** Opacity of the screen vignette in 3D: gone before the widen starts, so neither the widen nor
+ *  the swap to the flat OS (which has none) shows it popping off. */
+export const vignetteAlpha = (z) => 1 - ss(0.86, WIDEN_FROM, z)
+
+/** Opacity of the DOM screen over the drawn WebGL mirror while the lid opens (a crossfade). */
+export const holderAlpha = (le) => ss(0.42, 0.6, le)
 
 export const camFov = (aspect) => (aspect < CAM_NARROW_ASPECT ? 46 : 35)
 
@@ -42,14 +52,98 @@ export function camDistance(fov, aspect) {
   return Math.max(SCREEN_H / 2 / tv, SCREEN_W / 2 / (tv * aspect))
 }
 
-/** The wide room shot and its look target (L1248). */
-export function widePose(aspect) {
-  return aspect < CAM_NARROW_ASPECT
-    ? { wp: [0.5, 4.4, 13.8], wl: [0.1, 1.3, 0] }
-    : { wp: [1.4, 3.6, 10.2], wl: [0.2, 1.0, 0] }
+const NARROW_WP = [0.5, 4.4, 13.8]
+const NARROW_WL = [0.1, 1.3, 0]
+/** Top corners of the desk slab (7 × 3.2, top at y 0), which the phone wide shot must contain. */
+const DESK_CORNERS = [
+  [-3.5, 0, -1.6],
+  [3.5, 0, -1.6],
+  [-3.5, 0, 1.6],
+  [3.5, 0, 1.6],
+]
+/** The desk corners stay inside this fraction of the half-frame (NDC), with room for its edge. */
+export const WIDE_FIT_NDC = 0.95
+/** How far the look target drops per unit of pull-back, so the room is centred, not the wall. */
+const LOOK_DROP = 0.6
+
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const unit3 = (a) => {
+  const l = Math.hypot(a[0], a[1], a[2])
+  return [a[0] / l, a[1] / l, a[2] / l]
 }
 
-/** Camera position and look target between the wide shot (e=0) and the screen (e=1) (L1249–1253). */
+/** The narrow wide shot pulled back by `k`: the look target drops a little, and the camera keeps
+ *  the base pose's direction from it. k = 1 is the base pose. */
+function narrowPose(k) {
+  const wl = [NARROW_WL[0], NARROW_WL[1] - LOOK_DROP * (k - 1), NARROW_WL[2]]
+  return { wp: NARROW_WP.map((v, i) => wl[i] + (v - NARROW_WL[i]) * k), wl }
+}
+
+/** The largest |NDC| of the desk corners seen from `pose` (the look-at basis by hand). */
+function deskNdc(aspect, { wp, wl }) {
+  const tv = Math.tan((camFov(aspect) * DEG) / 2)
+  const f = unit3(sub3(wl, wp))
+  const r = unit3(cross3(f, [0, 1, 0]))
+  const u = cross3(r, f)
+  let m = 0
+  for (const c of DESK_CORNERS) {
+    const p = sub3(c, wp)
+    const depth = dot3(p, f)
+    if (!(depth > 0)) return Infinity
+    m = Math.max(m, Math.abs(dot3(p, r) / depth / (tv * aspect)), Math.abs(dot3(p, u) / depth / tv))
+  }
+  return m
+}
+
+let fitAspect = NaN
+let fitK = 1
+/** Smallest pull-back that frames the whole desk within WIDE_FIT_NDC (bisection, cached per aspect).
+ *  Capped at k 16, which still fits down to an aspect of about 0.04 (far narrower than any phone). */
+function narrowFitK(aspect) {
+  if (aspect === fitAspect) return fitK
+  let k = 1
+  if (deskNdc(aspect, narrowPose(1)) > WIDE_FIT_NDC) {
+    let lo = 1
+    let hi = 16
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2
+      if (deskNdc(aspect, narrowPose(mid)) > WIDE_FIT_NDC) lo = mid
+      else hi = mid
+    }
+    k = hi
+  }
+  fitAspect = aspect
+  fitK = k
+  return k
+}
+
+/** The wide room shot and its look target (L1248). On tall screens the camera pulls back by `k`
+ *  (the look target dropping a little) until the whole desk, mug and plant included, is in frame;
+ *  `k` is 1 when it already is. */
+export function widePose(aspect) {
+  if (aspect >= CAM_NARROW_ASPECT) return { wp: [1.4, 3.6, 10.2], wl: [0.2, 1.0, 0], k: 1 }
+  const k = narrowFitK(aspect)
+  if (k === 1) return { wp: [...NARROW_WP], wl: [...NARROW_WL], k }
+  return { ...narrowPose(k), k }
+}
+
+/** Scene fog for a wide shot pulled back by `k`, so the room is not fogged out on phones. */
+export const fogFor = (k) => ({ near: 16 * k, far: 34 * k })
+
+/**
+ * R11: the camera parameter that makes the screen's apparent size (∝ 1/distance) grow linearly
+ * with `e` when the distance falls from `d0` to `d1`.
+ */
+export function perceptualE(e, d0, d1) {
+  if (d0 <= d1) return e
+  const inv = 1 / d0 + (1 / d1 - 1 / d0) * e
+  return (d0 - 1 / inv) / (d0 - d1)
+}
+
+/** Camera position and look target between the wide shot (e=0) and the screen (e=1) (L1249–1253),
+ *  moved along the path by perceptualE (R11). */
 export function cameraPose({ e, aspect, sp, aPos, aN, d, reduce }) {
   const { wp, wl } = widePose(aspect)
   const par = reduce ? 0 : 1 - e
@@ -59,9 +153,10 @@ export function cameraPose({ e, aspect, sp, aPos, aN, d, reduce }) {
   const bx = aPos.x + aN.x * d
   const by = aPos.y + aN.y * d
   const bz = aPos.z + aN.z * d
+  const k = perceptualE(e, Math.hypot(ax - aPos.x, ay - aPos.y, az - aPos.z), d)
   return {
-    pos: { x: ax + (bx - ax) * e, y: ay + (by - ay) * e, z: az + (bz - az) * e },
-    look: { x: wl[0] + (aPos.x - wl[0]) * e, y: wl[1] + (aPos.y - wl[1]) * e, z: wl[2] + (aPos.z - wl[2]) * e },
+    pos: { x: ax + (bx - ax) * k, y: ay + (by - ay) * k, z: az + (bz - az) * k },
+    look: { x: wl[0] + (aPos.x - wl[0]) * k, y: wl[1] + (aPos.y - wl[1]) * k, z: wl[2] + (aPos.z - wl[2]) * k },
   }
 }
 

@@ -5,8 +5,11 @@
 //     motion, only when something changed (dirty);
 //   - otherwise at most every 70 ms (about 14 fps).
 // A width change (OS resize) is applied only after it has been stable for 200 ms and never while
-// the camera moves (B4). The layout is a pure function of W with stable seeds, so a rebuild reflows
-// the city instead of re-rolling it.
+// the camera moves (B4), except while `followSize()` says the size change is the screen widening
+// in step with the scroll (off the desk): then a new width applies at once, with rebuilds at least
+// FOLLOW_REBUILD_MS apart, so the city grows with the screen and the flat inside view starts at its
+// final layout. The layout is a pure function of W with stable seeds, so a rebuild reflows the
+// city instead of re-rolling it.
 import { CITY_H, clampWidth, isMode } from './modes.js'
 import { buildLayout, fitRaccoon, createWallState } from './layout.js'
 import { drawStatic, drawFrame, hitTest } from './render.js'
@@ -14,12 +17,16 @@ import { act } from './secrets.js'
 
 export const IDLE_FRAME_MS = 70
 export const REBUILD_DEBOUNCE_MS = 200
+/** While following the widen, rebuilds are at least this far apart (the last width still lands
+ *  within this long of the last change). */
+export const FOLLOW_REBUILD_MS = 100
 
 export function createWallpaperEngine({
   canvas,
   getOsSize,
   getOsState,
   isTweening = () => false,
+  followSize = () => false,
   reduce = () => false,
   snd,
   tracker,
@@ -38,6 +45,8 @@ export function createWallpaperEngine({
   let lastDraw = 0
   let hot = []
   let pending = null // {w, since}: a new width waiting out the debounce
+  let lastFollow = -Infinity // when followSize last rebuilt
+  let applyNow = false // resizeNow(): the next width change skips the debounce and the throttle
   let disposed = false
 
   const hidden = () => typeof document !== 'undefined' && document.hidden
@@ -71,7 +80,22 @@ export function createWallpaperEngine({
     }
     if (w === W) {
       pending = null
+      applyNow = false
       return null
+    }
+    if (applyNow) {
+      applyNow = false
+      pending = null
+      lastFollow = now
+      W = w
+      return 'layout'
+    }
+    if (followSize()) {
+      pending = null
+      if (now - lastFollow < FOLLOW_REBUILD_MS) return null
+      lastFollow = now
+      W = w
+      return 'layout'
     }
     if (!pending || pending.w !== w) {
       pending = { w, since: now }
@@ -117,6 +141,12 @@ export function createWallpaperEngine({
       if (needStatic) rebuild(false)
       T += red ? 0 : dt
       paint(red ? 0 : dt)
+    },
+
+    /** The next tick applies a changed width at once, ignoring the debounce and the follow
+     *  throttle (once). Used when the dive lands inside, so the flat view starts at its layout. */
+    resizeNow() {
+      applyNow = true
     },
 
     /** L602: unknown keys fall back to night. Redraws now when the OS is showing the desktop. */

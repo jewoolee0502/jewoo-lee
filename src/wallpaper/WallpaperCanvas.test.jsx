@@ -121,4 +121,59 @@ describe('WallpaperCanvas', () => {
       expect(drawn()).toBeGreaterThan(before)
     })
   })
+
+  // followSize (WallpaperCanvas.jsx): an OS resize applies at once only while the camera moves in
+  // the dive. Inside (the flat view) and on the desk it waits out the normal resize debounce
+  // (200 ms, engine.js REBUILD_DEBOUNCE_MS). Widths: 900 px -> clamp 240, 1200 px -> clamp 320.
+  describe('followSize is on only during the dive', () => {
+    function sized(phase) {
+      const { app, canvas } = mount()
+      const size = vi.spyOn(app.host, 'size').mockReturnValue({ w: 900, h: 675 })
+      app.ctrl.store.set({ phase, interactive: phase === 'inside' })
+      app.wallpaperEngine.tick(1000)
+      expect(canvas.width).toBe(240)
+      size.mockReturnValue({ w: 1200, h: 675 })
+      return { app, canvas }
+    }
+
+    it('during the dive (phase dive) a new width applies on the next tick', () => {
+      const { app, canvas } = sized('dive')
+      app.wallpaperEngine.tick(1016)
+      expect(canvas.width).toBe(320)
+    })
+
+    it('inside the laptop (phase inside) a new width waits out the 200 ms debounce', () => {
+      const { app, canvas } = sized('inside')
+      app.wallpaperEngine.tick(1016)
+      expect(canvas.width).toBe(240)
+      app.wallpaperEngine.tick(1100)
+      expect(canvas.width).toBe(240)
+      app.wallpaperEngine.tick(1300)
+      expect(canvas.width).toBe(320)
+    })
+
+    it('on the desk a new width waits out the 200 ms debounce', () => {
+      const { app, canvas } = sized('desk')
+      app.wallpaperEngine.tick(1016)
+      expect(canvas.width).toBe(240)
+      app.wallpaperEngine.tick(1100)
+      expect(canvas.width).toBe(240)
+      app.wallpaperEngine.tick(1300)
+      expect(canvas.width).toBe(320)
+    })
+
+    it('when the dive ends (dive to inside) a width that changed in the dive applies on the very next tick, once; later resizes inside wait out the debounce', () => {
+      const { app, canvas } = sized('dive')
+      app.ctrl.store.set({ phase: 'inside', interactive: true })
+      app.wallpaperEngine.tick(1016)
+      expect(canvas.width).toBe(320)
+      app.host.size.mockReturnValue({ w: 900, h: 675 })
+      app.wallpaperEngine.tick(1100)
+      expect(canvas.width).toBe(320)
+      app.wallpaperEngine.tick(1200)
+      expect(canvas.width).toBe(320)
+      app.wallpaperEngine.tick(1300)
+      expect(canvas.width).toBe(240)
+    })
+  })
 })

@@ -83,6 +83,8 @@ export function createApp(overrides = {}) {
   )
   let cueEl = null
   let cueOpacity = null
+  let hudStage = null
+  let hudOpacity = null
   app.ctrl = pick('ctrl', () =>
     createController({
       getTrackRect: () => app.dom.track?.getBoundingClientRect() ?? NO_RECT,
@@ -100,6 +102,17 @@ export function createApp(overrides = {}) {
           cueEl = el
           cueOpacity = v
           el.style.opacity = String(v)
+        },
+        // The HUD fades out as the screen grows under it, so it never sits on the OS menubar.
+        setHud(v) {
+          const el = app.dom.stage
+          if (!el || (el === hudStage && v === hudOpacity)) return
+          hudStage = el
+          hudOpacity = v
+          if (v === 1) el.style.removeProperty('--hud')
+          else el.style.setProperty('--hud', String(Math.round(v * 1000) / 1000))
+          el.classList.toggle('hud-dim', v < 0.5)
+          el.classList.toggle('hud-off', v === 0)
         },
         setZoomed: (v) => app.dom.stage?.classList.toggle('zoomed', Boolean(v)),
         setRunway: (flat) => app.dom.track?.classList.toggle('flat-runway', Boolean(flat)),

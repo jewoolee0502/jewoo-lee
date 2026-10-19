@@ -2,7 +2,11 @@
 export const OS_W = 900
 export const OS_H = 675
 export const NARROW_PX = 760
+/** A stage shorter than this (phone landscape) also gets the compact OS. */
+export const SHORT_PX = 480
 export const CAM_NARROW_ASPECT = 1.05
+/** The HUD fades out over this z range, before the growing screen reaches it. */
+export const HUD_FADE = [0.6, 0.8]
 
 // Scroll runway (plan-r2 R2), in stage heights: dive, inside plateau, out, tail. The track is
 // 100vh of stage plus the runway, so TRACK_VH = 100·(1 + sum) and tokens.css --track-h must match.

@@ -3,12 +3,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { StrictMode } from 'react'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { triggerIntersection } from '../test/setup.js'
+import { triggerIntersection, triggerResize } from '../test/setup.js'
 import { renderWithApp } from '../test/renderWithApp.jsx'
 import Stage from './Stage.jsx'
 import OsPortal from '../os/OsPortal.jsx'
 import { PROJECTS } from '../content/index.js'
-import { IDLE_MS, SETTLE_GRACE_MS } from '../core/constants.js'
+import { IDLE_MS, SETTLE_GRACE_MS, NARROW_PX, SHORT_PX } from '../core/constants.js'
 import { runwayLayout } from './runway.js'
 
 const pending = () => new Promise(() => {})
@@ -608,5 +608,59 @@ describe('stage/Stage', () => {
       EventTarget.prototype.addEventListener = origAdd
       EventTarget.prototype.removeEventListener = origRemove
     }
+  })
+
+  // Round 2 Phase 3 TEST LIST 4 (compact OS for short landscape): a stage that is too short is narrow too.
+  describe('narrow follows the stage size (phone portrait and short landscape)', () => {
+    const sizeStage = (container, width, height) => {
+      const stage = container.querySelector('#stage')
+      Object.defineProperty(stage, 'clientWidth', { configurable: true, value: width })
+      Object.defineProperty(stage, 'clientHeight', { configurable: true, value: height })
+      triggerResize(stage, { width, height })
+    }
+
+    it('a 844×390 stage (phone landscape) sets narrow true', () => {
+      const { app, container, unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      try {
+        sizeStage(container, 844, 390)
+        expect(app.ctrl.store.get().narrow).toBe(true)
+      } finally {
+        unmount()
+      }
+    })
+
+    it('a 1280×720 stage (desktop) sets narrow false', () => {
+      const { app, container, unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      try {
+        sizeStage(container, 844, 390)
+        sizeStage(container, 1280, 720)
+        expect(app.ctrl.store.get().narrow).toBe(false)
+      } finally {
+        unmount()
+      }
+    })
+
+    it('a wide stage that is shorter than SHORT_PX is narrow; one at SHORT_PX is not', () => {
+      expect(SHORT_PX).toBe(480)
+      const { app, container, unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      try {
+        sizeStage(container, 1000, SHORT_PX - 1)
+        expect(app.ctrl.store.get().narrow).toBe(true)
+        sizeStage(container, 1000, SHORT_PX)
+        expect(app.ctrl.store.get().narrow).toBe(false)
+      } finally {
+        unmount()
+      }
+    })
+
+    it('a narrow-width stage (under NARROW_PX) is narrow regardless of height', () => {
+      const { app, container, unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      try {
+        sizeStage(container, NARROW_PX - 1, 900)
+        expect(app.ctrl.store.get().narrow).toBe(true)
+      } finally {
+        unmount()
+      }
+    })
   })
 })

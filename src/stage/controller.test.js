@@ -8,7 +8,7 @@ import { createController } from './controller.js'
 function setup({ now } = {}) {
   const env = { scrollY: 0, status: 'ready', reduce: false, trackTop: null, trackH: 2900, stageH: 1000 }
   const os = { state: 'standby', boot: vi.fn(), setFlat: vi.fn(), setLive: vi.fn() }
-  const ui = { setCue: vi.fn(), setZoomed: vi.fn(), setRunway: vi.fn() }
+  const ui = { setCue: vi.fn(), setZoomed: vi.fn(), setRunway: vi.fn(), setHud: vi.fn() }
   const scrollTo = vi.fn()
   const scrollToResume = vi.fn()
   const glide = { to: vi.fn(), cancel: vi.fn(), active: false }
@@ -62,6 +62,20 @@ describe('stage/controller', () => {
     expect(ctrl.store.get().interactive).toBe(false)
     expect(os.setLive).not.toHaveBeenCalledWith(true)
     expect(ui.setCue).toHaveBeenLastCalledWith(0)
+  })
+
+  it('the HUD is fully shown on the desk and mid-dive, and gone before the screen reaches it (HUD_FADE)', () => {
+    const { ui, at } = setup()
+    at(0)
+    expect(ui.setHud).toHaveBeenLastCalledWith(1)
+    at(500)
+    expect(ui.setHud).toHaveBeenLastCalledWith(1)
+    at(700)
+    const mid = ui.setHud.mock.calls.at(-1)[0]
+    expect(mid).toBeGreaterThan(0)
+    expect(mid).toBeLessThan(1)
+    at(800)
+    expect(ui.setHud).toHaveBeenLastCalledWith(0)
   })
 
   it('3. at 1000: phase inside, zoomed on, the OS live, and the last setFlat is (true, false)', () => {

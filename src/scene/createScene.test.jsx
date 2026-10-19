@@ -393,6 +393,85 @@ describe('scene/createScene lifecycle', () => {
     expect(env.subs.wallpaper.size).toBe(0)
   })
 
+  // Round 2 Phase 3 TEST LIST 2 (R10/parallax): the parallax target is tracked on the stage, so it
+  // keeps following the cursor over the DOM screen; the canvas keeps its own pick and hover listeners.
+  it('the parallax pointer listeners (pointermove, pointerleave) are added to the stage element and removed by dispose()', () => {
+    const env = setup()
+    const stageAdd = vi.spyOn(env.stage, 'addEventListener')
+    const stageRemove = vi.spyOn(env.stage, 'removeEventListener')
+    const api = env.build()
+    const added = stageAdd.mock.calls.map(([type, fn]) => [type, fn])
+    for (const type of ['pointermove', 'pointerleave']) {
+      expect(added.some(([t]) => t === type), `stage ${type} added`).toBe(true)
+    }
+
+    api.dispose()
+
+    for (const [type, fn] of added.filter(([t]) => t === 'pointermove' || t === 'pointerleave')) {
+      expect(
+        stageRemove.mock.calls.some(([t, f]) => t === type && f === fn),
+        `stage ${type} removed`,
+      ).toBe(true)
+    }
+  })
+
+  // Round 2 Phase 3 TEST LIST 2 (R11/R12, mirror crossfade): frame() writes the holder's opacity and clip,
+  // and dispose() clears them with the visibility, so the holder is left as the host had it.
+  it('after dispose(), holder.style.opacity, visibility and clipPath are "" (frame() had written them)', () => {
+    const env = setup()
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+    const api = env.build()
+
+    // Mid-fade (le in (.42, .6)): the holder is partly transparent.
+    env.app.ctrl.z = 0.25
+    api.frame(0, 0.016)
+    expect(env.holder.style.opacity, 'opacity while fading').not.toBe('')
+    // Late widen (z in (.985, 1)): the holder grows out of the bezel and is never clipped.
+    env.app.ctrl.z = 0.985
+    api.frame(16, 0.016)
+    expect(env.holder.style.clipPath, 'clip while widening').toBe('')
+
+    api.dispose()
+
+    expect(env.holder.style.opacity).toBe('')
+    expect(env.holder.style.visibility).toBe('')
+    expect(env.holder.style.clipPath).toBe('')
+  })
+
+  // Round 3 (R12 revised): the holder is never clipped, from the start of the widen to the full view.
+  it('the holder is never clipped: clipPath stays "" across the whole widen (z .9 to 1)', () => {
+    const env = setup()
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+    const api = env.build()
+
+    for (const z of [0.9, 0.97, 0.985, 0.99, 1]) {
+      env.app.ctrl.z = z
+      api.frame(0, 0.016)
+      expect(env.holder.style.clipPath, `clip at z ${z}`).toBe('')
+    }
+
+    api.dispose()
+  })
+
+  // Round 3: dispose() puts the widened OS size back, so the holder is left at its host size.
+  it('dispose() resets the widened OS size: holder width and height are "" (or 900px / 675px) after a late widen', () => {
+    const env = setup()
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+    const api = env.build()
+
+    env.app.ctrl.z = 0.99
+    api.frame(0, 0.016)
+    expect(env.holder.style.width, 'widened width before dispose').not.toBe('900px')
+
+    api.dispose()
+
+    expect(['', '900px']).toContain(env.holder.style.width)
+    expect(['', '675px']).toContain(env.holder.style.height)
+  })
+
   it('a failure while building disposes the partial work, removes the canvas, and rethrows (B7)', () => {
     const env = setup({ failOn: 'DirectionalLight' })
     expect(() => env.build()).toThrow('boom: DirectionalLight')

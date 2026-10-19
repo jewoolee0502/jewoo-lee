@@ -131,6 +131,49 @@ describe('engine resize and mode', () => {
     expect(canvas.width).toBe(320)
   })
 
+  it('while followSize() is true, a new width applies on the next tick (then at most every 100 ms), even while tweening', () => {
+    let follow = false
+    const { engine, env, canvas } = make({ followSize: () => follow })
+    engine.tick(1000)
+    env.tweening = true
+    follow = true
+    env.size = { w: 1200, h: 675 }
+    engine.tick(1016)
+    expect(canvas.width).toBe(320)
+    env.size = { w: 1080, h: 675 } // clampWidth gives 288
+    engine.tick(1032)
+    expect(canvas.width).toBe(320) // throttled: within 100 ms of the last rebuild
+    engine.tick(1116)
+    expect(canvas.width).toBe(288)
+  })
+
+  // Round 3 TEST LIST 7 (followSize throttle): while following the size, the layout rebuilds at most
+  // once per 100 ms, and the final width is in place within 100 ms of the last change. The engine
+  // takes its clock through tick(now), so the timing is driven by injected times, not fake timers.
+  it('while followSize() is true, the layout rebuilds at most once per 100 ms, and the final width lands within 100 ms of the last change', () => {
+    const { engine, env, canvas } = make({ followSize: () => true })
+    engine.tick(1000)
+    const changes = []
+    let last = canvas.width
+    // The OS grows in 16 ms steps from 900 to 1200 px wide (clampWidth 240 to 320).
+    for (let i = 1; i <= 20; i++) {
+      const t = 1000 + i * 16
+      env.size = { w: 900 + i * 15, h: 675 }
+      engine.tick(t)
+      if (canvas.width !== last) {
+        changes.push(t)
+        last = canvas.width
+      }
+    }
+    expect(changes.length).toBeGreaterThan(0)
+    for (let i = 1; i < changes.length; i++) {
+      expect(changes[i] - changes[i - 1], `rebuild gap ${i}`).toBeGreaterThanOrEqual(100)
+    }
+    const lastChange = 1000 + 20 * 16
+    engine.tick(lastChange + 100)
+    expect(canvas.width).toBe(320)
+  })
+
   it('cancels a pending rebuild when the size returns to the current width', () => {
     const { engine, env, canvas } = make()
     engine.tick(1000)

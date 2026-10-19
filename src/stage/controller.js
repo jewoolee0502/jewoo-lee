@@ -12,7 +12,7 @@
 // #stage wheel listener only then.
 import { createStore } from '../core/store.js'
 import { ss } from '../core/math.js'
-import { REMAP_THRESHOLD } from '../core/constants.js'
+import { REMAP_THRESHOLD, HUD_FADE } from '../core/constants.js'
 import {
   runwayLayout,
   poseAt,
@@ -99,6 +99,7 @@ export function createController({
         if (!fallbackLive) ctrl.applyFlat()
         setDetent(false)
         ui.setCue(0)
+        ui.setHud?.(1)
         return
       }
       setDetent(s < m.L.diveEnd || detent.holding(now()))
@@ -107,6 +108,7 @@ export function createController({
         ctrl.seg = 'top'
         if (store.get().phase !== 'desk') store.set({ phase: 'desk' })
         ui.setCue(0.8)
+        ui.setHud?.(1)
         return
       }
 
@@ -118,6 +120,7 @@ export function createController({
       const phase = interactive ? 'inside' : pose.z > 0 ? 'dive' : 'desk'
       if (phase !== store.get().phase) store.set({ phase })
       ui.setCue(0.8 * (1 - ss(0, 0.15, pose.z)))
+      ui.setHud?.(1 - ss(HUD_FADE[0], HUD_FADE[1], pose.z))
     },
 
     /** Inside is always flat (R4): compact on narrow screens, scaled to fill otherwise. The

@@ -1,5 +1,7 @@
 // Canvas texture painters for the 3D scene, each (ctx, w, h, …) and free of three.js.
-// Ported unchanged from initScene (L1082–1088, L1143–1146, L1155, L1163–1164, L1223–1230).
+// Ported from initScene (L1082–1088, L1143–1146, L1155, L1163–1164, L1223–1230); the mirror's
+// standby and desktop drawings were reworked to match the DOM screen it crossfades with.
+import { OS_W, OS_H } from '../core/constants.js'
 
 /** Night sky over Mont-Royal with its cross, the city and a strip of snow (L1082–1088). */
 export function drawSky(x, w, h) {
@@ -100,7 +102,10 @@ const DESK_BLUE = '#3D98DD'
 /**
  * What the WebGL screen shows under (or, without CSS3D, instead of) the live DOM (L1223–1230).
  * `wall` is the wallpaper engine's canvas; without one (or before it has a size) the
- * desktop blue stands in.
+ * desktop blue stands in. The DOM screen crossfades in over this drawing while the lid opens,
+ * so the standby text sits where the DOM draws it (StandbyLayer: 64px logo with its baseline at
+ * 337 of 675 OS px, 34px "waking up" at 398) and the desktop is only the wallpaper and the
+ * menubar: drawn stand-in icons would ghost against the real ones during the fade.
  */
 export function drawMirror(x, w, h, osState, wall) {
   if (osState === 'on') {
@@ -117,32 +122,31 @@ export function drawMirror(x, w, h, osState, wall) {
     x.fillStyle = '#122030'
     x.font = '10px Silkscreen, monospace'
     x.fillText('◆ JAY-OS', 8, 13)
-    for (let i = 0; i < 7; i++) {
-      x.fillStyle = '#FFD15C'
-      x.fillRect(16, 32 + i * 48, 26, 24)
-    }
-    for (let i = 0; i < 7; i++) {
-      x.fillStyle = '#fff'
-      x.fillRect(w - 42, 32 + i * 48, 26, 24)
-    }
-    x.fillStyle = '#FBFCFD'
-    x.fillRect(120, 70, 270, 190)
-    x.fillStyle = '#4AA6EE'
-    x.fillRect(120, 70, 270, 20)
-    x.strokeStyle = '#122030'
-    x.lineWidth = 2
-    x.strokeRect(120, 70, 270, 190)
     return
   }
   x.fillStyle = '#030508'
   x.fillRect(0, 0, w, h)
   if (osState === 'standby') {
+    // .l-standby: radial-gradient(ellipse at center, #0b1a28, #030508 70%), farthest-corner.
+    x.save()
+    x.translate(w / 2, h / 2)
+    x.scale(1, h / w)
+    const g = x.createRadialGradient(0, 0, 0, 0, 0, (w / 2) * Math.SQRT2)
+    g.addColorStop(0, '#0b1a28')
+    g.addColorStop(0.7, '#030508')
+    x.fillStyle = g
+    x.fillRect(-w / 2, -w / 2, w, w)
+    x.restore()
+    const k = w / OS_W
     x.fillStyle = '#7FD4FF'
-    x.font = '42px Silkscreen, monospace'
     x.textAlign = 'center'
-    x.fillText('JAY-OS', w / 2, h / 2 - 6)
-    x.font = '24px VT323, monospace'
-    x.fillText('waking up …', w / 2, h / 2 + 34)
+    x.font = Math.round(64 * k) + 'px Silkscreen, monospace'
+    x.shadowColor = 'rgba(127,212,255,.6)'
+    x.shadowBlur = 18 * k
+    x.fillText('JAY-OS', w / 2, Math.round((337 / OS_H) * h))
+    x.shadowBlur = 0
+    x.font = Math.round(34 * k) + 'px VT323, monospace'
+    x.fillText('waking up …', w / 2, Math.round((398 / OS_H) * h))
     x.textAlign = 'left'
   }
   if (osState === 'boot') {

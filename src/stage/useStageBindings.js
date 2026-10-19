@@ -4,7 +4,7 @@
 // is attached only while the controller says the detent can act (the dive), so wheel scrolling
 // everywhere else stays on the compositor.
 import { useEffect, useLayoutEffect } from 'react'
-import { NARROW_PX, SETTLE_GRACE_MS } from '../core/constants.js'
+import { NARROW_PX, SHORT_PX, SETTLE_GRACE_MS } from '../core/constants.js'
 import { createTicker } from './ticker.js'
 import { createKeyHandler } from './keys.js'
 import { createScrollIdle } from './scrollIdle.js'
@@ -75,7 +75,7 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
     io.observe(stage)
 
     const ro = new ResizeObserver(() => {
-      ctrl.setNarrow(stage.clientWidth < NARROW_PX)
+      ctrl.setNarrow(stage.clientWidth < NARROW_PX || stage.clientHeight < SHORT_PX)
       app.os.refit?.()
     })
     ro.observe(stage)

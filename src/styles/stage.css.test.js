@@ -58,4 +58,10 @@ describe('styles/stage.css', () => {
     expect(body(css, '.exit-pill')).toMatch(/display:\s*none/)
     expect(body(css, '.stage.zoomed .exit-pill')).toMatch(/display:\s*inline-flex/)
   })
+
+  // Round 3 TEST LIST 6 (HUD): below half visible (--hud < .5) the HUD cannot be clicked; the stage
+  // gets .hud-dim from createApp's setHud, and this rule turns the pointer off for the HUD.
+  it('.stage.hud-dim .hud has pointer-events none, so a faded HUD cannot take clicks', () => {
+    expect(body(css, '.stage.hud-dim .hud')).toMatch(/pointer-events:\s*none/)
+  })
 })

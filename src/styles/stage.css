@@ -29,7 +29,9 @@
 @keyframes wheel{0%{transform:translateY(0);opacity:1}70%{transform:translateY(7px);opacity:0}100%{opacity:0}}
 @keyframes chev{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(4px);opacity:1}}
 .hud{position:absolute;top:max(14px,env(safe-area-inset-top,0px));right:max(14px,env(safe-area-inset-right,0px));display:flex;gap:8px;z-index:20}
-.hud{flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 28px)}
+.hud{flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 28px);opacity:var(--hud,1)}
+.stage.hud-dim .hud{pointer-events:none}
+.stage.hud-off .hud{visibility:hidden}
 @media (max-width:520px){.hud button{padding:7px 8px!important;font-size:11px!important}}
 .hud button{font:12px var(--f-px);background:rgba(10,16,28,.72);color:#EAF2FB;border:1.5px solid rgba(234,242,251,.35);padding:8px 10px;cursor:pointer}
 .hud button:hover{border-color:#EAF2FB}

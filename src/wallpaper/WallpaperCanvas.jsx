@@ -23,6 +23,9 @@ export default function WallpaperCanvas() {
       getOsState: () => app.os.state,
       // The camera moves during the dive and during a programmatic glide (enter, exit, settle).
       isTweening: () => app.ctrl?.store.get().phase === 'dive' || Boolean(app.glide?.active),
+      // In the dive the OS changes size as it widens with the scroll (R12); following it means the
+      // city grows with the screen. Inside, a resize waits out the normal debounce.
+      followSize: () => app.ctrl?.store.get().phase === 'dive',
       reduce: () => Boolean(app.motion.reduce()),
       snd: app.snd,
       tracker,
@@ -37,12 +40,21 @@ export default function WallpaperCanvas() {
       engine.setMode(mode)
     })
     // The OS turning on is the first moment the desktop is visible: draw it right away.
+    // Landing inside: the last widen step (throttled in the dive) applies on the next tick, so
+    // the flat view never reflows after its debounce. Later resizes inside debounce as usual.
+    let phase = app.ctrl?.store.get().phase
+    const offPhase = app.ctrl?.store.subscribe((s) => {
+      if (s.phase === phase) return
+      if (phase === 'dive' && s.phase === 'inside') engine.resizeNow()
+      phase = s.phase
+    })
     const offOs = app.os.store.subscribe((s) => {
       if (s.state === 'on') engine.setMode(mode)
     })
     return () => {
       offMode()
       offOs()
+      offPhase?.()
       engine.dispose()
       if (engineRef.current === engine) engineRef.current = null
       if (app.wallpaperEngine === engine) app.wallpaperEngine = null
