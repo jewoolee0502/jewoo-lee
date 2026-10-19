@@ -297,3 +297,70 @@ describe('stage/controller', () => {
     expect(os.setLive).toHaveBeenLastCalledWith(true)
   })
 })
+
+// Bug K: focus moving to the résumé while inside the laptop leaves the laptop without scrolling.
+describe('stage/controller leave()', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('K1. leave() from z 1 tweens z to 0 over max(.5, 1.5 * z) s and sets mode desk', () => {
+    const { ctrl, at, step, mode } = setup()
+    at(0)
+    at(36)
+    step(2)
+    expect(ctrl.z).toBe(1)
+    ctrl.leave()
+    expect(mode()).toBe('desk')
+    expect(ctrl.tw).toMatchObject({ from: 1, to: 0, dur: 1.5 })
+    step(1.55)
+    expect(ctrl.z).toBe(0)
+    expect(ctrl.tw).toBeNull()
+  })
+
+  it('K2. leave() never scrolls, even when the page is below the top of the track', () => {
+    const { scrollTo, scrollToResume, at, step, ctrl } = setup()
+    at(0)
+    at(36)
+    step(2)
+    at(600) // p .3, well past the .005 threshold that exit() scrolls at
+    ctrl.leave()
+    step(2)
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(scrollToResume).not.toHaveBeenCalled()
+  })
+
+  it('K3. after leave(), update() at the same p does not re-enter the laptop', () => {
+    const { os, at, step, ctrl, mode } = setup()
+    at(0)
+    at(36)
+    step(2)
+    ctrl.leave()
+    step(2)
+    at(36)
+    expect(ctrl.suppress).toBe(true)
+    expect(ctrl.armed).toBe(false)
+    expect(mode()).toBe('desk')
+    expect(os.boot).toHaveBeenCalledTimes(1)
+  })
+
+  it('K4. after leave(), returning to the top does not re-enter until the page passes p .6 again', () => {
+    const { os, at, step, ctrl, mode } = setup()
+    at(0)
+    at(36)
+    step(2)
+    ctrl.leave()
+    step(2)
+    at(0)
+    at(36)
+    expect(mode()).toBe('desk')
+    at(800) // p .67 clears suppress
+    at(0)
+    at(36)
+    expect(mode()).toBe('inside')
+    expect(os.boot).toHaveBeenCalledTimes(2)
+  })
+})

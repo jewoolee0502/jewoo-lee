@@ -15,12 +15,12 @@ export default function RecruiterView({ returnFocusRef }) {
   const wasOpen = useRef(false)
 
   useEffect(() => {
-    if (open) closeRef.current?.focus()
+    if (open) closeRef.current?.focus({ preventScroll: true })
     else if (wasOpen.current) {
       // Return focus to the HUD button, unless something else (the résumé heading) took it.
       const active = document.activeElement
       if (!active || active === document.body || recRef.current?.contains(active)) {
-        returnFocusRef?.current?.focus()
+        returnFocusRef?.current?.focus({ preventScroll: true })
       }
     }
     wasOpen.current = open
@@ -38,10 +38,10 @@ export default function RecruiterView({ returnFocusRef }) {
     const active = document.activeElement
     if (e.shiftKey && (active === first || !e.currentTarget.contains(active))) {
       e.preventDefault()
-      last.focus()
+      last.focus({ preventScroll: true })
     } else if (!e.shiftKey && active === last) {
       e.preventDefault()
-      first.focus()
+      first.focus({ preventScroll: true })
     }
   }
 

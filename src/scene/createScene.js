@@ -5,6 +5,7 @@
 // and a throw while building disposes the partial work before rethrowing (B6, B7).
 import * as THREE from 'three'
 import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
+import { pinScroll } from '../stage/pinScroll.js'
 import { OS_W } from '../core/constants.js'
 import { corkboardPngs, approvedCount } from '../wall/wallStore.js'
 import {
@@ -178,6 +179,9 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       css = new CSS3DRenderer()
       css.domElement.className = 'css3d'
       canvas.after(css.domElement)
+      // Bug J: focus inside the OS must not scroll the CSS3D layers (overflow:hidden) away.
+      offs.push(pinScroll(css.domElement))
+      if (css.domElement.firstElementChild) offs.push(pinScroll(css.domElement.firstElementChild))
       cssScene = new THREE.Scene()
       cssObj = new CSS3DObject(holder)
       cssScene.add(cssObj)

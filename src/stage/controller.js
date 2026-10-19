@@ -110,6 +110,16 @@ export function createController({
       if (ctrl.p > 0.005) scrollTo({ top: getTrackRect().top + scrollY(), behavior: behavior() })
     },
 
+    /** Bug K: focus moved out of the stage (Tab onto the résumé) while inside the laptop. Tween
+     *  out like exit(), but never scroll and never move focus; suppress auto-enter like
+     *  goToResume() (cleared once the page passes p .6) so it does not re-enter at once. */
+    leave() {
+      if (sceneStatus() !== 'ready' || store.get().mode !== 'inside') return
+      ctrl.suppress = true
+      ctrl.armed = false
+      startExit()
+    },
+
     /** D11: leave the laptop (if inside) and go to the résumé without re-triggering auto-enter. */
     goToResume() {
       ctrl.suppress = true

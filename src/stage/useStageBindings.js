@@ -5,6 +5,7 @@ import { createTicker } from './ticker.js'
 import { createWheelHandler } from './wheel.js'
 import { createKeyHandler } from './keys.js'
 import { bindHostClasses } from '../os/hostClasses.js'
+import { pinScroll } from './pinScroll.js'
 
 export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef, parkRef }) {
   // Elements first (layout effect), so the controller and host can use them in the same commit.
@@ -68,7 +69,21 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
     const onKey = createKeyHandler({ app })
     window.addEventListener('keydown', onKey)
 
+    // Bug J: keep the overflow:hidden containers that hold the OS from keeping a scroll offset.
+    const unpins = [stage, flatHostRef.current, host.osEl].map(pinScroll)
+
+    // Bug K: focus leaving the stage (Tab onto the résumé) while inside the laptop leaves it.
+    const onFocusIn = (e) => {
+      if (ctrl.store.get().mode !== 'inside') return
+      const t = e.target
+      if (t instanceof Node && stage.contains(t)) return
+      ctrl.leave()
+    }
+    document.addEventListener('focusin', onFocusIn)
+
     return () => {
+      document.removeEventListener('focusin', onFocusIn)
+      unpins.forEach((off) => off())
       window.removeEventListener('keydown', onKey)
       stage.removeEventListener('wheel', onWheel, { passive: false })
       ro.disconnect()
@@ -77,5 +92,5 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
       offScene()
       offClasses()
     }
-  }, [app, stageRef])
+  }, [app, stageRef, flatHostRef])
 }

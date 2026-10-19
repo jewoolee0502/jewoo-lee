@@ -100,4 +100,24 @@ describe('Terminal', () => {
     })
     expect(input).toHaveFocus()
   })
+
+  // Bug J: programmatic and click focus inside the OS must not scroll overflow:hidden ancestors.
+  it('focus calls pass { preventScroll: true }, both on mount and on a click in the terminal', () => {
+    vi.useFakeTimers()
+    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus')
+    try {
+      const { input, container } = mount()
+      act(() => {
+        vi.advanceTimersByTime(60)
+      })
+      expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
+      expect(focusSpy.mock.contexts).toContain(input)
+      focusSpy.mockClear()
+      fireEvent.click(container.querySelector('.term'))
+      expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true })
+      expect(focusSpy.mock.contexts).toContain(input)
+    } finally {
+      focusSpy.mockRestore()
+    }
+  })
 })

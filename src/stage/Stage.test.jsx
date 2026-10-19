@@ -248,4 +248,81 @@ describe('stage/Stage', () => {
       unmount?.()
     }
   })
+
+  // Bug J: overflow:hidden containers that hold the OS get their scroll offsets pinned to 0.
+  it('10. scrolling #stage, .flat-host or #os resets their scrollTop and scrollLeft to 0', () => {
+    const { container, app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+    const targets = [container.querySelector('#stage'), container.querySelector('.flat-host'), app.host.osEl]
+    for (const el of targets) {
+      el.scrollTop = 239
+      el.scrollLeft = 12
+      el.dispatchEvent(new Event('scroll'))
+      expect(el.scrollTop).toBe(0)
+      expect(el.scrollLeft).toBe(0)
+    }
+  })
+
+  // Bug K: Tab from inside the laptop onto the résumé leaves the laptop, without stealing focus.
+  it('11. with mode inside, focusin outside #stage calls ctrl.leave; focusin inside #stage does not', () => {
+    const { container, app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+    app.ctrl.store.set({ mode: 'inside' })
+    const leave = vi.spyOn(app.ctrl, 'leave')
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      fireEvent.focusIn(outside)
+      expect(leave).toHaveBeenCalledTimes(1)
+      leave.mockClear()
+      fireEvent.focusIn(within(container).getByRole('button', { name: 'Résumé ↓' }))
+      expect(leave).not.toHaveBeenCalled()
+    } finally {
+      outside.remove()
+    }
+  })
+
+  // Regression guard: pinScroll targets only the overflow:hidden containers, never window bodies.
+  it('12. a .wb window body inside app.host.osEl keeps its scroll offset', () => {
+    const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+    const wb = document.createElement('div')
+    wb.className = 'wb'
+    app.host.osEl.appendChild(wb)
+    wb.scrollTop = 120
+    wb.dispatchEvent(new Event('scroll'))
+    expect(wb.scrollTop).toBe(120)
+  })
+
+  // Regression guard: Bug K only applies in 'inside' mode; a desk-mode focus move must not leave.
+  it('13. with mode desk, focusin on a button outside #stage does not call ctrl.leave', () => {
+    const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+    app.ctrl.store.set({ mode: 'desk' })
+    const leave = vi.spyOn(app.ctrl, 'leave')
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      fireEvent.focusIn(outside)
+      expect(leave).not.toHaveBeenCalled()
+    } finally {
+      outside.remove()
+    }
+  })
+
+  // Regression guard: unmount removes the focusin listener and the pinScroll listeners.
+  it('14. after unmount, focusin outside #stage does not call ctrl.leave and #stage scroll is not reset', () => {
+    const { app, container, unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+    const stageEl = container.querySelector('#stage')
+    app.ctrl.store.set({ mode: 'inside' })
+    const leave = vi.spyOn(app.ctrl, 'leave')
+    unmount()
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      fireEvent.focusIn(outside)
+      expect(leave).not.toHaveBeenCalled()
+      stageEl.scrollTop = 120
+      stageEl.dispatchEvent(new Event('scroll'))
+      expect(stageEl.scrollTop).toBe(120)
+    } finally {
+      outside.remove()
+    }
+  })
 })
