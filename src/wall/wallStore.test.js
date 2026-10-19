@@ -1,6 +1,6 @@
 // Wall store over the mock client: init, submit validation, the corkboard selector, and recovery.
 import { describe, it, expect, vi } from 'vitest'
-import { createWallStore, corkboardPngs } from './wallStore.js'
+import { createWallStore, corkboardPngs, approvedCount } from './wallStore.js'
 import { createMockWallClient } from './mockWallClient.js'
 import { EXAMPLES } from './examples.js'
 import { gridToPngDataUrl, encodeIndexedPng, bytesToBase64, PNG_PREFIX } from '../lib/png.js'
@@ -104,5 +104,17 @@ describe('wall store', () => {
     failing = false
     await wall.refresh()
     expect(wall.store.get().status).toBe('ready')
+  })
+})
+
+describe('approvedCount (the caption count, not the example count)', () => {
+  it('is 0 while only the examples are shown', () => {
+    expect(approvedCount({ approved: [] })).toBe(0)
+  })
+
+  it('counts every approved drawing, including those past the 6 on the corkboard', () => {
+    const approved = Array.from({ length: 8 }, (_, i) => ({ id: `d${i}`, dataUrl: drawingUrl(i), decidedAt: i }))
+    expect(approvedCount({ approved })).toBe(8)
+    expect(corkboardPngs({ approved })).toHaveLength(6)
   })
 })

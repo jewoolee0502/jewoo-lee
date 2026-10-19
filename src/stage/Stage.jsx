@@ -46,7 +46,7 @@ export default function Stage() {
         </div>
       </section>
       <div className="park" ref={parkRef} />
-      <SceneMount sceneLayerRef={sceneLayerRef} stageRef={stageRef} tipRef={tipRef} />
+      <SceneMount sceneLayerRef={sceneLayerRef} stageRef={stageRef} tipRef={tipRef} parkRef={parkRef} />
     </>
   )
 }

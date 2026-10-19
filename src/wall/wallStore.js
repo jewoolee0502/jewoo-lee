@@ -25,6 +25,9 @@ export function corkboardPngs(state) {
   return state.approved.length ? state.approved.slice(0, CORKBOARD_SLOTS).map((d) => d.dataUrl) : EXAMPLES
 }
 
+/** The corkboard caption count (D16): approved drawings only, never the examples. */
+export const approvedCount = (state) => state.approved.length
+
 export function createWallStore({ clientFactory = () => createWallClient(), toast = () => {} } = {}) {
   const store = createStore(INITIAL)
   let client = null

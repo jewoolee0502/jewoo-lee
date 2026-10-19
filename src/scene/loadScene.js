@@ -1,5 +1,22 @@
-// Phase 3 stub: no 3D scene yet, so the site always runs the flat fallback.
-// Phase 7 replaces this with the WebGL probe and `import('./createScene.js')`.
-export async function loadScene() {
-  return null
+// Lazy scene loader: the WebGL probe (L1057), then `import('./createScene.js')`, which is the
+// only module that imports three, so three lands in its own chunk. Returns null (flat
+// fallback) when there is no WebGL or the chunk fails to load.
+
+export function defaultCanGL() {
+  try {
+    const c = document.createElement('canvas')
+    return Boolean(c.getContext('webgl') || c.getContext('experimental-webgl'))
+  } catch {
+    return false
+  }
+}
+
+export async function loadScene({ canGL = defaultCanGL, importer = () => import('./createScene.js') } = {}) {
+  if (!canGL()) return null
+  try {
+    return await importer()
+  } catch (e) {
+    console.error('scene', e)
+    return null
+  }
 }
