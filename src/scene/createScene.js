@@ -225,6 +225,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       const m = new THREE.Mesh(B(...size), hitM)
       m.position.set(...pos)
       m.castShadow = m.receiveShadow = false
+      m.userData.proxy = true
       parent.add(m)
       return m
     }
@@ -650,9 +651,14 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
       ray.setFromCamera(ndc, camera)
     }
+    // A hit box only widens a target: from the distance-ordered hits, the first real (visible)
+    // mesh wins, so a widened box never steals a tap from a floppy you can see below it. Only
+    // when the ray meets no real mesh does the nearest hit box count.
+    const isProxy = (o) => Boolean(o.userData?.proxy) || o.material?.visible === false
+    const firstHit = (hits) => hits.find((h) => !isProxy(h.object)) ?? hits[0] ?? null
     function pick(e) {
       aim(e)
-      const h = ray.intersectObjects(hot, true)[0]
+      const h = firstHit(ray.intersectObjects(hot, true))
       return h ? (hotspotOf(h.object)?.obj ?? null) : null
     }
     const hueOf = (mt) => {
@@ -708,7 +714,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       const o = ctrl.z < 0.9 ? pick(e) : null
       // Any laptop part counts (the base body too, which is not a hotspot), checked only at the
       // desk, where the lid can peek; `pick` has just aimed the ray.
-      overLaptop = ctrl.z < 0.02 && ray.intersectObjects([base], true).length > 0
+      overLaptop = ctrl.z < 0.02 && firstHit(ray.intersectObjects([base], true)) !== null
       if (o !== hover) {
         glow(hover, false)
         hover = o

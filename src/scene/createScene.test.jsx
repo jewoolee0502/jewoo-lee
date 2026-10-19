@@ -1034,3 +1034,109 @@ describe('scene/createScene glow strength and hit proxies (round 2 §7 6C)', () 
     })
   })
 })
+
+// A visible mesh is a real hit and beats a hit proxy (the invisible hitBox) even when the proxy is
+// nearer. Among proxies alone the nearest one wins. The raycaster mock returns `state.hits` in the
+// order given, so the array order is the distance order.
+describe('scene/createScene pick: a real mesh beats a hit proxy', () => {
+  beforeEach(() => {
+    state.calls = []
+    state.created = []
+    state.failOn = null
+    state.seq = 0
+    state.hits = []
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const labelOf = (o) => {
+    const l = o.userData?.hot?.label
+    return typeof l === 'string' ? l : ''
+  }
+  const hotOf = (label) => state.created.find((o) => o.__kind === 'Group' && labelOf(o) === label)
+  const isProxy = (m) => m.material?.__args?.[0]?.visible === false
+  const canvasOf = (env) => env.mount.querySelector('canvas.gl')
+  const pointer = (el, type, x = 10) => el.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: 10 }))
+  const sized = (env) => {
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+  }
+  /** The invisible hit box the code built into a hotspot group. */
+  const proxyOf = (group) => {
+    const m = group.children.find((c) => c.__kind === 'Mesh' && isProxy(c))
+    expect(m, labelOf(group) + ' hit proxy').toBeDefined()
+    // A real three material carries `visible`; the mock keeps only constructor args, so set it here.
+    m.material.visible = false
+    // The mock's add() does not set parent, and hotspotOf walks parent up to the hot group.
+    m.parent = group
+    m.userData = {}
+    return m
+  }
+  /** A visible mesh that belongs to a hotspot group (the floppy's own mesh, or a prop's mesh). */
+  const realMeshOf = (group) => {
+    const m = group.children.find((c) => c.__kind === 'Mesh' && !isProxy(c))
+    expect(m, labelOf(group) + ' real mesh').toBeDefined()
+    m.material.visible = true
+    m.parent = group
+    m.userData = {}
+    return m
+  }
+  /** Moves the pointer over the stage with the raycaster returning `hits`, then reads the tooltip. */
+  const pickWith = (env, hits) => {
+    state.hits = hits.map((object) => ({ object }))
+    pointer(canvasOf(env), 'pointermove')
+    return env.tipEl.hidden ? null : env.tipEl.textContent
+  }
+
+  it('a visible floppy mesh (GAMES, farther) beats the nearer invisible RESUME hit proxy', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.ctrl.z = 0
+    const resume = hotOf('Floppy · RESUME')
+    const games = hotOf('Floppy · GAMES')
+    expect(resume, 'RESUME floppy group').toBeDefined()
+    expect(games, 'GAMES floppy group').toBeDefined()
+
+    const picked = pickWith(env, [proxyOf(resume), realMeshOf(games)])
+
+    expect(picked).toBe(labelOf(games))
+    api.dispose()
+  })
+
+  it('when the only hits are proxies, the nearest proxy wins (RESUME proxy before GAMES proxy gives RESUME)', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.ctrl.z = 0
+    const resume = hotOf('Floppy · RESUME')
+    const games = hotOf('Floppy · GAMES')
+
+    const picked = pickWith(env, [proxyOf(resume), proxyOf(games)])
+
+    expect(picked).toBe(labelOf(resume))
+    api.dispose()
+  })
+
+  it('a visible prop mesh (McGill mug, farther) beats the nearer invisible dog-tags hit proxy', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.ctrl.z = 0
+    const tags = hotOf('Dog tags')
+    const mug = hotOf('McGill mug')
+    expect(tags, 'dog tags group').toBeDefined()
+    expect(mug, 'mug group').toBeDefined()
+    // The mug has no visible mesh of its own in the mock's scene graph list, so one is built under it.
+    const mugMesh = new T.three.Mesh(new T.three.BoxGeometry(0.2, 0.2, 0.2), new T.three.MeshStandardMaterial({ color: 0xed1b2f }))
+    mug.add(mugMesh)
+
+    const picked = pickWith(env, [proxyOf(tags), realMeshOf(mug)])
+
+    expect(picked).toBe(labelOf(mug))
+    api.dispose()
+  })
+})
