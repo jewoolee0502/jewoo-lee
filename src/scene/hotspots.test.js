@@ -12,7 +12,6 @@ const LABELS = [
   'Dog tags',
   'McGill mug',
   'Desk lamp',
-  'Visitor wall',
   'Polaroid',
   'Sticky note',
   'Keyboard',
@@ -93,11 +92,12 @@ describe('scene/hotspots', () => {
     expect(local.toggleLamp).toHaveBeenCalled()
   })
 
-  it('Visitor wall calls ctrl.enter and openApp(wall)', () => {
+  it('there is no Visitor wall hotspot any more (the corkboard is gone)', () => {
     const { actions, os, ctrl } = setup()
-    actions.get('Visitor wall')()
-    expect(ctrl.enter).toHaveBeenCalled()
-    expect(os.openApp).toHaveBeenCalledWith('wall')
+    expect(actions.get('Visitor wall')).toBeUndefined()
+    expect(actions.has('Visitor wall')).toBe(false)
+    expect(os.openApp).not.toHaveBeenCalledWith('wall')
+    expect(ctrl.enter).not.toHaveBeenCalled()
   })
 
   it('Polaroid zooms in (ctrl.enter) and opens about (L1201)', () => {
@@ -134,10 +134,10 @@ describe('scene/hotspots', () => {
     expect(local.insertFloppy).toHaveBeenCalledWith(0)
   })
 
-  it('the labels are the prototype hotspot labels (13 with three floppies; the plan text says 12)', () => {
+  it('the labels are the 12 hotspot labels left after the Visitor wall is removed (three floppies)', () => {
     const { actions } = setup()
     expect([...actions.keys()].sort()).toEqual([...LABELS].sort())
-    expect(actions.size).toBe(13)
+    expect(actions.size).toBe(12)
   })
 
   it('hotspotOf(hit) walks up the parents to the first object with userData.hot, or null', () => {

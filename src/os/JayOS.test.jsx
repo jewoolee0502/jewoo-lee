@@ -130,17 +130,9 @@ describe('JayOS shell', () => {
       'Mail',
       'Wallpaper',
     ])
-    expect(labels('r')).toEqual([
-      'BugHunt.exe',
-      'Snake.exe',
-      'Paint',
-      'Visitor Wall',
-      'Service.txt',
-      'Trophies',
-      'Recycle Bin',
-    ])
+    expect(labels('r')).toEqual(['BugHunt.exe', 'Snake.exe', 'Service.txt', 'Trophies', 'Recycle Bin'])
     const imgs = [...container.querySelectorAll('button.ic img')]
-    expect(imgs.length).toBe(15)
+    expect(imgs.length).toBe(13)
     for (const img of imgs) expect(img.getAttribute('src')).toMatch(/^data:image\/png/)
   })
 

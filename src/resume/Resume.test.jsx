@@ -115,29 +115,31 @@ describe('resume/Resume', () => {
     expect(cv).toHaveAttribute('download')
   })
 
-  it('7. footer credits edh.dev with "Inspired by" and the copyright line', () => {
+  it('7. footer is the copyright line only: "© 2026 Jewoo Lee", no edh.dev credit and no link', () => {
     const { container } = renderWithApp(<Resume />)
     const footer = container.querySelector('footer')
     expect(footer).not.toBeNull()
-    expect(footer).toHaveTextContent('Inspired by')
     expect(footer).toHaveTextContent('© 2026 Jewoo Lee')
-    expect(footer.querySelector('a[href="https://edh.dev"]')).not.toBeNull()
+    expect(footer.textContent.trim()).toBe('© 2026 Jewoo Lee')
+    expect(footer.textContent).not.toMatch(/Inspired by/)
+    expect(footer.textContent).not.toMatch(/edh\.dev/)
+    expect(footer.querySelector('a')).toBeNull()
   })
 
-  it('8. trophies: the server render shows 0/13 and 13 locked cards; a client render with boot shows 1/13 and ★ Power User', () => {
+  it('8. trophies: the server render shows 0/12 and 12 locked cards; a client render with boot shows 1/12 and ★ Power User', () => {
     const server = toContainer(serverMarkup())
-    expect(server.querySelector('#trophies .ach-count').textContent).toBe('0/13')
-    expect(server.querySelectorAll('.ach.lock')).toHaveLength(13)
+    expect(server.querySelector('#trophies .ach-count').textContent).toBe('0/12')
+    expect(server.querySelectorAll('.ach.lock')).toHaveLength(12)
     server.remove()
 
     localStorage.setItem('jayos-ach', JSON.stringify(['boot']))
     const { container } = renderWithApp(<Resume />)
-    expect(container.querySelector('#trophies .ach-count').textContent).toBe('1/13')
+    expect(container.querySelector('#trophies .ach-count').textContent).toBe('1/12')
     expect(container.querySelectorAll('.ach.got')).toHaveLength(1)
     expect(container.querySelector('.ach.got')).toHaveTextContent('★ Power User')
   })
 
-  it('9. hydrating the prerendered markup with stored achievements has no mismatch and then shows 1/13', async () => {
+  it('9. hydrating the prerendered markup with stored achievements has no mismatch and then shows 1/12', async () => {
     localStorage.setItem('jayos-ach', JSON.stringify(['boot']))
     const container = toContainer(renderResumeHtml())
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -155,7 +157,7 @@ describe('resume/Resume', () => {
       )
     })
     await waitFor(() => {
-      expect(container.querySelector('#trophies .ach-count').textContent).toBe('1/13')
+      expect(container.querySelector('#trophies .ach-count').textContent).toBe('1/12')
     })
 
     expect(recoverable).not.toHaveBeenCalled()

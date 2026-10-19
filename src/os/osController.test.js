@@ -270,15 +270,13 @@ describe('osController', () => {
       expect(dynApp('p:x')).toBeNull()
     })
 
-    it('art:0 is unknown before addArt, and after it opens as my-art-0.png at 320x390', () => {
+    it('has no art state and no addArt (Paint and its saved drawings are gone); art:0 never opens', () => {
       const { c } = makeController()
       bootToOn(c)
 
+      expect(c.store.get()).not.toHaveProperty('art')
+      expect(c.addArt).toBeUndefined()
       expect(c.openApp('art:0')).toBeNull()
-
-      expect(c.addArt('data:image/png;base64,AAAA')).toBe(0)
-      expect(c.store.get().art).toHaveLength(1)
-      expect(c.openApp('art:0')).toMatchObject({ title: 'my-art-0.png', w: 320, h: 390 })
     })
 
     it('shutdown: windows are removed at once; off at 600 ms; then() runs at 1500 ms', () => {

@@ -16,7 +16,7 @@ describe('resume/entry-server (node, no DOM)', () => {
     expect(html).toContain('Wholesale Express')
     expect(html).toContain('Joblog')
     expect(html).toContain('href="mailto:jewoo.lee@mail.mcgill.ca"')
-    expect(html).toContain('0/13')
+    expect(html).toContain('0/12')
   })
 
   it('does not contain the outlet comment, a draft blurb or placeholder values', () => {

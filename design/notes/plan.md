@@ -1,5 +1,7 @@
 # Implementation plan: JAY-OS portfolio revamp
 
+> Round 2 (design/notes/plan-r2.md) removed Paint, the Visitor Wall, Supabase, the corkboard and the edh.dev credit; text below about them is historical.
+
 Branch `feat/website-revamp`, worktree `.worktrees/feat-website-revamp`.
 Source of truth for look, feel and behaviour: `design/revamp-lab.html` (cited as `L<n>`).
 Investigator specs (`design/notes/explore-*.md`) were checked against the source. Corrections are noted where they matter (for example, the terminal `help` prints **14** lines, not 15, and Tab on `h` lists `help  hello  hi  history`).

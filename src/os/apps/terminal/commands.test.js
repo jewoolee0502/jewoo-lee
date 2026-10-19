@@ -19,7 +19,7 @@ const HELP = [
   'skills        what Jay works with',
   'experience    the career log',
   'contact       ways to reach Jay',
-  'snake · bugs · paint     play',
+  'snake · bugs     play',
   'matrix · weather · lamp  mess with the room',
   'wallpaper     pick a Montréal desktop scene',
   'salute        Marine Corps salute',
@@ -29,7 +29,7 @@ const HELP = [
 
 const COMMAND_KEYS = [
   'help', 'whoami', 'neofetch', 'ls', 'projects', 'open', 'cat', 'skills', 'experience', 'contact',
-  'snake', 'bugs', 'paint', 'matrix', 'weather', 'lamp', 'wallpaper', 'salute', 'sudo', 'coffee',
+  'snake', 'bugs', 'matrix', 'weather', 'lamp', 'wallpaper', 'salute', 'sudo', 'coffee',
   'date', 'pwd', 'cd', 'echo', 'hello', 'hi', '안녕', 'git', 'vim', 'rm', 'cheat', 'history',
   'clear', 'exit', 'shutdown',
 ]
@@ -170,14 +170,12 @@ describe('open and cat', () => {
 })
 
 describe('app and effect commands', () => {
-  it('snake, bugs and paint open their apps', () => {
+  it('snake and bugs open their apps', () => {
     const { ctx, run } = makeTerm()
     expect(run('snake')).toEqual([['good luck. it eats skills.', 'b']])
     expect(run('bugs')).toEqual([['grab a newspaper.', 'b']])
-    run('paint')
     expect(ctx.os.openApp).toHaveBeenCalledWith('snake')
     expect(ctx.os.openApp).toHaveBeenCalledWith('bugs')
-    expect(ctx.os.openApp).toHaveBeenCalledWith('paint')
   })
 
   it('matrix calls os.matrix and prints the line in class d', () => {
@@ -268,6 +266,15 @@ describe('wallpaper', () => {
 })
 
 describe('history, clear, exit and shutdown', () => {
+  it('ls lists the desktop without Paint or Visitor Wall', () => {
+    const { run } = makeTerm()
+    const text = run('ls').map(([t]) => t).join('\n')
+    expect(text).toContain('Snake.exe')
+    expect(text).toContain('Wallpaper')
+    expect(text).not.toMatch(/Paint/)
+    expect(text).not.toMatch(/Visitor ?Wall/)
+  })
+
   it('history lists the entries after two commands, including history itself', () => {
     const { run } = makeTerm()
     run('ls')
@@ -325,6 +332,15 @@ describe('command not found and lookups', () => {
   it('suggests the closest command within distance 2', () => {
     const { run } = makeTerm()
     expect(run('hepl')).toEqual([['jaysh: command not found: hepl. Did you mean "help"?', 'w']])
+  })
+
+  it('paint, wall and visitorwall are no longer commands (Paint and the Visitor Wall are gone)', () => {
+    const { ctx, run } = makeTerm()
+    for (const name of ['paint', 'wall', 'visitorwall']) {
+      expect(run(name), name).toEqual([[`jaysh: command not found: ${name}. Try "help".`, 'w']])
+    }
+    expect(ctx.os.openApp).not.toHaveBeenCalledWith('paint')
+    expect(ctx.os.openApp).not.toHaveBeenCalledWith('wall')
   })
 
   it('says Try "help" when nothing is close', () => {

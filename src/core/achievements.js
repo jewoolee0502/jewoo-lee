@@ -12,7 +12,6 @@ export const ACH = [
   ['hire', 'sudo make me an offer', 'Find the command that hires Jay', 'pdf'],
   ['bugs', 'Exterminator', 'Squash 10 bugs in one round of BugHunt', 'bug'],
   ['snake', 'Ssssskills', 'Eat 5 skills in Snake', 'snake'],
-  ['paint', 'Artist in Residence', 'Save a drawing to the desktop or pin it to the Visitor Wall', 'paint'],
   ['tags', 'Once a Marine', 'Find Jay’s dog tags', 'tag'],
   ['lamp', 'Night Owl', 'Turn off the desk lamp', 'trophy'],
   ['konami', 'Cheat Code', 'An old cheat code works here. Try it with arrow keys.', 'trophy'],

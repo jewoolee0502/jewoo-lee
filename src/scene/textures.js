@@ -1,5 +1,5 @@
 // Canvas texture painters for the 3D scene, each (ctx, w, h, …) and free of three.js.
-// Ported unchanged from initScene (L1082–1106, L1143–1146, L1155, L1163–1164, L1223–1230).
+// Ported unchanged from initScene (L1082–1088, L1143–1146, L1155, L1163–1164, L1223–1230).
 
 /** Night sky over Mont-Royal with its cross, the city and a strip of snow (L1082–1088). */
 export function drawSky(x, w, h) {
@@ -42,51 +42,6 @@ export function drawSky(x, w, h) {
   }
   x.fillStyle = '#F4F7FF'
   x.fillRect(0, h - 14, w, 14)
-}
-
-export const CORK_SLOTS = [[252, 52], [340, 52], [428, 52], [252, 160], [340, 160], [428, 160]]
-const PINS = ['#E8452E', '#4AA6EE', '#FFD15C']
-
-/**
- * The Visitor Wall corkboard with up to 6 pinned drawings (L1101–1106). The caption counts
- * approved drawings only (D16), so the examples shown while none are approved read
- * "your drawing here?".
- */
-export function drawCork(x, w, h, imgs = [], approvedCount = imgs.length) {
-  x.fillStyle = '#C8955E'
-  x.fillRect(0, 0, w, h)
-  for (let i = 0; i < 900; i++) {
-    x.fillStyle = i % 2 ? 'rgba(90,50,20,.18)' : 'rgba(255,230,190,.12)'
-    x.fillRect((i * 73) % w, (i * 151) % h, 2, 2)
-  }
-  x.fillStyle = '#2A1A0C'
-  x.font = '20px Silkscreen, monospace'
-  x.fillText('VISITOR WALL', 258, 34)
-  CORK_SLOTS.forEach(([sx, sy], i) => {
-    const im = imgs[i]
-    x.save()
-    x.translate(sx + 38, sy + 44)
-    x.rotate((((i * 37) % 7) - 3) * 0.035)
-    if (im) {
-      x.fillStyle = '#fff'
-      x.fillRect(-38, -38, 76, 76)
-      x.imageSmoothingEnabled = false
-      x.drawImage(im, -33, -33, 66, 66)
-    } else {
-      x.strokeStyle = 'rgba(42,26,12,.35)'
-      x.setLineDash([5, 4])
-      x.lineWidth = 2
-      x.strokeRect(-34, -34, 68, 68)
-    }
-    x.fillStyle = PINS[i % 3]
-    x.beginPath()
-    x.arc(0, -36, 6, 0, 7)
-    x.fill()
-    x.restore()
-  })
-  x.fillStyle = '#2A1A0C'
-  x.font = '15px JetBrains Mono, monospace'
-  x.fillText(approvedCount > 0 ? approvedCount + ' pinned by visitors' : 'your drawing here?', 258, h - 16)
 }
 
 /** The yellow sticky note on the palm rest (L1143). */

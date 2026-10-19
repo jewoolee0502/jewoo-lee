@@ -4,7 +4,7 @@ export default function AboutOs() {
     <>
       <h2>JAY-OS 2.0</h2>
       <p>A portfolio you can poke. Built with React, Three.js and a lot of CSS.</p>
-      <p className="muted">Inspired by ED-Linux on edh.dev. Runs on a 90s laptop in Montréal, with snow.</p>
+      <p className="muted">Runs on a 90s laptop in Montréal, with snow.</p>
     </>
   )
 }

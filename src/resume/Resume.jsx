@@ -235,11 +235,7 @@ export default function Resume() {
       </main>
       <footer className="r-foot">
         <div className="wrap">
-          {'© 2026 Jewoo Lee · Inspired by '}
-          <a href="https://edh.dev" {...ext}>
-            edh.dev
-          </a>
-          {' by Ed Hinrichsen.'}
+          © 2026 Jewoo Lee
         </div>
       </footer>
     </>

@@ -6,8 +6,8 @@ function makeDeps() {
 }
 
 describe('ACH', () => {
-  it('has 13 achievements in the prototype order', () => {
-    expect(ACH).toHaveLength(13)
+  it('has 12 achievements in the prototype order (Artist in Residence removed with Paint)', () => {
+    expect(ACH).toHaveLength(12)
     expect(ACH.map((a) => a.id)).toEqual([
       'boot',
       'floppy',
@@ -16,7 +16,6 @@ describe('ACH', () => {
       'hire',
       'bugs',
       'snake',
-      'paint',
       'tags',
       'lamp',
       'konami',
@@ -80,5 +79,15 @@ describe('createAchievements', () => {
     const ach = createAchievements(makeDeps())
 
     expect(ach.store.get().got).toEqual(new Set())
+  })
+
+  it('a stored "paint" id from an older build is dropped and the count stays correct', () => {
+    localStorage.setItem('jayos-ach', '["boot","paint","lamp"]')
+
+    const ach = createAchievements(makeDeps())
+
+    expect(ach.store.get().got).toEqual(new Set(['boot', 'lamp']))
+    expect(ach.store.get().got.has('paint')).toBe(false)
+    expect(ACH.filter((a) => ach.store.get().got.has(a.id))).toHaveLength(2)
   })
 })

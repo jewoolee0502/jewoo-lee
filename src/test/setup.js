@@ -6,7 +6,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import { act, cleanup } from '@testing-library/react'
 import { createRecordingContext } from './fakeCanvas.js'
 
-// Files with `// @vitest-environment node` (the PGlite SQL tests) have no DOM: skip the stubs.
+// Files with `// @vitest-environment node` have no DOM: skip the stubs.
 const DOM = typeof window !== 'undefined'
 
 /* ---------- canvas ---------- */

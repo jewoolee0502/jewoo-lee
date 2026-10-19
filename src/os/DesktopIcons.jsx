@@ -1,6 +1,5 @@
-// Desktop icons (L712–716); saved drawings are appended to the right column (L1002–1003).
+// Desktop icons (L712–716): apps on the left, games and extras on the right.
 import { useApp } from '../app/AppContext.jsx'
-import { useStore } from '../core/store.js'
 import { ICON } from '../lib/pixelIcons.js'
 
 const DESK_L = [
@@ -17,8 +16,6 @@ const DESK_L = [
 const DESK_R = [
   ['bugs', 'BugHunt.exe', 'bug'],
   ['snake', 'Snake.exe', 'snake'],
-  ['paint', 'Paint', 'paint'],
-  ['wall', 'Visitor Wall', 'wall'],
   ['service', 'Service.txt', 'tag'],
   ['ach', 'Trophies', 'trophy'],
   ['bin', 'Recycle Bin', 'bin'],
@@ -35,8 +32,6 @@ function Icon({ id, label, src }) {
 }
 
 export default function DesktopIcons() {
-  const { os } = useApp()
-  const art = useStore(os.store, (s) => s.art)
   return (
     <>
       <div className="icons l" id="icons-l">
@@ -47,9 +42,6 @@ export default function DesktopIcons() {
       <div className="icons r" id="icons-r">
         {DESK_R.map(([id, label, icon]) => (
           <Icon key={id} id={id} label={label} src={ICON[icon]} />
-        ))}
-        {art.map((src, n) => (
-          <Icon key={'art:' + n} id={'art:' + n} label={'my-art-' + n + '.png'} src={src} />
         ))}
       </div>
     </>

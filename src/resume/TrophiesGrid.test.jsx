@@ -13,37 +13,38 @@ describe('resume/TrophiesGrid', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders one card per achievement (13), with ★ for unlocked and ☆ for locked', () => {
+  it('renders one card per achievement (12), with ★ for unlocked and ☆ for locked', () => {
     localStorage.setItem('jayos-ach', JSON.stringify(['boot', 'term']))
     const { container } = renderWithApp(<TrophiesGrid />)
     const cards = container.querySelectorAll('.ach')
-    expect(cards).toHaveLength(13)
-    expect(ACH).toHaveLength(13)
+    expect(cards).toHaveLength(12)
+    expect(ACH).toHaveLength(12)
     expect(container.querySelectorAll('.ach.got')).toHaveLength(2)
-    expect(container.querySelectorAll('.ach.lock')).toHaveLength(11)
+    expect(container.querySelectorAll('.ach.lock')).toHaveLength(10)
 
     const power = within(container).getByText('Power User').closest('.ach')
     expect(power).toHaveClass('got')
     expect(power).toHaveTextContent('★ Power User')
     expect(power).toHaveTextContent('Boot JAY-OS')
 
-    const artist = within(container).getByText('Artist in Residence').closest('.ach')
-    expect(artist).toHaveClass('lock')
-    expect(artist).toHaveTextContent('☆ Artist in Residence')
+    const owl = within(container).getByText('Night Owl').closest('.ach')
+    expect(owl).toHaveClass('lock')
+    expect(owl).toHaveTextContent('☆ Night Owl')
+    expect(within(container).queryByText('Artist in Residence')).toBeNull()
   })
 
   it('updates live when an achievement is unlocked in the store', () => {
     const { container, app } = renderWithApp(<TrophiesGrid />)
     expect(container.querySelectorAll('.ach.got')).toHaveLength(0)
     act(() => {
-      app.ach.unlock('paint')
+      app.ach.unlock('lamp')
     })
     expect(container.querySelectorAll('.ach.got')).toHaveLength(1)
-    expect(within(container).getByText('Artist in Residence').closest('.ach')).toHaveClass('got')
+    expect(within(container).getByText('Night Owl').closest('.ach')).toHaveClass('got')
   })
 
   it('the server render (getServerSnapshot) shows every card locked, even with stored progress', () => {
-    localStorage.setItem('jayos-ach', JSON.stringify(['boot', 'term', 'paint']))
+    localStorage.setItem('jayos-ach', JSON.stringify(['boot', 'term', 'lamp']))
     const html = renderToString(
       <AppProvider app={createApp()}>
         <TrophiesGrid />
@@ -51,7 +52,7 @@ describe('resume/TrophiesGrid', () => {
     )
     const div = document.createElement('div')
     div.innerHTML = html
-    expect(div.querySelectorAll('.ach.lock')).toHaveLength(13)
+    expect(div.querySelectorAll('.ach.lock')).toHaveLength(12)
     expect(div.querySelectorAll('.ach.got')).toHaveLength(0)
   })
 })

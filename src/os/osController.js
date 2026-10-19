@@ -38,7 +38,6 @@ export function createOsController({ host, registry, ach, snd, motion, timers, s
     wins: [],
     focusedId: null,
     menuOpen: false,
-    art: [],
     flat: false,
     compact: false,
     live: false,
@@ -100,7 +99,7 @@ export function createOsController({ host, registry, ach, snd, motion, timers, s
   /* ---------- windows ---------- */
 
   function getDef(id) {
-    return lookupApp(registry, id, get().art) ?? null
+    return lookupApp(registry, id) ?? null
   }
 
   function focus(id) {
@@ -167,13 +166,6 @@ export function createOsController({ host, registry, ach, snd, motion, timers, s
     patchWin(id, { x, y })
   }
 
-  /** Saves a drawing; returns its index `n` (opened as `art:n`). */
-  function addArt(dataUrl) {
-    const n = get().art.length
-    store.set((s) => ({ art: [...s.art, dataUrl] }))
-    return n
-  }
-
   function setMenu(open) {
     store.set({ menuOpen: Boolean(open) })
   }
@@ -234,7 +226,6 @@ export function createOsController({ host, registry, ach, snd, motion, timers, s
     focus,
     moveWindow,
     getDef,
-    addArt,
     setMenu,
     disco,
     matrix,

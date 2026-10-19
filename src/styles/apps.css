@@ -43,12 +43,9 @@
 .t-in:focus,.t-in:focus-visible{outline:0}
 .win[data-app="term"] .wb{padding:0}
 .game-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;font:13px var(--f-px)}
-.snake-cv,.paint-cv{display:block;border:2px solid #122030;image-rendering:pixelated;touch-action:none;max-width:100%}
+.snake-cv{display:block;border:2px solid #122030;image-rendering:pixelated;touch-action:none;max-width:100%}
 .dpad{display:grid;grid-template-columns:repeat(3,44px);gap:4px;margin-top:10px}
 .dpad button{height:40px;font:14px var(--f-px);border:2px solid #122030;background:#fff;cursor:pointer;color:#122030}
-.palette{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
-.palette button{width:28px;height:28px;border:2px solid #122030;cursor:pointer;padding:0}
-.palette button.on{outline:3px solid #FFD15C;outline-offset:1px}
 .bug-layer{position:absolute;inset:32px 0 0 0;z-index:6500;pointer-events:none;overflow:hidden}
 .bugx{position:absolute;left:0;top:0;width:44px;height:44px;margin:-22px 0 0 -22px;border:0;background:none;padding:0;cursor:crosshair;pointer-events:auto}
 .bugx img{width:100%;height:100%;image-rendering:pixelated}
@@ -68,20 +65,3 @@
 .seg{display:inline-flex;border:2px solid #122030}
 .seg button{font:12px var(--f-px);border:0;padding:6px 10px;background:#fff;color:#122030;cursor:pointer}
 .seg button.on{background:#122030;color:#fff}
-.notice{display:flex;gap:12px;align-items:center;border:2px dashed #C98A1B;background:#FFF6D8;padding:10px;margin:10px 0;font-size:15px}
-.notice img{width:56px;height:56px;image-rendering:pixelated;border:1px solid #c9d2db;background:#fff}
-.ex{font:10px var(--f-px);color:#566476;display:block;margin-top:4px}
-/* Visitor Wall (L839–861 inline styles, as classes) */
-.wall-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
-.wall-card{cursor:default;padding:6px}
-.wall-card:hover{transform:none;box-shadow:3px 3px 0 #122030}
-.wall-card img{aspect-ratio:1;image-rendering:pixelated;border:0;object-fit:contain;background:#fff}
-.wall-act{margin-top:6px}
-.wb .btn.wall-down{padding:4px 8px;font-size:11px;background:#fff}
-.wall-h{margin:16px 0 8px}
-.wall-row{display:flex;gap:12px;align-items:center;border:2px solid #122030;padding:8px;margin-bottom:8px;background:#fff}
-.wall-row img{width:64px;height:64px;image-rendering:pixelated;border:1px solid #c9d2db}
-.wall-row span{flex:1;font-size:14px}
-.wall-go{margin-top:14px}
-.wall-mod{margin-top:16px;border-top:2px dashed #c9d2db;padding-top:10px}
-.wall-email{flex:1;min-width:180px;font:15px var(--f-body);border:2px solid #122030;padding:8px;background:#fff;color:#122030}

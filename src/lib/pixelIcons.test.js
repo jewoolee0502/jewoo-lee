@@ -5,9 +5,16 @@ import { readPngInfo } from './png.js'
 const PREFIX = 'data:image/png;base64,'
 
 describe('ICON', () => {
-  it('has the 15 keys from BMP', () => {
-    expect(Object.keys(ICON)).toHaveLength(15)
+  it('has the 13 keys from BMP (paint and wall removed with Paint and the Visitor Wall)', () => {
+    expect(Object.keys(ICON)).toHaveLength(13)
     expect(Object.keys(ICON).sort()).toEqual(Object.keys(BMP).sort())
+  })
+
+  it('has no paint or wall icon', () => {
+    expect(Object.keys(ICON)).not.toContain('paint')
+    expect(Object.keys(ICON)).not.toContain('wall')
+    expect(Object.keys(BMP)).not.toContain('paint')
+    expect(Object.keys(BMP)).not.toContain('wall')
   })
 
   it('every value is a PNG data URL', () => {

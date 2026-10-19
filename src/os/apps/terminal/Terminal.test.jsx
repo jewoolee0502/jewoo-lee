@@ -17,7 +17,7 @@ const HELP = [
   'skills        what Jay works with',
   'experience    the career log',
   'contact       ways to reach Jay',
-  'snake · bugs · paint     play',
+  'snake · bugs     play',
   'matrix · weather · lamp  mess with the room',
   'wallpaper     pick a Montréal desktop scene',
   'salute        Marine Corps salute',

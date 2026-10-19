@@ -1,11 +1,9 @@
-// Pure-JS indexed (colour type 3, 8-bit) PNG encoder plus a small reader and the
-// Visitor Wall drawing validator (D10). Deflate uses stored blocks only, so the
+// Pure-JS indexed (colour type 3, 8-bit) PNG encoder plus a small IHDR reader, used
+// by the pixel icons and the asset script. Deflate uses stored blocks only, so the
 // output is deterministic and needs no zlib.
 
 const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 export const PNG_PREFIX = 'data:image/png;base64,'
-export const MAX_DRAWING_BYTES = 4096
-export const DRAWING_SIZE = 24
 
 let crcTable = null
 function getCrcTable() {
@@ -114,38 +112,10 @@ export function bytesToBase64(bytes) {
   return btoa(s)
 }
 
-export function base64ToBytes(b64) {
-  const s = atob(b64)
-  const out = new Uint8Array(s.length)
-  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i)
-  return out
-}
-
 export function hexToRgb(hex) {
   const h = hex.replace('#', '')
   const n = parseInt(h.length === 3 ? h.replace(/./g, (c) => c + c) : h, 16)
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
-}
-
-/**
- * gridToPngDataUrl(grid: (hex|null)[], size, paletteHex[]) -> data URL.
- * Index 0 is transparent; paletteHex[i] maps to index i + 1.
- */
-export function gridToPngDataUrl(grid, size, paletteHex) {
-  const lookup = new Map(paletteHex.map((h, i) => [h.toLowerCase(), i + 1]))
-  const indices = new Uint8Array(size * size)
-  for (let i = 0; i < size * size; i++) {
-    const v = grid[i]
-    indices[i] = v ? lookup.get(String(v).toLowerCase()) || 0 : 0
-  }
-  const bytes = encodeIndexedPng({
-    width: size,
-    height: size,
-    indices,
-    palette: [[0, 0, 0], ...paletteHex.map(hexToRgb)],
-    alpha: [0, ...paletteHex.map(() => 255)],
-  })
-  return PNG_PREFIX + bytesToBase64(bytes)
 }
 
 function hasSignature(bytes) {
@@ -162,28 +132,4 @@ export function readPngInfo(bytes) {
   if (type !== 'IHDR' || len !== 13) return { ok: false }
   const be = (o) => ((bytes[o] << 24) | (bytes[o + 1] << 16) | (bytes[o + 2] << 8) | bytes[o + 3]) >>> 0
   return { ok: true, width: be(16), height: be(20), colorType: bytes[25] }
-}
-
-const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/
-
-/**
- * validateDrawingDataUrl(url) -> {ok:true, base64} | {ok:false, code}
- * codes: bad_png (prefix, base64 or signature), too_large (> 4096 bytes), bad_size (not 24×24).
- */
-export function validateDrawingDataUrl(url) {
-  if (typeof url !== 'string' || !url.startsWith(PNG_PREFIX)) return { ok: false, code: 'bad_png' }
-  const base64 = url.slice(PNG_PREFIX.length)
-  if (!base64 || base64.length % 4 !== 0 || !BASE64_RE.test(base64)) return { ok: false, code: 'bad_png' }
-  let bytes
-  try {
-    bytes = base64ToBytes(base64)
-  } catch {
-    return { ok: false, code: 'bad_png' }
-  }
-  if (!hasSignature(bytes)) return { ok: false, code: 'bad_png' }
-  if (bytes.length > MAX_DRAWING_BYTES) return { ok: false, code: 'too_large' }
-  const info = readPngInfo(bytes)
-  if (!info.ok) return { ok: false, code: 'bad_png' }
-  if (info.width !== DRAWING_SIZE || info.height !== DRAWING_SIZE) return { ok: false, code: 'bad_size' }
-  return { ok: true, base64 }
 }

@@ -33,7 +33,7 @@ export default [
     },
   },
   {
-    files: ['vite.config.js', 'eslint.config.js', 'scripts/**', 'supabase/**'],
+    files: ['vite.config.js', 'eslint.config.js', 'scripts/**'],
     languageOptions: {
       globals: { ...globals.node },
     },
@@ -55,17 +55,14 @@ export default [
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-            { name: 'three', message: LAZY_ONLY },
-            { name: '@supabase/supabase-js', message: LAZY_ONLY },
-          ],
+          paths: [{ name: 'three', message: LAZY_ONLY }],
           patterns: [{ group: ['three/*'], message: LAZY_ONLY }],
         },
       ],
     },
   },
   {
-    files: ['src/scene/createScene.js', 'src/wall/supabaseWallClient.js'],
+    files: ['src/scene/createScene.js'],
     rules: { 'no-restricted-imports': 'off' },
   },
 ]

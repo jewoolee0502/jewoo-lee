@@ -7,7 +7,6 @@ import * as THREE from 'three'
 import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
 import { pinScroll } from '../stage/pinScroll.js'
 import { OS_W } from '../core/constants.js'
-import { corkboardPngs, approvedCount } from '../wall/wallStore.js'
 import {
   lidT as lidOf,
   hingeAngle,
@@ -27,22 +26,20 @@ import {
   dragYaw,
   stepParallax,
 } from './sceneMath.js'
-import { drawSky, drawCork, drawNote, drawSticker, drawLogo, drawFloppyLabel, drawMirror } from './textures.js'
+import { drawSky, drawNote, drawSticker, drawLogo, drawFloppyLabel, drawMirror } from './textures.js'
 import { FLOPPIES, createFloppySequencer } from './floppy.js'
 import { createHotspotActions, hotspotOf } from './hotspots.js'
+import { POLAROID } from './props.js'
 
 const CANVAS_FONTS = ['20px Silkscreen', '600 54px Caveat', '15px "JetBrains Mono"', '24px VT323', '42px Silkscreen']
 const PORTRAIT = 'img/jay-px.png'
 const PORTRAIT_FALLBACK = 'img/jay.jpg'
 const POINTER_EVENTS = ['pointermove', 'pointerdown', 'pointerup', 'pointerleave']
 
-const sameList = (a, b) => a === b || (a.length === b.length && a.every((v, i) => v === b[i]))
-
 /**
- * Subscribes the scene api to the app stores (section 3): OS state -> onOS (mirror), approved
- * drawings -> setWall(pngs, approvedCount) (only when either changes), wallpaper ->
- * onOS(current state). Pushes the current corkboard once and asks the wall to load. Returns the
- * unsubscribe function; if wiring throws midway, the subscriptions made so far are removed.
+ * Subscribes the scene api to the app stores (section 3): OS state -> onOS (mirror), wallpaper ->
+ * onOS(current state). Returns the unsubscribe function; if wiring throws midway, the
+ * subscriptions made so far are removed.
  */
 export function wireScene(api, app) {
   const offs = []
@@ -66,20 +63,6 @@ function wire(api, app, offs) {
     }),
   )
 
-  let pngs = corkboardPngs(app.wall.store.get())
-  let count = approvedCount(app.wall.store.get())
-  api.setWall(pngs, count)
-  offs.push(
-    app.wall.store.subscribe((s) => {
-      const next = corkboardPngs(s)
-      const nextCount = approvedCount(s)
-      if (nextCount === count && sameList(next, pngs)) return
-      pngs = next
-      count = nextCount
-      api.setWall(next, nextCount)
-    }),
-  )
-
   let wp = app.wallpaper.store.get()
   offs.push(
     app.wallpaper.store.subscribe((s) => {
@@ -88,8 +71,6 @@ function wire(api, app, offs) {
       api.onOS(app.os.state)
     }),
   )
-
-  app.wall.ensureInit?.()
 }
 
 /**
@@ -266,24 +247,16 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     scene.add(new THREE.Points(snowG, new THREE.PointsMaterial({ color: 0xffffff, size: 0.035, transparent: true, opacity: 0.9 })))
     let snowBoost = 0
 
-    // ---------- visitor wall corkboard, polaroid (L1098–1113) ----------
-    const cork = new THREE.Group()
-    cork.position.set(1.55, 3.05, -2.97)
-    scene.add(cork)
-    mk(B(2.12, 1.47, 0.04), M(0x7a4e2c), 0, 0, 0, cork)
-    let wallImgs = []
-    let wallCount = 0
-    let wallGen = 0
-    const corkTex = canvasTex(512, 350, (x, w, h) => drawCork(x, w, h, wallImgs, wallCount))
-    flat(corkTex, 2.0, 1.36, 0, 0, 0.025, cork)
+    // ---------- polaroid, taped alone to the wall (L1107–1113, R13) ----------
     const pol = new THREE.Group()
-    pol.position.set(-0.55, 0, 0.05)
-    pol.rotation.z = 0.06
-    cork.add(pol)
-    mk(B(0.64, 0.76, 0.012), M(0xf7f7f2, { roughness: 0.9 }), 0, 0, 0, pol)
+    pol.position.set(...POLAROID.pos)
+    pol.rotation.z = POLAROID.rotZ
+    pol.scale.setScalar(POLAROID.scale)
+    scene.add(pol)
+    mk(B(...POLAROID.card), M(0xf7f7f2, { roughness: 0.9 }), 0, 0, 0, pol)
     const photoM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 })
-    const photo = new THREE.Mesh(new THREE.PlaneGeometry(0.54, 0.58), photoM)
-    photo.position.set(0, 0.06, 0.008)
+    const photo = new THREE.Mesh(new THREE.PlaneGeometry(...POLAROID.photo), photoM)
+    photo.position.set(0, POLAROID.photoY, 0.008)
     pol.add(photo)
     // The dithered portrait; if it fails, the plain photo (L1111's fallback); if that fails too,
     // the polaroid stays a blank white print.
@@ -302,28 +275,9 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     loader.load(imgBase + PORTRAIT, usePhoto, undefined, () => {
       if (!disposed) loader.load(imgBase + PORTRAIT_FALLBACK, usePhoto, undefined, () => {})
     })
-    mk(new THREE.SphereGeometry(0.035, 10, 8), M(0xe8452e), 0, 0.36, 0.02, pol)
-
-    function setWall(pngs, count) {
-      const gen = ++wallGen
-      const list = (pngs || []).slice(0, 6)
-      Promise.all(
-        list.map(
-          (src) =>
-            new Promise((resolve) => {
-              const im = new Image()
-              im.onload = () => resolve(im)
-              im.onerror = () => resolve(null)
-              im.src = src
-            }),
-        ),
-      ).then((ims) => {
-        if (disposed || gen !== wallGen) return
-        wallImgs = ims.filter(Boolean)
-        wallCount = count ?? wallImgs.length
-        corkTex.redraw()
-      })
-    }
+    const { tape } = POLAROID
+    const tapeM = new THREE.MeshStandardMaterial({ color: tape.color, transparent: true, opacity: tape.opacity, roughness: 0.9 })
+    mk(B(...tape.size), tapeM, ...tape.pos, pol).rotation.z = tape.rotZ
 
     // ---------- dog tags (L1116–1121) ----------
     const tags = new THREE.Group()
@@ -528,7 +482,6 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     addHot(tags, 'Dog tags')
     addHot(mug, 'McGill mug')
     addHot(lamp, 'Desk lamp')
-    addHot(cork, 'Visitor wall')
     addHot(pol, 'Polaroid')
     addHot(noteM, 'Sticky note')
     addHot(kbHot, 'Keyboard')
@@ -620,7 +573,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       osState = s
       mirror.redraw()
     }
-    const redrawText = () => [mirror, note, sticker, logo, corkTex, ...floppies.map((f) => f.lab)].forEach((t) => t.redraw())
+    const redrawText = () => [mirror, note, sticker, logo, ...floppies.map((f) => f.lab)].forEach((t) => t.redraw())
     const fonts = globalThis.document?.fonts
     if (fonts) {
       if (typeof fonts.load === 'function')
@@ -734,7 +687,6 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       css: Boolean(css),
       frame,
       onOS,
-      setWall,
       pressKey(k) {
         const m = keys.get(String(k).toUpperCase())
         if (m) m.userData.p = 1

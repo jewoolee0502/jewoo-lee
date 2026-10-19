@@ -18,6 +18,14 @@ describe('createApp', () => {
     expect(app.toasts).toBe(fakeToasts)
   })
 
+  it('has no wall store and no Paint or Visitor Wall state (round 2 Phase 1)', () => {
+    const app = createApp()
+
+    expect(app).not.toHaveProperty('wall')
+    expect(app.os.store.get()).not.toHaveProperty('art')
+    app.dispose()
+  })
+
   it('gains the OS host and controller (phase 2), wired to each other', () => {
     const app = createApp()
 

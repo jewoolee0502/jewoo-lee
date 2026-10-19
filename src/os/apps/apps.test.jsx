@@ -189,18 +189,18 @@ describe('Service', () => {
 })
 
 describe('Trophies', () => {
-  it('shows 0 of 13 with 13 locked items, then updates live when an achievement unlocks', () => {
+  it('shows 0 of 12 with 12 locked items, then updates live when an achievement unlocks', () => {
     // Rendered on its own so the boot achievement does not count.
     const { app } = renderWithApp(<Trophies win={{ id: 'ach' }} />)
-    expect(screen.getByText('0 of 13 unlocked. Progress stays in this browser.')).toBeInTheDocument()
+    expect(screen.getByText('0 of 12 unlocked. Progress stays in this browser.')).toBeInTheDocument()
     const items = () => [...document.querySelectorAll('ul.achl li')]
-    expect(items()).toHaveLength(13)
+    expect(items()).toHaveLength(12)
     expect(items().every((li) => li.classList.contains('lock'))).toBe(true)
 
     act(() => {
       app.ach.unlock('boot')
     })
-    expect(screen.getByText('1 of 13 unlocked. Progress stays in this browser.')).toBeInTheDocument()
+    expect(screen.getByText('1 of 12 unlocked. Progress stays in this browser.')).toBeInTheDocument()
     expect(items()[0].classList.contains('lock')).toBe(false)
     expect(items()[0].textContent).toContain('Power User')
   })
@@ -216,25 +216,13 @@ describe('Bin', () => {
 })
 
 describe('AboutOs', () => {
-  it('shows the title, the build line and the inspiration line', () => {
+  it('shows the title, the build line and the muted laptop line (no credit line)', () => {
     const { app } = bootedApp()
     const w = open(app, 'aboutos')
     expect(within(w).getByText('JAY-OS 2.0')).toBeInTheDocument()
     expect(w.textContent).toContain('Built with React, Three.js and a lot of CSS.')
-    expect(w.textContent).toContain('Inspired by ED-Linux on edh.dev')
-  })
-})
-
-describe('Art', () => {
-  it('shows a saved drawing from art:0 with its caption', () => {
-    const { app } = bootedApp()
-    let n
-    act(() => {
-      n = app.os.addArt('data:image/png;base64,QQ==')
-    })
-    expect(n).toBe(0)
-    const w = open(app, 'art:0')
-    expect(w.querySelector('img').getAttribute('src')).toBe('data:image/png;base64,QQ==')
-    expect(within(w).getByText('Drawn by you. Jay would love to see it.')).toBeInTheDocument()
+    expect(w.textContent).toContain('Runs on a 90s laptop in Montréal, with snow.')
+    expect(w.textContent).not.toContain('Inspired')
+    expect(w.textContent).not.toContain('ED-Linux')
   })
 })

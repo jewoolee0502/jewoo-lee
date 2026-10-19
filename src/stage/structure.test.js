@@ -7,6 +7,19 @@ import { resolve } from 'node:path'
 const root = process.cwd()
 const abs = (rel) => resolve(root, rel)
 
+// Non-test source files under a directory (test files may mock or name the banned packages).
+function sourceFiles(dir = abs('src')) {
+  const out = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = resolve(dir, entry.name)
+    if (entry.isDirectory()) out.push(...sourceFiles(p))
+    else if (/\.(m?js|jsx|css)$/.test(entry.name) && !/\.test\.[a-z]+$/.test(entry.name)) out.push(p)
+  }
+  return out
+}
+const rel = (p) => p.slice(root.length + 1)
+const filesImporting = (re) => sourceFiles().filter((f) => re.test(readFileSync(f, 'utf8'))).map(rel)
+
 describe('phase 3 structure', () => {
   it('src/components does not exist', () => {
     expect(existsSync(abs('src/components'))).toBe(false)
@@ -29,18 +42,6 @@ describe('phase 3 structure', () => {
 describe('phase 8 structure', () => {
   const html = () => readFileSync(abs('index.html'), 'utf8')
 
-  // Non-test source files under src/ (test files may mock or name the banned packages).
-  function sourceFiles(dir = abs('src')) {
-    const out = []
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const p = resolve(dir, entry.name)
-      if (entry.isDirectory()) out.push(...sourceFiles(p))
-      else if (/\.(m?js|jsx|css)$/.test(entry.name) && !/\.test\.[a-z]+$/.test(entry.name)) out.push(p)
-    }
-    return out
-  }
-  const rel = (p) => p.slice(root.length + 1)
-  const filesImporting = (re) => sourceFiles().filter((f) => re.test(readFileSync(f, 'utf8'))).map(rel)
 
   it('index.html has the résumé outlet, description meta and the skip link to #resume', () => {
     const text = html()
@@ -76,8 +77,70 @@ describe('phase 8 structure', () => {
   it('three is imported only by src/scene/createScene.js', () => {
     expect(filesImporting(/['"]three(\/[^'"]*)?['"]/)).toEqual(['src/scene/createScene.js'])
   })
+})
 
-  it('@supabase/supabase-js is imported only by src/wall/supabaseWallClient.js', () => {
-    expect(filesImporting(/['"]@supabase\/supabase-js['"]/)).toEqual(['src/wall/supabaseWallClient.js'])
+// Phase 1 TEST LIST (round 2): Paint, the Visitor Wall, Supabase, the corkboard and the edh.dev credit are gone.
+describe('phase 1 removals', () => {
+  const pkg = () => JSON.parse(readFileSync(abs('package.json'), 'utf8'))
+
+  it('package.json has neither @supabase/supabase-js nor @electric-sql/pglite in any dependency field', () => {
+    const p = pkg()
+    for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+      expect(p[field] ?? {}, field).not.toHaveProperty('@supabase/supabase-js')
+      expect(p[field] ?? {}, field).not.toHaveProperty('@electric-sql/pglite')
+    }
+  })
+
+  it('the removed directories and files do not exist', () => {
+    for (const rel of [
+      'supabase',
+      'src/wall',
+      'src/os/apps/paint',
+      'src/os/apps/VisitorWall.jsx',
+      'src/os/apps/Art.jsx',
+      'src/test/fakeSupabase.js',
+    ]) {
+      expect(existsSync(abs(rel)), rel).toBe(false)
+    }
+  })
+
+  it('the Phase 1 props module exists (src/scene/props.js)', () => {
+    expect(existsSync(abs('src/scene/props.js'))).toBe(true)
+  })
+
+  // Scanned: every non-test source file under src/ and scripts/, plus the top-level files named in the plan.
+  // Test files are skipped (they may name the removed features while asserting their absence).
+  const TOP_LEVEL = ['README.md', 'index.html', '.env.example', 'package.json', 'vite.config.js', 'eslint.config.js']
+  const BANNED = [
+    /supabase/i,
+    /pglite/i,
+    /Visitor ?Wall/,
+    /wallStore/,
+    /corkboard|drawCork/i,
+    /edh\.dev/i,
+    /Hinrichsen/,
+    /ED-Linux/,
+    /Artist in Residence/,
+    /paintLogic/,
+    /my-art-/,
+  ]
+  function scanFiles() {
+    const files = [...sourceFiles(), ...sourceFiles(abs('scripts')).filter((f) => !/\.test\.[a-z]+$/.test(f))]
+    return [...files, ...TOP_LEVEL.map(abs).filter((f) => existsSync(f))]
+  }
+
+  // RecycleWise's and Joblog's tech tags name Supabase (their real stack): only that pattern skips projects.js.
+  const ALLOWED = new Map([['src/content/projects.js', [String(/supabase/i)]]])
+
+  it('no file under src/, scripts/ or the top-level scan list matches a removed-feature pattern', () => {
+    const hits = []
+    for (const f of scanFiles()) {
+      const text = readFileSync(f, 'utf8')
+      for (const re of BANNED) {
+        if (ALLOWED.get(rel(f))?.includes(String(re))) continue
+        if (re.test(text)) hits.push(`${rel(f)} ${re}`)
+      }
+    }
+    expect(hits).toEqual([])
   })
 })

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { inflateSync } from 'node:zlib'
-import { encodeIndexedPng, gridToPngDataUrl, readPngInfo, validateDrawingDataUrl } from './png.js'
+import * as png from './png.js'
+import { encodeIndexedPng, readPngInfo } from './png.js'
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-const PREFIX = 'data:image/png;base64,'
 
 // Independent CRC-32 (poly 0xEDB88320) used to re-check the encoder's chunk CRCs.
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
@@ -31,14 +31,6 @@ function parseChunks(bytes) {
     off += 12 + len
   }
   return chunks
-}
-
-function toDataUrl(bytes) {
-  return PREFIX + Buffer.from(bytes).toString('base64')
-}
-
-function decodeDataUrl(url) {
-  return Buffer.from(url.slice(PREFIX.length), 'base64')
 }
 
 describe('encodeIndexedPng', () => {
@@ -86,42 +78,17 @@ describe('encodeIndexedPng', () => {
   })
 })
 
-describe('gridToPngDataUrl and validateDrawingDataUrl', () => {
-  const palette = ['#122030', '#FFFFFF', '#E8452E', '#4AA6EE']
-
-  it('an all-transparent 24x24 paint grid encodes to at most 4096 bytes', () => {
-    const grid = Array(24 * 24).fill(null)
-    const url = gridToPngDataUrl(grid, 24, palette)
-
-    expect(decodeDataUrl(url).length).toBeLessThanOrEqual(4096)
+describe('module surface after the Paint and Visitor Wall removal', () => {
+  it('exports none of the removed drawing helpers', () => {
+    for (const name of ['gridToPngDataUrl', 'validateDrawingDataUrl', 'MAX_DRAWING_BYTES', 'DRAWING_SIZE', 'base64ToBytes']) {
+      expect(png, name).not.toHaveProperty(name)
+    }
   })
 
-  it('that 24x24 grid validates as ok', () => {
-    const url = gridToPngDataUrl(Array(24 * 24).fill(null), 24, palette)
-
-    expect(validateDrawingDataUrl(url)).toMatchObject({ ok: true })
-  })
-
-  it('a 25x24 image is rejected with bad_size', () => {
-    const bytes = encodeIndexedPng({
-      width: 25,
-      height: 24,
-      indices: new Uint8Array(25 * 24),
-      palette: [[0, 0, 0]],
-      alpha: [0],
-    })
-
-    expect(validateDrawingDataUrl(toDataUrl(bytes))).toMatchObject({ ok: false, code: 'bad_size' })
-  })
-
-  it('a JPEG data URL is rejected with bad_png', () => {
-    expect(validateDrawingDataUrl('data:image/jpeg;base64,AAAA')).toMatchObject({ ok: false, code: 'bad_png' })
-  })
-
-  it('a valid prefix plus 6000 bytes of signature-valid junk is rejected with too_large', () => {
-    const junk = Buffer.concat([PNG_SIGNATURE, Buffer.alloc(6000)])
-
-    expect(validateDrawingDataUrl(toDataUrl(junk))).toMatchObject({ ok: false, code: 'too_large' })
+  it('keeps the encoder, the icon helpers and readPngInfo', () => {
+    for (const name of ['encodeIndexedPng', 'PNG_PREFIX', 'bytesToBase64', 'hexToRgb', 'readPngInfo']) {
+      expect(png, name).toHaveProperty(name)
+    }
   })
 })
 

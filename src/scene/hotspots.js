@@ -46,10 +46,6 @@ export function createHotspotActions({ app, local }) {
     app.snd.tone(300, 0.1, 'sine', 0.06)
   })
   actions.set('Desk lamp', () => local.toggleLamp())
-  actions.set('Visitor wall', () => {
-    enter()
-    open('wall')
-  })
   actions.set('Polaroid', () => {
     enter()
     open('about')

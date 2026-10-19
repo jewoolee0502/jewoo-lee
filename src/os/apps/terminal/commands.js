@@ -24,12 +24,9 @@ export const NAMES = new Map([
   ['bughunt', 'bugs'],
   ['bugs', 'bugs'],
   ['snake', 'snake'],
-  ['paint', 'paint'],
   ['service', 'service'],
   ['wallpaper', 'display'],
   ['display', 'display'],
-  ['wall', 'wall'],
-  ['visitorwall', 'wall'],
   ['trophies', 'ach'],
   ['achievements', 'ach'],
   ['bin', 'bin'],
@@ -37,7 +34,7 @@ export const NAMES = new Map([
 ])
 
 const LS =
-  'About.txt  Projects/  Experience.log  Skills.inv  Terminal  Resume.pdf  Mail  BugHunt.exe  Snake.exe  Paint  Wallpaper  Visitor Wall  Service.txt  Trophies  Recycle Bin'
+  'About.txt  Projects/  Experience.log  Skills.inv  Terminal  Resume.pdf  Mail  BugHunt.exe  Snake.exe  Wallpaper  Service.txt  Trophies  Recycle Bin'
 
 const helpLines = (n) => [
   'whoami        who is Jay',
@@ -48,7 +45,7 @@ const helpLines = (n) => [
   'skills        what Jay works with',
   'experience    the career log',
   'contact       ways to reach Jay',
-  'snake · bugs · paint     play',
+  'snake · bugs     play',
   'matrix · weather · lamp  mess with the room',
   'wallpaper     pick a Montréal desktop scene',
   'salute        Marine Corps salute',
@@ -145,7 +142,6 @@ export function createCommands(ctx) {
         say('grab a newspaper.', 'b')
       },
     ],
-    ['paint', () => openApp('paint')],
     [
       'matrix',
       () => {

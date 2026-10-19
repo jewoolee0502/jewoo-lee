@@ -8,7 +8,6 @@ import { StrictMode, useRef } from 'react'
 import { render, waitFor } from '@testing-library/react'
 import { createApp } from '../app/createApp.js'
 import { AppProvider } from '../app/AppContext.jsx'
-import { createStore } from '../core/store.js'
 import SceneMount from '../stage/SceneMount.jsx'
 
 const T = vi.hoisted(() => {
@@ -180,12 +179,9 @@ function trackSubs(store) {
 }
 
 function setup({ failOn = null } = {}) {
-  const wallStore = createStore({ approved: [] })
-  const wall = { store: wallStore, ensureInit: vi.fn(async () => {}), dispose: vi.fn() }
-  const app = createApp({ wall })
+  const app = createApp()
   const subs = {
     os: trackSubs(app.os.store),
-    wall: trackSubs(wallStore),
     wallpaper: trackSubs(app.wallpaper.store),
   }
   const mount = document.createElement('div')
@@ -220,7 +216,6 @@ function setup({ failOn = null } = {}) {
 
   return {
     app,
-    wall,
     subs,
     mount,
     stage,
@@ -322,17 +317,24 @@ describe('scene/createScene lifecycle', () => {
     }
   })
 
+  it('the scene api has no setWall (the corkboard is gone) and the app has no wall store', () => {
+    const env = setup()
+    const api = env.build()
+    expect(api).not.toHaveProperty('setWall')
+    expect(env.app.wall).toBeUndefined()
+    api.dispose()
+  })
+
   it('dispose() disconnects its ResizeObserver and unsubscribes from every store', () => {
     const env = setup()
     const api = env.build()
     expect(env.observers.length).toBeGreaterThanOrEqual(1)
-    expect(env.subs.os.size + env.subs.wall.size + env.subs.wallpaper.size).toBeGreaterThan(0)
+    expect(env.subs.os.size + env.subs.wallpaper.size).toBeGreaterThan(0)
 
     api.dispose()
 
     for (const o of env.observers) expect(o.disconnect).toHaveBeenCalled()
     expect(env.subs.os.size).toBe(0)
-    expect(env.subs.wall.size).toBe(0)
     expect(env.subs.wallpaper.size).toBe(0)
   })
 
@@ -350,7 +352,6 @@ describe('scene/createScene lifecycle', () => {
   it('StrictMode double mount through SceneMount leaves exactly one live renderer, and unmount releases it', async () => {
     const env = setup()
     const app = createApp({
-      wall: env.wall,
       loadScene: async () => ({
         // SceneMount passes createScene's own option shape; only the park comes from the test.
         createScene: (args) => {

@@ -28,20 +28,20 @@ describe('stage/Stage', () => {
     vi.restoreAllMocks()
   })
 
-  it('1. the HUD shows Recruiter view, Résumé ↓, ★ 0/13 and Sound: off with aria-pressed false', () => {
+  it('1. the HUD shows Recruiter view, Résumé ↓, ★ 0/12 and Sound: off with aria-pressed false', () => {
     const { container } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
     const hud = within(container)
     expect(hud.getByRole('button', { name: 'Recruiter view' })).toBeInTheDocument()
     expect(hud.getByRole('button', { name: 'Résumé ↓' })).toBeInTheDocument()
-    expect(hud.getByRole('button', { name: '★ 0/13' })).toBeInTheDocument()
+    expect(hud.getByRole('button', { name: '★ 0/12' })).toBeInTheDocument()
     const sound = hud.getByRole('button', { name: /Sound: off/ })
     expect(sound).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('1b. with jayos-ach preset to boot and term, the HUD shows ★ 2/13', () => {
+  it('1b. with jayos-ach preset to boot and term, the HUD shows ★ 2/12', () => {
     localStorage.setItem('jayos-ach', JSON.stringify(['boot', 'term']))
     const { container } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-    expect(within(container).getByRole('button', { name: '★ 2/13' })).toBeInTheDocument()
+    expect(within(container).getByRole('button', { name: '★ 2/12' })).toBeInTheDocument()
   })
 
   it('2. clicking Sound: off shows Sound: on on the HUD button and on the menubar #mb-snd', () => {
@@ -121,13 +121,13 @@ describe('stage/Stage', () => {
     })
   })
 
-  it('4. clicking ★ 0/13 calls nav.openLaptop and then os.openApp("ach")', () => {
+  it('4. clicking ★ 0/12 calls nav.openLaptop and then os.openApp("ach")', () => {
     const { container, app } = renderWithApp(<Stage />, {
       loadScene: vi.fn(pending),
       nav: { goToResume: vi.fn(), openLaptop: vi.fn() },
     })
     const openApp = vi.spyOn(app.os, 'openApp')
-    fireEvent.click(within(container).getByRole('button', { name: '★ 0/13' }))
+    fireEvent.click(within(container).getByRole('button', { name: '★ 0/12' }))
     expect(app.nav.openLaptop).toHaveBeenCalledTimes(1)
     expect(openApp).toHaveBeenCalledWith('ach')
     expect(app.nav.openLaptop.mock.invocationCallOrder[0]).toBeLessThan(openApp.mock.invocationCallOrder[0])

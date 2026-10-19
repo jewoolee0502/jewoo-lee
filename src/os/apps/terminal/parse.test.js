@@ -18,12 +18,9 @@ const NAMES = new Map([
   ['bughunt', 'bugs'],
   ['bugs', 'bugs'],
   ['snake', 'snake'],
-  ['paint', 'paint'],
   ['service', 'service'],
   ['wallpaper', 'display'],
   ['display', 'display'],
-  ['wall', 'wall'],
-  ['visitorwall', 'wall'],
   ['trophies', 'ach'],
   ['achievements', 'ach'],
   ['bin', 'bin'],
@@ -33,7 +30,7 @@ const NAMES = new Map([
 // Command names in the insertion order of the prototype's C object (L895–926).
 const COMMAND_ORDER = [
   'help', 'whoami', 'neofetch', 'ls', 'projects', 'open', 'cat', 'skills', 'experience', 'contact',
-  'snake', 'bugs', 'paint', 'matrix', 'weather', 'lamp', 'wallpaper', 'salute', 'sudo', 'coffee',
+  'snake', 'bugs', 'matrix', 'weather', 'lamp', 'wallpaper', 'salute', 'sudo', 'coffee',
   'date', 'pwd', 'cd', 'echo', 'hello', 'hi', '안녕', 'git', 'vim', 'rm', 'cheat', 'history',
   'clear', 'exit', 'shutdown',
 ]
@@ -89,7 +86,8 @@ describe('resolveOpen', () => {
   })
 
   it('resolves names through the NAMES map, ignoring spaces and file extensions', () => {
-    expect(resolve('Visitor Wall')).toMatchObject({ kind: 'app', id: 'wall' })
+    expect(resolve('Visitor Wall')).toMatchObject({ kind: 'none' })
+    expect(resolve('Paint')).toMatchObject({ kind: 'none' })
     expect(resolve('recycle bin')).toMatchObject({ kind: 'app', id: 'bin' })
     expect(resolve('Trophies.exe')).toMatchObject({ kind: 'app', id: 'ach' })
   })
