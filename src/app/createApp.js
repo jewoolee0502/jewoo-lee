@@ -6,6 +6,9 @@ import { createToasts } from '../core/toasts.js'
 import { createSound } from '../core/sound.js'
 import { createAchievements } from '../core/achievements.js'
 import { createWallpaperStore } from '../wallpaper/wallpaperStore.js'
+import { createOsHost } from '../os/osHost.js'
+import { createOsController } from '../os/osController.js'
+import { registry } from '../os/registry.js'
 
 export function createApp(overrides = {}) {
   const app = {}
@@ -22,6 +25,20 @@ export function createApp(overrides = {}) {
     }),
   )
   app.wallpaper = pick('wallpaper', () => createWallpaperStore())
+  app.host = pick('host', () => createOsHost())
+  app.os = pick('os', () =>
+    createOsController({
+      host: app.host,
+      registry,
+      ach: app.ach,
+      toasts: app.toasts,
+      snd: app.snd,
+      motion: app.motion,
+      timers: app.timers,
+      scene: () => app.scene?.api ?? null,
+      ctrl: () => app.ctrl,
+    }),
+  )
 
   // Any extra override fields (later phases' modules or test fakes) are kept as given.
   for (const key of Object.keys(overrides)) {
@@ -36,6 +53,7 @@ export function createApp(overrides = {}) {
 
   /** Tears everything down: timers, media listeners. */
   app.dispose = () => {
+    app.os?.dispose?.()
     app.timers.clearAll?.()
     app.motion.dispose?.()
   }

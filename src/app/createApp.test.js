@@ -17,4 +17,13 @@ describe('createApp', () => {
 
     expect(app.toasts).toBe(fakeToasts)
   })
+
+  it('gains the OS host and controller (phase 2), wired to each other', () => {
+    const app = createApp()
+
+    expect(app.host.osEl.id).toBe('os')
+    expect(app.os.store.get().state).toBe('standby')
+    expect(app.os.size()).toEqual({ w: 900, h: 675 })
+    app.dispose()
+  })
 })
