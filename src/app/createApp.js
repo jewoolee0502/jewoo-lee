@@ -12,9 +12,6 @@ import { registry } from '../os/registry.js'
 import { createStore } from '../core/store.js'
 import { createController } from '../stage/controller.js'
 import { createGlide } from '../stage/glide.js'
-import { snapPoints } from '../stage/runway.js'
-import { syncSnapRail } from '../stage/snapRail.js'
-import { RUNWAY_SNAP } from '../core/constants.js'
 import { scrollToResume } from '../stage/scrollToResume.js'
 import { loadScene } from '../scene/loadScene.js'
 
@@ -71,23 +68,9 @@ export function createApp(overrides = {}) {
 
   // Stage elements, registered by <Stage/> while it is mounted. The controller writes the
   // per-frame cue opacity, the `zoomed` class and `flat-runway` straight to them (no React state
-  // per frame), and syncs the snap rail once per layout.
-  app.dom = pick('dom', () => ({ track: null, stage: null, cue: null, rail: null }))
-  // plan-r2 §7 U1: snapping needs scroll-snap-stop (the plateau stop); without it the page never snaps.
-  app.snapSupported = pick('snapSupported', () => () =>
-    RUNWAY_SNAP && Boolean(globalThis.CSS?.supports?.('scroll-snap-stop', 'always')),
-  )
-  const root = () => globalThis.document?.documentElement
-  // `snap-hold` is on while either the glide is writing or a detent snap is waiting for its wheel
-  // burst to end (see the controller's onWheel).
-  const snapHolds = { glide: false, detent: false }
-  const syncHold = () => root()?.classList.toggle('snap-hold', snapHolds.glide || snapHolds.detent)
-  const holdSnap = (kind, on) => {
-    snapHolds[kind] = Boolean(on)
-    syncHold()
-  }
-  // Programmatic page scrolls at our own pace (R7); the bindings cancel it on user input. Its
-  // writes suspend the page's snap (U3).
+  // per frame).
+  app.dom = pick('dom', () => ({ track: null, stage: null, cue: null }))
+  // Programmatic page scrolls at our own pace (R7); the bindings cancel it on user input.
   app.glide = pick('glide', () =>
     createGlide({
       getY: () => globalThis.scrollY,
@@ -96,7 +79,6 @@ export function createApp(overrides = {}) {
       caf: (id) => globalThis.cancelAnimationFrame(id),
       now: () => performance.now(),
       reduce: () => app.motion.reduce(),
-      hold: (on) => holdSnap('glide', on),
     }),
   )
   let cueEl = null
@@ -108,7 +90,6 @@ export function createApp(overrides = {}) {
       getTrackRect: () => app.dom.track?.getBoundingClientRect() ?? NO_RECT,
       getStageHeight: () => app.dom.stage?.clientHeight || globalThis.innerHeight,
       scrollY: () => globalThis.scrollY,
-      scrollTo: (opts) => globalThis.scrollTo(opts),
       glide: app.glide,
       reduce: () => app.motion.reduce(),
       sceneStatus: () => app.scene.store.get().status,
@@ -134,21 +115,6 @@ export function createApp(overrides = {}) {
         },
         setZoomed: (v) => app.dom.stage?.classList.toggle('zoomed', Boolean(v)),
         setRunway: (flat) => app.dom.track?.classList.toggle('flat-runway', Boolean(flat)),
-        // U1, U2: the rail first, then the class, so the page never snaps without its rail.
-        setSnap(L) {
-          const html = root()
-          if (!html) return
-          if (!L || !app.dom.rail || !app.snapSupported()) {
-            snapHolds.detent = false
-            html.classList.remove('runway-snap')
-            syncHold()
-            return
-          }
-          syncSnapRail(app.dom.rail, snapPoints(L))
-          html.classList.add('runway-snap')
-          syncHold()
-        },
-        holdSnap: (on) => holdSnap('detent', on),
       },
       scrollToResume: (behavior) => scrollToResume(behavior),
     }),
@@ -172,7 +138,6 @@ export function createApp(overrides = {}) {
   /** Tears everything down: timers, media listeners. */
   app.dispose = () => {
     app.glide?.cancel?.()
-    app.ctrl?.releaseSnap?.()
     app.os?.dispose?.()
     app.timers.clearAll?.()
     app.motion.dispose?.()

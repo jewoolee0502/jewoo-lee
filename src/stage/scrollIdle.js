@@ -5,10 +5,10 @@
 // hold re-arms it. `y` seeds the last position, so the first scroll already has a direction.
 //
 // plan-r2 §7 U6, U7: onIdle gets `{ dir, travel }`. `dir` is the user's last direction: the sign of
-// the last same-sign run of at least DIR_MIN_PX, so the browser's ≤ 4 px snap correction or a twitch
-// at the end of a gesture never flips it; it persists across rests (0 until the user first scrolls).
+// the last same-sign run of at least DIR_MIN_PX, so a few px of browser correction or a twitch at
+// the end of a gesture never flips it; it persists across rests (0 until the user first scrolls).
 // `travel` is how far the page moved since the last rest. Own scrolls (`scroll(y, true)`: glide
-// frames, jumps and the re-snap after them) move the travel origin with them and never the direction.
+// frames and jumps) move the travel origin with them and never the direction.
 import { IDLE_MS, DIR_MIN_PX } from '../core/constants.js'
 
 export function createScrollIdle({ timers, onIdle, idleMs = IDLE_MS, y = null }) {

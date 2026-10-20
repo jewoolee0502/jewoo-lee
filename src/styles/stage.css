@@ -11,13 +11,6 @@
 .track.flat-runway .flat-host{position:relative;inset:auto;grid-area:os;z-index:5}
 .fallback-note{grid-area:note;align-self:center;margin:0;padding:8px 8px 8px max(14px,env(safe-area-inset-left,0px));font:12px/1.4 var(--f-mono);color:var(--scene-ink)}
 @media (max-width:600px){.track.flat-runway .stage{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"hud" "note" "os"}.track.flat-runway .hud{justify-content:flex-start;padding-left:max(14px,env(safe-area-inset-left,0px))}}
-/* plan-r2 §7 U1–U3: the plateau stop and the 8 px rail that keeps mandatory snapping free. */
-html.runway-snap{scroll-snap-type:y mandatory}
-html.runway-snap.snap-hold{scroll-snap-type:none}
-html.runway-snap #resume-root{scroll-snap-align:start}
-.snap-rail{position:absolute;left:0;top:0;width:1px;height:100%;pointer-events:none}
-.snap-rail>i{position:absolute;left:0;width:1px;height:1px;scroll-snap-align:start}
-.snap-rail>i.stop{scroll-snap-stop:always}
 .stage{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;background:var(--scene);color:var(--scene-ink);touch-action:pan-y}
 .stage .gl{position:absolute;inset:0;width:100%;height:100%;display:block}
 .stage .css3d{position:absolute!important;inset:0;pointer-events:none}

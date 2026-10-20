@@ -3,7 +3,6 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as constants from '../core/constants.js'
-import { createDetent } from './runway.js'
 
 // Vitest runs from the project root (vite.config.js sits there).
 const root = process.cwd()
@@ -232,27 +231,38 @@ describe('round 2 phase 5 scripts', () => {
   })
 })
 
-// Phase 6A TEST LIST (plan-r2 section 7): the settle bias is gone, the detent stays, and the new constants exist.
-describe('phase 6A structure', () => {
+// Round 3 Phase R3-1 TEST LIST (plan-r3 V4): the snap rail, the arrow step and the detent are gone, and the
+// runway constants are the two-view values (TRACK_VH 200 plus a 120 px plateau).
+describe('round 3 structure', () => {
   it('no file under src/ references SETTLE_BIAS (U6 replaced the bias with the last user direction)', () => {
     expect(filesImporting(/SETTLE_BIAS/)).toEqual([])
   })
 
-  it('constants.js drops SETTLE_BIAS and carries the 6A values (U1–U9)', () => {
+  it('constants.js drops the snap, detent and runway-8 constants', () => {
+    for (const name of ['RUNWAY', 'SNAP_GRID_PX', 'ARROW_STEP_PX', 'RUNWAY_SNAP', 'SNAP_OWN_TOL_PX', 'PLATEAU_MIN_PX']) {
+      expect(constants, name).not.toHaveProperty(name)
+    }
+    expect(Object.keys(constants).filter((k) => k.startsWith('DETENT_')), 'DETENT_*').toEqual([])
     expect(constants).not.toHaveProperty('SETTLE_BIAS')
+  })
+
+  it('constants.js carries the round 3 values', () => {
     expect(constants).toMatchObject({
-      PLATEAU_MIN_PX: 120,
-      SNAP_GRID_PX: 8,
-      SNAP_OWN_TOL_PX: 5,
+      TRACK_VH: 200,
+      PLATEAU_PX: 120,
+      OWN_TOL_PX: 5,
       OWN_MS: 300,
       SETTLE_TINY_PX: 16,
       DIR_MIN_PX: 8,
-      ARROW_STEP_PX: 40,
-      RUNWAY_SNAP: true,
     })
   })
 
-  it('createDetent is still exported (U5: the JS detent stays for notched wheels)', () => {
-    expect(typeof createDetent).toBe('function')
+  it('src/stage/snapRail.js and src/stage/arrowStep.js do not exist', () => {
+    expect(existsSync(abs('src/stage/snapRail.js'))).toBe(false)
+    expect(existsSync(abs('src/stage/arrowStep.js'))).toBe(false)
+  })
+
+  it('no non-test source references the snap rail, the detent or the arrow step', () => {
+    expect(filesImporting(/runway-snap|snap-hold|createDetent|snapPoints|syncSnapRail|arrowStep/)).toEqual([])
   })
 })

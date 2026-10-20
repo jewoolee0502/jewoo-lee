@@ -9,8 +9,9 @@
   --f-px:"Silkscreen","JetBrains Mono",ui-monospace,monospace;
   --f-vt:"VT323","JetBrains Mono",ui-monospace,monospace;
   --scene:#141C2E; --scene-ink:#EAF2FB; --scene-dim:#9FB2C8;
-  /* The scroll track (stage + runway). Must equal TRACK_VH in src/core/constants.js. */
-  --track-h:290vh;
+  /* The laptop view's scroll track: stage + dive (TRACK_VH) + the open plateau (PLATEAU_PX),
+     as in src/core/constants.js. */
+  --track-h:calc(200vh + 120px);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){

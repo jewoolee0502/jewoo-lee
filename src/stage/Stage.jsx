@@ -27,9 +27,8 @@ export default function Stage() {
   const tipRef = useRef(null)
   const parkRef = useRef(null)
   const recButtonRef = useRef(null)
-  const railRef = useRef(null)
 
-  useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef, parkRef, railRef })
+  useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef, parkRef })
 
   return (
     <>
@@ -45,8 +44,6 @@ export default function Stage() {
           <RecruiterView returnFocusRef={recButtonRef} />
           {unavailable && <NoWebGLNotice />}
         </div>
-        {/* plan-r2 §7 U2: the snap rail; the controller fills it once the scene is ready. */}
-        <div className="snap-rail" id="snap-rail" aria-hidden="true" ref={railRef} />
       </section>
       <div className="park" ref={parkRef} />
       <SceneMount sceneLayerRef={sceneLayerRef} stageRef={stageRef} tipRef={tipRef} parkRef={parkRef} />

@@ -1,17 +1,17 @@
 // Round 2 Phase 2 TEST LIST: stage/Stage.test.jsx. Rendered through renderWithApp with loadScene overridable.
-// Native scroll: the only non-passive listener is #stage wheel; the window carries the idle settle.
-// Phase 6A (plan-r2 section 7): onIdle passes { dir, travel }; arrow keys step 40 px while the page snaps.
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+// Native scroll: the window carries the idle settle and the wheel grace hold.
+// Round 3 Phase R3-1 (plan-r3 V4): the page is native; the window wheel is passive, nothing is non-passive.
+// onIdle passes { dir, travel }.
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { StrictMode } from 'react'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { triggerIntersection, triggerResize, setReducedMotion } from '../test/setup.js'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { triggerIntersection, triggerResize } from '../test/setup.js'
 import { renderWithApp } from '../test/renderWithApp.jsx'
 import Stage from './Stage.jsx'
 import OsPortal from '../os/OsPortal.jsx'
 import { PROJECTS } from '../content/index.js'
 import { IDLE_MS, SETTLE_GRACE_MS, NARROW_PX, SHORT_PX } from '../core/constants.js'
 import { KONAMI, KONAMI_IDLE_MS } from './keys.js'
-import { runwayLayout } from './runway.js'
 
 const pending = () => new Promise(() => {})
 const NOTICE = '3D is unavailable in this browser, so JAY-OS runs flat. Everything still works.'
@@ -229,13 +229,13 @@ describe('stage/Stage', () => {
     expect(cue).toBeInTheDocument()
   })
 
-  it('9. unmount removes every listener it added: #stage wheel and the window scroll, key, touch and pointer listeners', () => {
+  it('9. unmount removes every listener it added: the window scroll, key, touch, pointer and wheel listeners (the wheel one passive); #stage gets no wheel listener', () => {
     const added = []
     const removed = []
     const origAdd = EventTarget.prototype.addEventListener
     const origRemove = EventTarget.prototype.removeEventListener
     EventTarget.prototype.addEventListener = function (type, fn, opts) {
-      added.push({ target: this, type, fn })
+      added.push({ target: this, type, fn, opts })
       return origAdd.call(this, type, fn, opts)
     }
     EventTarget.prototype.removeEventListener = function (type, fn, opts) {
@@ -247,7 +247,7 @@ describe('stage/Stage', () => {
     const winAdd = window.addEventListener
     const winRemove = window.removeEventListener
     window.addEventListener = function (type, fn, opts) {
-      added.push({ target: window, type, fn })
+      added.push({ target: window, type, fn, opts })
       return winAdd.call(this, type, fn, opts)
     }
     window.removeEventListener = function (type, fn, opts) {
@@ -258,22 +258,21 @@ describe('stage/Stage', () => {
     let unmount
     try {
       ;({ unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) }))
-      const stageEl = added.find((a) => a.type === 'wheel' && a.target.id === 'stage')?.target
-      expect(stageEl).toBeDefined()
-      const ours = added.filter(
-        (a) => (a.target === window && WINDOW_TYPES.includes(a.type)) || (a.target === stageEl && a.type === 'wheel'),
-      )
+      expect(added.some((a) => a.type === 'wheel' && a.target.id === 'stage'), '#stage wheel').toBe(false)
+      const ours = added.filter((a) => a.target === window && [...WINDOW_TYPES, 'wheel'].includes(a.type))
       for (const type of WINDOW_TYPES) {
-        expect(ours.some((a) => a.target === window && a.type === type), `window ${type} added`).toBe(true)
+        expect(ours.some((a) => a.type === type), `window ${type} added`).toBe(true)
       }
-      expect(ours.some((a) => a.target === stageEl && a.type === 'wheel')).toBe(true)
+      const wheel = ours.find((a) => a.type === 'wheel')
+      expect(wheel, 'window wheel added').toBeDefined()
+      expect(wheel.opts, 'window wheel passive').toEqual(expect.objectContaining({ passive: true }))
 
       unmount()
 
       for (const a of ours) {
         expect(
-          removed.some((r) => r.target === a.target && r.type === a.type && r.fn === a.fn),
-          `${a.target === window ? 'window' : '#stage'} ${a.type} removed`,
+          removed.some((r) => r.target === window && r.type === a.type && r.fn === a.fn),
+          `window ${a.type} removed`,
         ).toBe(true)
       }
     } finally {
@@ -345,44 +344,6 @@ describe('stage/Stage', () => {
     expect(pill).toHaveAttribute('id', 'hud-exit')
     fireEvent.click(pill)
     expect(app.nav.goToResume).toHaveBeenCalledTimes(1)
-  })
-
-  // Round 2 (R5): #stage is the only non-passive wheel listener; it asks the controller.
-  it('16. a #stage wheel the controller takes is cancelled, and cancels any running glide first', () => {
-    const { container, app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-    const onWheel = vi.fn(() => true)
-    app.ctrl.onWheel = onWheel
-    app.glide.cancel = vi.fn()
-    const ev = new WheelEvent('wheel', { deltaY: 50, cancelable: true, bubbles: true })
-    container.querySelector('#stage').dispatchEvent(ev)
-    expect(app.glide.cancel).toHaveBeenCalled()
-    expect(onWheel).toHaveBeenCalledTimes(1)
-    expect(ev.defaultPrevented).toBe(true)
-  })
-
-  it('16b. when the controller does not take the wheel, the event is not prevented', () => {
-    const { container, app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-    app.ctrl.onWheel = vi.fn(() => false)
-    const ev = new WheelEvent('wheel', { deltaY: 50, cancelable: true, bubbles: true })
-    container.querySelector('#stage').dispatchEvent(ev)
-    expect(ev.defaultPrevented).toBe(false)
-  })
-
-  it('16c. the #stage wheel listener is added with passive: false', () => {
-    const origAdd = EventTarget.prototype.addEventListener
-    const calls = []
-    EventTarget.prototype.addEventListener = function (type, fn, opts) {
-      if (type === 'wheel' && this.id === 'stage') calls.push(opts)
-      return origAdd.call(this, type, fn, opts)
-    }
-    try {
-      const { unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-      expect(calls.length).toBeGreaterThan(0)
-      expect(calls.every((o) => o && o.passive === false)).toBe(true)
-      unmount()
-    } finally {
-      EventTarget.prototype.addEventListener = origAdd
-    }
   })
 
   // Round 2 (R6): the window scroll feeds the idle settle; a touch hold defers it.
@@ -731,62 +692,6 @@ describe('stage/Stage', () => {
     })
   })
 
-  // Round 2 (R5, plan-r2): the non-passive #stage wheel listener is only needed for the detent near
-  // the dive -> plateau boundary. It is attached while s < diveEnd and detached otherwise.
-  it('19. the non-passive #stage wheel listener is attached only in the dive (s < diveEnd) and re-attached on the way back', async () => {
-    const counter = { created: 0, disposed: 0 }
-    const live = new Set()
-    const origAdd = EventTarget.prototype.addEventListener
-    const origRemove = EventTarget.prototype.removeEventListener
-    EventTarget.prototype.addEventListener = function (type, fn, opts) {
-      if (type === 'wheel' && this.id === 'stage' && opts?.passive === false) live.add(fn)
-      return origAdd.call(this, type, fn, opts)
-    }
-    EventTarget.prototype.removeEventListener = function (type, fn, opts) {
-      if (type === 'wheel' && this.id === 'stage') live.delete(fn)
-      return origRemove.call(this, type, fn, opts)
-    }
-    try {
-      const { app, container, unmount } = renderWithApp(<Stage />, {
-        loadScene: vi.fn(async () => fakeScene(counter)),
-      })
-      await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
-
-      // The track rect drives the scroll position s = -track.top; the controller reads it per frame.
-      const TRACK_H = 6000
-      const L = runwayLayout({ trackH: TRACK_H, stageH: window.innerHeight })
-      let trackTop = 0
-      const track = container.querySelector('#track')
-      track.getBoundingClientRect = () => ({ top: trackTop, height: TRACK_H, bottom: TRACK_H + trackTop, left: 0, right: 0, width: 0, x: 0, y: trackTop })
-      const place = (s, seg) => {
-        trackTop = -s
-        act(() => app.ctrl.update())
-        expect(app.ctrl.seg).toBe(seg)
-      }
-
-      place(0, 'top')
-      expect(live.size, 'at the top').toBeGreaterThan(0)
-      place(L.diveEnd / 2, 'dive')
-      expect(live.size, 'mid-dive').toBeGreaterThan(0)
-      place((L.diveEnd + L.insideEnd) / 2, 'inside')
-      expect(live.size, 'plateau').toBe(0)
-      place((L.insideEnd + L.outEnd) / 2, 'out')
-      expect(live.size, 'out').toBe(0)
-      place((L.outEnd + L.R) / 2, 'tail')
-      expect(live.size, 'tail').toBe(0)
-      place(L.R + 200, 'past')
-      expect(live.size, 'résumé').toBe(0)
-      place(L.diveEnd / 2, 'dive')
-      expect(live.size, 'back in the dive').toBeGreaterThan(0)
-
-      unmount()
-      expect(live.size, 'after unmount').toBe(0)
-    } finally {
-      EventTarget.prototype.addEventListener = origAdd
-      EventTarget.prototype.removeEventListener = origRemove
-    }
-  })
-
   // Round 2 Phase 3 TEST LIST 4 (compact OS for short landscape): a stage that is too short is narrow too.
   describe('narrow follows the stage size (phone portrait and short landscape)', () => {
     const sizeStage = (container, width, height) => {
@@ -841,260 +746,30 @@ describe('stage/Stage', () => {
     })
   })
 
-  // Phase 6A (U2): the snap rail is an aria-hidden sibling of #stage, inside #track, and app.dom.rail.
-  it('the snap rail is an aria-hidden #snap-rail inside #track but outside #stage, and app.dom.rail is it', () => {
-    const { app, container } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-    const rail = container.querySelector('#track > #snap-rail')
-    expect(rail).toHaveAttribute('aria-hidden', 'true')
-    expect(rail.closest('#stage')).toBeNull()
-    expect(app.dom.rail).toBe(rail)
-  })
-
-  // Phase 6A (U1): unmount releases the snap (the controller removes runway-snap and the rail).
-  it('unmount calls ctrl.releaseSnap', () => {
-    const { app, unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-    const release = vi.spyOn(app.ctrl, 'releaseSnap')
-    unmount()
-    expect(release).toHaveBeenCalled()
-  })
-
-  // Phase 6A (U4): ArrowUp/ArrowDown step 40 px in JS while the page snaps; everything else is native.
-  describe('arrow keys step 40 px while the page snaps (U4)', () => {
-    const snapOn = () => document.documentElement.classList.add('runway-snap')
-    afterEach(() => {
-      document.documentElement.classList.remove('runway-snap', 'snap-hold')
-      setReducedMotion(false)
-    })
-
-    it('ArrowDown on the page with snapping on is prevented and steps +40 smoothly', () => {
-      renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-      snapOn()
-      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-      const ev = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
-      document.body.dispatchEvent(ev)
-      expect(ev.defaultPrevented).toBe(true)
-      expect(scrollBy).toHaveBeenCalledWith({ top: 40, behavior: 'smooth' })
-    })
-
-    it('ArrowUp steps −40', () => {
-      renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-      snapOn()
-      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-      const ev = new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true })
-      document.body.dispatchEvent(ev)
-      expect(ev.defaultPrevented).toBe(true)
-      expect(scrollBy).toHaveBeenCalledWith({ top: -40, behavior: 'smooth' })
-    })
-
-    it('with reduced motion the step is instant', () => {
-      setReducedMotion(true)
-      renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-      snapOn()
-      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
-      expect(scrollBy).toHaveBeenCalledWith({ top: 40, behavior: 'instant' })
-    })
-
-    it('without the runway-snap class the arrow is native: not prevented, no scrollBy', () => {
-      renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-      const ev = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
-      document.body.dispatchEvent(ev)
-      expect(ev.defaultPrevented).toBe(false)
-      expect(scrollBy).not.toHaveBeenCalled()
-    })
-
-    it('inside a text field the arrow is native', () => {
-      renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-      snapOn()
-      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-      const input = document.createElement('input')
-      document.body.appendChild(input)
-      try {
-        const ev = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
-        input.dispatchEvent(ev)
-        expect(ev.defaultPrevented).toBe(false)
-        expect(scrollBy).not.toHaveBeenCalled()
-      } finally {
-        input.remove()
-      }
-    })
-
-    it('after a pointer press in a window body that can still scroll down, the arrow stays native', () => {
-      renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-      snapOn()
-      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-      const wb = document.createElement('div')
-      wb.className = 'wb'
-      Object.defineProperties(wb, {
-        clientHeight: { configurable: true, value: 100 },
-        scrollHeight: { configurable: true, value: 300 },
-        scrollTop: { configurable: true, value: 0, writable: true },
-      })
-      document.body.appendChild(wb)
-      try {
-        fireEvent.pointerDown(wb)
-        const ev = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
-        document.body.dispatchEvent(ev)
-        expect(ev.defaultPrevented).toBe(false)
-        expect(scrollBy).not.toHaveBeenCalled()
-      } finally {
-        wb.remove()
-      }
-    })
-
-    // Phase 6A TEST LIST (arrow keys never stolen from another scroller): the step is 0 when the keydown
-    // target is inside (or is) a recruiter dialog, or inside an overflow:auto/scroll element that can still
-    // scroll that way, even if keyboard-focused. At its end the page step happens.
-    describe('arrow keys yield to another scroller (never stolen)', () => {
-      function scrollerEl({ scrollTop = 0, clientHeight = 100, scrollHeight = 300 } = {}) {
-        const el = document.createElement('div')
-        Object.defineProperties(el, {
-          clientHeight: { configurable: true, value: clientHeight },
-          scrollHeight: { configurable: true, value: scrollHeight },
-          scrollTop: { configurable: true, value: scrollTop, writable: true },
-        })
-        document.body.appendChild(el)
-        return el
-      }
-
-      // jsdom has no layout: report `overflow` for the given elements, the real style for everything else.
-      function stubOverflow(map) {
-        const real = window.getComputedStyle.bind(window)
-        vi.spyOn(window, 'getComputedStyle').mockImplementation((el, pseudo) => {
-          const o = map.get(el)
-          return o ? { overflow: o, overflowX: o, overflowY: o } : real(el, pseudo)
-        })
-      }
-
-      function keyOn(target, key) {
-        const ev = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
-        target.dispatchEvent(ev)
-        return ev
-      }
-
-      beforeEach(() => {
-        renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-        snapOn()
-      })
-
-      it('a keydown inside a recruiter dialog ([role=dialog]) is native: not prevented, no scrollBy', () => {
-        const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-        const dialog = document.createElement('div')
-        dialog.setAttribute('role', 'dialog')
-        const inner = document.createElement('button')
-        dialog.appendChild(inner)
-        document.body.appendChild(dialog)
-        try {
-          for (const key of ['ArrowDown', 'ArrowUp']) {
-            expect(keyOn(inner, key).defaultPrevented, key).toBe(false)
-            expect(keyOn(dialog, key).defaultPrevented, key).toBe(false)
-          }
-          expect(scrollBy).not.toHaveBeenCalled()
-        } finally {
-          dialog.remove()
-        }
-      })
-
-      it('a keydown inside the .rec card is native: not prevented, no scrollBy', () => {
-        const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-        const rec = document.createElement('div')
-        rec.className = 'rec'
-        document.body.appendChild(rec)
-        try {
-          const ev = keyOn(rec, 'ArrowDown')
-          expect(ev.defaultPrevented).toBe(false)
-          expect(scrollBy).not.toHaveBeenCalled()
-        } finally {
-          rec.remove()
-        }
-      })
-
-      it('a keyboard-focused control inside an overflow:auto scroller that can still scroll down keeps ArrowDown native', () => {
-        const scroller = scrollerEl({ scrollTop: 0 })
-        const button = document.createElement('button')
-        scroller.appendChild(button)
-        stubOverflow(new Map([[scroller, 'auto']]))
-        const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-        try {
-          button.focus()
-          expect(document.activeElement).toBe(button)
-          expect(keyOn(button, 'ArrowDown').defaultPrevented).toBe(false)
-          expect(scrollBy).not.toHaveBeenCalled()
-        } finally {
-          scroller.remove()
-        }
-      })
-
-      it('the scroller itself as the keydown target (overflow:scroll, can scroll up) keeps ArrowUp native', () => {
-        const scroller = scrollerEl({ scrollTop: 200 })
-        stubOverflow(new Map([[scroller, 'scroll']]))
-        const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-        try {
-          expect(keyOn(scroller, 'ArrowUp').defaultPrevented).toBe(false)
-          expect(scrollBy).not.toHaveBeenCalled()
-        } finally {
-          scroller.remove()
-        }
-      })
-
-      it('inside a scroller that is at its bottom, ArrowDown is the page step (+40, prevented)', () => {
-        const scroller = scrollerEl({ scrollTop: 200, clientHeight: 100, scrollHeight: 300 })
-        const button = document.createElement('button')
-        scroller.appendChild(button)
-        stubOverflow(new Map([[scroller, 'auto']]))
-        const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-        try {
-          const ev = keyOn(button, 'ArrowDown')
-          expect(ev.defaultPrevented).toBe(true)
-          expect(scrollBy).toHaveBeenCalledWith({ top: 40, behavior: 'smooth' })
-        } finally {
-          scroller.remove()
-        }
-      })
-
-      it('inside a scroller that is at its top, ArrowUp is the page step (−40, prevented)', () => {
-        const scroller = scrollerEl({ scrollTop: 0 })
-        const button = document.createElement('button')
-        scroller.appendChild(button)
-        stubOverflow(new Map([[scroller, 'auto']]))
-        const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-        try {
-          const ev = keyOn(button, 'ArrowUp')
-          expect(ev.defaultPrevented).toBe(true)
-          expect(scrollBy).toHaveBeenCalledWith({ top: -40, behavior: 'smooth' })
-        } finally {
-          scroller.remove()
-        }
-      })
-
-      it('a non-scrolling element (overflow visible) is not a scroller: the page step happens', () => {
-        const scroller = scrollerEl({ scrollTop: 0 })
-        const button = document.createElement('button')
-        scroller.appendChild(button)
-        stubOverflow(new Map([[scroller, 'visible']]))
-        const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
-        try {
-          expect(keyOn(button, 'ArrowDown').defaultPrevented).toBe(true)
-          expect(scrollBy).toHaveBeenCalledWith({ top: 40, behavior: 'smooth' })
-        } finally {
-          scroller.remove()
-        }
-      })
-    })
-
-    // Phase 6A (U1): the scene turning unavailable after ready clears the runway snap at once, through the
-    // status subscription (no frame needed).
-    it('scene status ready then unavailable removes runway-snap from <html> at once, with no frame', () => {
-      const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
-      document.documentElement.classList.add('runway-snap')
-      try {
-        act(() => app.scene.setStatus('ready'))
-        act(() => app.scene.setStatus('unavailable'))
-        expect(document.documentElement.classList.contains('runway-snap')).toBe(false)
-      } finally {
-        document.documentElement.classList.remove('runway-snap', 'snap-hold')
-      }
-    })
+  // R3-1 (V4): no listener in the app is added non-passive for the inputs that scroll the page.
+  it('no listener is added with passive: false for wheel, touchstart or touchmove', () => {
+    const added = []
+    const origAdd = EventTarget.prototype.addEventListener
+    const winAdd = window.addEventListener
+    EventTarget.prototype.addEventListener = function (type, fn, opts) {
+      added.push({ target: this, type, opts })
+      return origAdd.call(this, type, fn, opts)
+    }
+    window.addEventListener = function (type, fn, opts) {
+      added.push({ target: window, type, opts })
+      return winAdd.call(this, type, fn, opts)
+    }
+    let unmount
+    try {
+      ;({ unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) }))
+      const risky = added.filter(
+        (a) => ['wheel', 'touchstart', 'touchmove'].includes(a.type) && a.opts?.passive === false,
+      )
+      expect(risky.map((a) => `${a.target === window ? 'window' : a.target.id || a.target.tagName} ${a.type}`)).toEqual([])
+    } finally {
+      EventTarget.prototype.addEventListener = origAdd
+      window.addEventListener = winAdd
+      unmount?.()
+    }
   })
 })

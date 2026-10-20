@@ -1,19 +1,19 @@
-// Round 2 Phase 2 TEST LIST: stage/controller.test.js (rewrite). The camera pose is a pure
-// function of the scroll position (R1): no tween, no armed/suppress, no leave().
-// Harness: stage H = 1000, track 2900 (R 1900), rect.top = −scrollY unless env.trackTop is set.
+// Round 3 Phase R3-1 TEST LIST: stage/controller.test.js. The camera pose is a pure function of the
+// scroll position (R1): no tween, no armed/suppress, no leave().
+// Harness: stage H = 1000, track 2120 (R 1120, diveEnd 1000), rect.top = −scrollY unless env.trackTop is set.
 // `at(y)` sets scrollY and runs one update(). `glide` is a fake { to, cancel, jump, owns, active }.
-// Phase 6A (plan-r2 section 7): the remap and the detent write through glide.jump (U3); the snap rail
-// is synced through ui.setSnap before a remap (U1, U2); the cue follows cueOpacity (U9).
+// Round 3 (plan-r3 V2–V5): the document ends at the open laptop. Enter and settle target R, not diveEnd;
+// the resize rule jumps through glide.jump; nothing snaps or detents. goToResume (test 9) stays until
+// the two views (R3-2) replace it.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createController } from './controller.js'
 
-function setup({ now } = {}) {
-  const env = { scrollY: 0, status: 'ready', reduce: false, trackTop: null, trackH: 2900, stageH: 1000 }
+function setup() {
+  const env = { scrollY: 0, status: 'ready', reduce: false, trackTop: null, trackH: 2120, stageH: 1000 }
   const os = { state: 'standby', boot: vi.fn(), setFlat: vi.fn(), setLive: vi.fn() }
-  const ui = { setCue: vi.fn(), setZoomed: vi.fn(), setRunway: vi.fn(), setHud: vi.fn(), setSnap: vi.fn() }
-  const scrollTo = vi.fn()
-  const scrollToResume = vi.fn()
+  const ui = { setCue: vi.fn(), setZoomed: vi.fn(), setRunway: vi.fn(), setHud: vi.fn() }
   const glide = { to: vi.fn(), cancel: vi.fn(), jump: vi.fn(), owns: vi.fn(() => false), active: false }
+  const scrollToResume = vi.fn()
   const ctrl = createController({
     getTrackRect: () => ({
       top: env.trackTop ?? -env.scrollY,
@@ -25,14 +25,12 @@ function setup({ now } = {}) {
     }),
     getStageHeight: () => env.stageH,
     scrollY: () => env.scrollY,
-    scrollTo,
     glide,
     reduce: () => env.reduce,
     sceneStatus: () => env.status,
     os,
     ui,
     scrollToResume,
-    now,
   })
   const at = (y) => {
     env.scrollY = y
@@ -40,7 +38,7 @@ function setup({ now } = {}) {
   }
   const phase = () => ctrl.store.get().phase
   const lastTo = () => glide.to.mock.calls.at(-1)?.[0]
-  return { env, os, ui, scrollTo, scrollToResume, glide, ctrl, at, phase, lastTo }
+  return { env, os, ui, glide, scrollToResume, ctrl, at, phase, lastTo }
 }
 
 describe('stage/controller', () => {
@@ -102,16 +100,16 @@ describe('stage/controller', () => {
     expect(os.setFlat).toHaveBeenLastCalledWith(false, false)
   })
 
-  it('5. out segment: 1420 is z .5 in dive, 1720 is z 0 at desk, 2500 stays desk', () => {
+  it('5. the plateau: 1060 and 1120 are inside with z 1; after 1120 then 1060 it stays inside', () => {
     const { ctrl, at, phase } = setup()
-    at(1420)
-    expect(ctrl.z).toBe(0.5)
-    expect(phase()).toBe('dive')
-    at(1720)
-    expect(ctrl.z).toBe(0)
-    expect(phase()).toBe('desk')
-    at(2500)
-    expect(phase()).toBe('desk')
+    at(1060)
+    expect(ctrl.z).toBe(1)
+    expect(phase()).toBe('inside')
+    at(1120)
+    expect(phase()).toBe('inside')
+    at(1060)
+    expect(phase()).toBe('inside')
+    expect(ctrl.z).toBe(1)
   })
 
   it('6. narrow: with setNarrow(true), the last setFlat once inside is (true, true)', () => {
@@ -121,22 +119,22 @@ describe('stage/controller', () => {
     expect(os.setFlat).toHaveBeenLastCalledWith(true, true)
   })
 
-  it('7. enter() glides to trackTopDoc + diveEnd from wherever the page is, and does nothing when inside or loading', () => {
+  it('7. enter() glides to the open laptop (R 1120) from wherever the page is, and does nothing when inside, loading or interactive', () => {
     const a = setup()
     a.at(0)
     a.ctrl.enter()
-    expect(a.lastTo()).toBe(1000)
+    expect(a.lastTo()).toBe(1120)
 
     const b = setup()
-    b.at(3000)
+    b.at(500)
     b.ctrl.enter()
-    expect(b.lastTo()).toBe(1000)
+    expect(b.lastTo()).toBe(1120)
 
     const c = setup()
     c.env.trackTop = 200
     c.at(50)
     c.ctrl.enter()
-    expect(c.lastTo()).toBe(1250)
+    expect(c.lastTo()).toBe(1370)
 
     const d = setup()
     d.at(1000)
@@ -151,13 +149,24 @@ describe('stage/controller', () => {
     expect(e.glide.to).not.toHaveBeenCalled()
   })
 
-  it('7b. enter() with no scene (unavailable) scrolls the track top into view and never glides', () => {
-    const { env, scrollTo, glide, ctrl, at } = setup()
+  it('7b. enter() with no scene (unavailable) does not glide at the track top: the fallback is already open', () => {
+    const { env, glide, ctrl, at } = setup()
+    env.status = 'unavailable'
+    at(0)
+    ctrl.enter()
+    expect(glide.to).not.toHaveBeenCalled()
+  })
+
+  // Interim until R3-2: the résumé still follows the track, so from there the fallback's enter()
+  // glides (smooth, or instant under reduced motion through the glide) back up to the track top.
+  it('7c. enter() with no scene, scrolled past the track (the résumé below), glides to the track top', () => {
+    const { env, glide, ctrl, at } = setup()
     env.status = 'unavailable'
     at(300)
     ctrl.enter()
-    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }))
-    expect(glide.to).not.toHaveBeenCalled()
+    expect(glide.to).toHaveBeenCalledTimes(1)
+    expect(glide.to).toHaveBeenLastCalledWith(0)
+    expect(glide.jump).not.toHaveBeenCalled()
   })
 
   it('8. exit() from inside glides to the track top; from desk it does nothing', () => {
@@ -187,11 +196,11 @@ describe('stage/controller', () => {
     expect(b.scrollToResume).toHaveBeenLastCalledWith('auto')
   })
 
-  it('10. settle({dir, travel}) glides by the user direction: down at 100 px travel to diveEnd, up at 200 px from the out segment to insideEnd; a tiny travel returns', () => {
+  it('10. settle({dir, travel}) glides by the user direction: down at 100 px travel to the open laptop, up at 200 px to the desk, a tiny travel returns; the plateau, beyond R and a running glide never settle', () => {
     const a = setup()
     a.at(100)
     a.ctrl.settle({ dir: 1, travel: 100 })
-    expect(a.lastTo()).toBe(1000)
+    expect(a.lastTo()).toBe(1120)
 
     const b = setup()
     b.at(10)
@@ -199,9 +208,9 @@ describe('stage/controller', () => {
     expect(b.lastTo()).toBe(0)
 
     const c = setup()
-    c.at(1300)
+    c.at(900)
     c.ctrl.settle({ dir: -1, travel: 200 })
-    expect(c.lastTo()).toBe(1120)
+    expect(c.lastTo()).toBe(0)
 
     const d = setup()
     d.at(1060)
@@ -209,7 +218,7 @@ describe('stage/controller', () => {
     expect(d.glide.to).not.toHaveBeenCalled()
 
     const e = setup()
-    e.at(2000)
+    e.at(1120)
     e.ctrl.settle({ dir: 1, travel: 100 })
     expect(e.glide.to).not.toHaveBeenCalled()
 
@@ -261,192 +270,121 @@ describe('stage/controller', () => {
     expect(ui.setCue).toHaveBeenLastCalledWith(0)
   })
 
-  it('13. resize remap: a stage/track change over 15 % jumps to the remapped position (U3: through glide.jump); a 5 % change does not', () => {
-    const a = setup()
-    a.at(1000)
-    a.env.stageH = 600
-    a.env.trackH = 1740
-    a.ctrl.update(0)
-    expect(a.glide.jump).toHaveBeenCalledWith(600)
-    expect(a.scrollTo).not.toHaveBeenCalled()
+  // V5 (plan-r3 I7): a layout change on an open laptop jumps to its new open end, mid-dive keeps its
+  // fraction only past REMAP_THRESHOLD, and a glide the controller started is re-aimed at its end.
+  describe('resize rule (V5, I7)', () => {
+    it('(a) mid-dive with a 36 % layout change keeps the dive fraction through glide.jump (500 → 300)', () => {
+      const { env, glide, at } = setup()
+      at(500)
+      env.stageH = 600
+      env.trackH = 1320
+      at(500)
+      expect(glide.jump).toHaveBeenCalledWith(300)
+    })
 
-    const b = setup()
-    b.at(1000)
-    b.env.trackH = 2800 // R 1800 against 1900: 5 %
-    b.ctrl.update(0)
-    expect(b.glide.jump).not.toHaveBeenCalled()
-    expect(b.scrollTo).not.toHaveBeenCalled()
+    it('(b) mid-dive with a 4.5 % layout change keeps the position: no jump', () => {
+      const { env, glide, at } = setup()
+      at(500)
+      env.stageH = 1050
+      env.trackH = 2220
+      at(500)
+      expect(glide.jump).not.toHaveBeenCalled()
+    })
+
+    it('(c) open at 1000 with a taller layout (dive end 1050) jumps to the new open end: glide.jump(1170)', () => {
+      const { env, glide, at } = setup()
+      at(1000)
+      env.stageH = 1050
+      env.trackH = 2220
+      at(1000)
+      expect(glide.jump).toHaveBeenCalledWith(1170)
+    })
+
+    it('(d) open at 1120 with the taller layout: already on its plateau, no jump', () => {
+      const { env, glide, at } = setup()
+      at(1120)
+      env.stageH = 1050
+      env.trackH = 2220
+      at(1120)
+      expect(glide.jump).not.toHaveBeenCalled()
+    })
+
+    it('(e) an open glide started by enter() is re-aimed at the new open end when the layout changes', () => {
+      const { env, glide, at, ctrl } = setup()
+      at(0)
+      ctrl.enter()
+      expect(glide.to).toHaveBeenLastCalledWith(1120)
+      glide.active = true
+      env.stageH = 1050
+      env.trackH = 2220
+      at(300)
+      expect(glide.to).toHaveBeenLastCalledWith(1170)
+    })
+
+    it('(f) once the controller glide has finished, its end is forgotten: a later active glide is not re-aimed, the resize rule applies', () => {
+      const { env, glide, at, ctrl } = setup()
+      at(0)
+      ctrl.enter()
+      glide.active = true
+      at(500)
+      glide.active = false
+      at(500)
+      // A glide the controller did not start (it is active, but no controller end is pending).
+      glide.active = true
+      env.stageH = 600
+      env.trackH = 1320
+      at(500)
+      expect(glide.to).toHaveBeenCalledTimes(1)
+      expect(glide.jump).toHaveBeenCalledWith(300)
+    })
+
+    it('(g) a small layout change (mobile toolbar) late in the dive keeps the dive fraction: no jump to open, still mid-dive', () => {
+      const { env, glide, ctrl, at, phase, os } = setup()
+      env.stageH = 754
+      env.trackH = 2 * 844 + 120
+      at(900)
+      const z0 = ctrl.z
+      expect(phase()).toBe('dive')
+      env.stageH = 844
+      at(900)
+      expect(glide.jump).toHaveBeenCalledWith(813)
+      expect(phase()).toBe('dive')
+      expect(ctrl.store.get().interactive).toBe(false)
+      expect(os.setLive).not.toHaveBeenCalledWith(true)
+      expect(Math.abs(ctrl.z - z0)).toBeLessThan(0.01)
+    })
   })
 
-  it('14. invariant through the controller: z > 0 implies the stage is still pinned, at three viewport sizes', () => {
+  it('14. the document end is the open laptop: at trackH − stageH the phase is inside and every s from diveEnd to R has z 1, at three viewport sizes', () => {
     const sizes = [
-      { H: 1000, trackH: 2900 },
-      { H: 600, trackH: 1740 },
-      { H: 844, trackH: 2448 },
+      { H: 1000, trackH: 2120 },
+      { H: 600, trackH: 1320 },
+      { H: 844, trackH: 1808 },
     ]
     for (const { H, trackH } of sizes) {
-      const { env, ctrl, at } = setup()
+      const { env, ctrl, phase, at } = setup()
       env.stageH = H
       env.trackH = trackH
       const R = trackH - H
-      for (let y = 0; y <= trackH; y += 5) {
+      at(R)
+      expect(phase(), `H ${H} R`).toBe('inside')
+      for (let y = R; y >= H; y -= 5) {
         at(y)
-        if (ctrl.z > 0) {
-          expect(y, `H ${H} y ${y}`).toBeLessThan(R)
-          expect(y, `H ${H} y ${y}`).toBeLessThanOrEqual(R - 0.15 * H)
-        }
+        expect(ctrl.z, `H ${H} y ${y}`).toBe(1)
+        expect(phase(), `H ${H} y ${y}`).toBe('inside')
       }
     }
   })
 
-  it('14b. the H 1000 case: z > 0 only for y ≤ 1750', () => {
-    const { ctrl, at } = setup()
-    for (let y = 0; y <= 3000; y += 10) {
-      at(y)
-      if (ctrl.z > 0) expect(y).toBeLessThanOrEqual(1750)
-    }
-  })
-
-  it('15. onWheel: a burst crossing the plateau returns true and snaps to 1000 through glide.jump; the next event returns true with no extra jump', () => {
-    const { at, ctrl, glide, scrollTo } = setup()
-    at(800)
-    expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })).toBe(true)
-    expect(glide.jump).toHaveBeenCalledWith(1000)
-    expect(scrollTo).not.toHaveBeenCalled()
-    glide.jump.mockClear()
-    expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 16 })).toBe(true)
-    expect(glide.jump).not.toHaveBeenCalled()
-  })
-
-  it('15c. an exact landing on the plateau (800 + 200 = 1000) holds the detent: events < DETENT_GAP_MS apart keep the flag true', () => {
-    const clock = { t: 0 }
-    const { at, ctrl, glide } = setup({ now: () => clock.t })
-    at(800)
-    expect(ctrl.onWheel({ deltaY: 200, deltaMode: 0, timeStamp: 0 })).toBe(true)
-    expect(glide.jump).toHaveBeenCalledWith(1000)
-    at(1000)
-    expect(ctrl.store.get().detent).toBe(true)
-    for (let t = 16; t <= 96; t += 16) {
-      clock.t = t
-      ctrl.onWheel({ deltaY: 50, deltaMode: 0, timeStamp: t })
-      at(1000)
-      expect(ctrl.store.get().detent, `t ${t}`).toBe(true)
-    }
-  })
-
-  it('15b. onWheel while loading returns false (the event is left alone)', () => {
-    const { env, ctrl, at } = setup()
-    env.status = 'loading'
-    at(800)
-    expect(ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })).toBe(false)
-  })
-
-  // Phase 6A (U1, U2): the rail is synced once per layout, before any remap, and released with the scene.
-  describe('snap rail sync (U1, U2)', () => {
-    it('the first ready frame syncs the rail with the layout once; ten more frames at other positions do not sync it again', () => {
-      const { ui, at } = setup()
-      at(0)
-      expect(ui.setSnap).toHaveBeenCalledTimes(1)
-      expect(ui.setSnap).toHaveBeenCalledWith(expect.objectContaining({ R: 1900, diveEnd: 1000, insideEnd: 1120, outEnd: 1720 }))
-      for (const y of [100, 500, 1000, 1200, 1500, 1720, 1800, 1900, 2500, 2900]) at(y)
-      expect(ui.setSnap).toHaveBeenCalledTimes(1)
-    })
-
-    it('a resize syncs the new layout again, before glide.jump (the rail must move first, or the browser re-snaps to the old one)', () => {
-      const { env, ui, glide, at } = setup()
-      at(1000)
-      ui.setSnap.mockClear()
-      env.stageH = 720
-      env.trackH = 2088
-      at(1000)
-      expect(ui.setSnap).toHaveBeenCalledWith(expect.objectContaining({ R: 1368, diveEnd: 720, insideEnd: 840, outEnd: 1238 }))
-      expect(glide.jump).toHaveBeenCalled()
-      expect(ui.setSnap.mock.invocationCallOrder[0]).toBeLessThan(glide.jump.mock.invocationCallOrder[0])
-    })
-
-    it('while loading the rail is never synced', () => {
-      const { env, ui, at } = setup()
-      env.status = 'loading'
-      at(0)
-      at(1000)
-      expect(ui.setSnap).not.toHaveBeenCalled()
-    })
-
-    it('unavailable clears the rail once over three updates', () => {
-      const { env, ui, at } = setup()
-      env.status = 'unavailable'
-      at(0)
-      at(100)
-      at(200)
-      expect(ui.setSnap).toHaveBeenCalledTimes(1)
-      expect(ui.setSnap).toHaveBeenCalledWith(null)
-    })
-
-    it('releaseSnap() clears the rail (setSnap(null)) and forgets the synced layout', () => {
-      const { ui, ctrl, at } = setup()
-      at(0)
-      ui.setSnap.mockClear()
-      ctrl.releaseSnap()
-      expect(ui.setSnap).toHaveBeenCalledWith(null)
-      at(0)
-      expect(ui.setSnap).toHaveBeenCalledTimes(2)
-      expect(ui.setSnap).toHaveBeenLastCalledWith(expect.objectContaining({ diveEnd: 1000 }))
-    })
-  })
-
-  // Phase 6A (U9): the cue is visible at the top only, and the loading cue follows the same function.
+  // Scroll cue (U9): visible at the top only; the cue is 0 once the dive has begun.
   describe('scroll cue (U9)', () => {
-    it('at the top the cue is .8; at 1720 (the tail) and 2500 (the résumé) it is 0', () => {
+    it('at the top the cue is .8; on the open plateau (1120) it is 0', () => {
       const { ui, at } = setup()
       at(0)
       expect(ui.setCue).toHaveBeenLastCalledWith(0.8)
-      at(1720)
-      expect(ui.setCue).toHaveBeenLastCalledWith(0)
-      at(2500)
+      at(1120)
       expect(ui.setCue).toHaveBeenLastCalledWith(0)
     })
-  })
-
-  // Browser re-check (phase 6A): Chrome ends a wheel sequence at its first blocked event and snaps from
-  // where the sequence meant to end (short of the stop), so the detent keeps the CSS snap off until rest.
-  it('15d. a detent snap holds the CSS snap (ui.holdSnap) before its jump, once, until the next settle', () => {
-    const { at, ctrl, ui, glide } = setup()
-    ui.holdSnap = vi.fn()
-    at(800)
-    ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })
-    ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 16 })
-    expect(ui.holdSnap.mock.calls).toEqual([[true]])
-    expect(ui.holdSnap.mock.invocationCallOrder[0]).toBeLessThan(glide.jump.mock.invocationCallOrder[0])
-    at(1000)
-    ctrl.settle({ dir: 1, travel: 200 })
-    expect(ui.holdSnap.mock.calls).toEqual([[true], [false]])
-    ctrl.settle({ dir: 1, travel: 0 })
-    expect(ui.holdSnap).toHaveBeenCalledTimes(2)
-  })
-
-  // Phase 6A TEST LIST (detent snap-hold not stuck): a detent snap to where the page already is moves
-  // nothing, so it must not hold the CSS snap (a hold with no jump would stay on until a settle that never
-  // comes, since no burst ends at a new position).
-  it('15e. a detent snap whose snapTo equals the current s (|snapTo − s| < 1) does not call ui.holdSnap', () => {
-    const { at, ctrl, ui, glide } = setup()
-    ui.holdSnap = vi.fn()
-    at(999.5)
-    const r = ctrl.onWheel({ deltaY: 300, deltaMode: 0, timeStamp: 0 })
-    expect(r).toBe(true)
-    expect(glide.jump).toHaveBeenCalledWith(1000)
-    expect(ui.holdSnap).not.toHaveBeenCalled()
-  })
-
-  // Phase 6A TEST LIST (runway-snap cleared at once): applyFlat runs on the scene status change and must
-  // clear the rail as soon as the scene is unavailable, not on the next frame.
-  it('15f. applyFlat after the scene turns unavailable (no frame) clears the rail: ui.setSnap(null)', () => {
-    const { env, ui, ctrl, at } = setup()
-    at(0)
-    expect(ui.setSnap).toHaveBeenLastCalledWith(expect.objectContaining({ diveEnd: 1000 }))
-    ui.setSnap.mockClear()
-    env.status = 'unavailable'
-    ctrl.applyFlat()
-    expect(ui.setSnap).toHaveBeenCalledWith(null)
   })
 
   it('16. the controller never boots the OS when the scene is ready (the lid does)', () => {

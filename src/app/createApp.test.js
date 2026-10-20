@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { createApp } from './createApp.js'
-import { runwayLayout, snapPoints } from '../stage/runway.js'
 
 describe('createApp', () => {
   it('returns motion, toasts, snd, ach and wallpaper', () => {
@@ -66,12 +65,12 @@ describe('createApp', () => {
     let top = 0
     app.dom.stage = stage
     app.dom.track = {
-      getBoundingClientRect: () => ({ top: -top, height: 2900, bottom: 0, left: 0, right: 0, width: 0 }),
+      getBoundingClientRect: () => ({ top: -top, height: 2120, bottom: 0, left: 0, right: 0, width: 0 }),
     }
     app.scene.setStatus('ready')
 
     let sawDim = false
-    for (let s = 0; s <= 2900; s += 50) {
+    for (let s = 0; s <= 2120; s += 10) {
       top = s
       app.ctrl.update(0)
       const raw = stage.style.getPropertyValue('--hud')
@@ -84,131 +83,25 @@ describe('createApp', () => {
     app.dispose()
   })
 
-  // Phase 6A (plan-r2 section 7, U1–U3): the snap rail is synced from the controller's ready frame, and the
-  // classes on <html> follow snap support (CSS.supports) and the glide's holds.
-  describe('snap rail and snap classes (phase 6A)', () => {
-    afterEach(() => {
-      document.documentElement.classList.remove('runway-snap', 'snap-hold')
-    })
+  // Round 3 Phase R3-1 (plan-r3 V4): the snap rail is gone from the app, and the glide never touches the
+  // classes on <html> (nothing snaps the page, so there is no hold to set).
+  it('app.dom has no rail slot', () => {
+    const app = createApp()
+    expect(app.dom).not.toHaveProperty('rail')
+    app.dispose()
+  })
 
-    function readyApp(overrides = {}) {
-      const app = createApp(overrides)
-      const stage = document.createElement('div')
-      Object.defineProperty(stage, 'clientHeight', { configurable: true, value: 1000 })
-      app.dom.stage = stage
-      app.dom.track = {
-        getBoundingClientRect: () => ({ top: 0, height: 2900, bottom: 2900, left: 0, right: 0, width: 0 }),
-      }
-      app.dom.rail = document.createElement('div')
-      app.scene.setStatus('ready')
-      return app
-    }
-
-    it('dom gains a rail slot, null until the stage mounts it', () => {
-      const app = createApp()
-      expect(app.dom).toHaveProperty('rail', null)
-      app.dispose()
-    })
-
-    it('with snap support, a ready frame adds runway-snap to <html> and fills the rail: the stop plus one marker per point', () => {
-      const app = readyApp({ snapSupported: () => true })
-      app.ctrl.update(0)
-      const L = runwayLayout({ trackH: 2900, stageH: 1000 })
-      expect(document.documentElement.classList.contains('runway-snap')).toBe(true)
-      expect(app.dom.rail.children).toHaveLength(snapPoints(L).points.length + 1)
-      expect(app.dom.rail.children[0]).toHaveClass('stop')
-      expect(app.dom.rail.children[0].style.top).toBe('1000px')
-      app.dispose()
-    })
-
-    it('without CSS.supports (jsdom), the page never snaps: no runway-snap class and no markers', () => {
-      const app = readyApp()
-      app.ctrl.update(0)
-      expect(document.documentElement.classList.contains('runway-snap')).toBe(false)
-      expect(app.dom.rail.children).toHaveLength(0)
-      app.dispose()
-    })
-
-    it('releaseSnap() removes runway-snap and snap-hold from <html>', () => {
-      const app = readyApp({ snapSupported: () => true })
-      app.ctrl.update(0)
-      document.documentElement.classList.add('snap-hold')
-      app.ctrl.releaseSnap()
-      expect(document.documentElement.classList.contains('runway-snap')).toBe(false)
-      expect(document.documentElement.classList.contains('snap-hold')).toBe(false)
-      app.dispose()
-    })
-
-    it('a detent hold (ui.holdSnap) keeps snap-hold on through a glide write until it is released', () => {
-      const app = readyApp({ snapSupported: () => true })
-      app.ctrl.update(0)
-      vi.spyOn(globalThis, 'scrollTo').mockImplementation(() => {})
-      const root = document.documentElement.classList
-      app.ctrl.onWheel({ deltaY: 1200, deltaMode: 0, timeStamp: 0 })
-      expect(root.contains('snap-hold')).toBe(true)
-      app.ctrl.settle({ dir: 1, travel: 0 })
-      expect(root.contains('snap-hold')).toBe(false)
-      vi.restoreAllMocks()
-      app.dispose()
-    })
-
-    it('the glide holds the snap: hold(true) adds snap-hold to <html> during its write, hold(false) removes it', () => {
-      const app = createApp()
-      const seen = []
-      vi.spyOn(globalThis, 'scrollTo').mockImplementation(() => {
-        seen.push(document.documentElement.classList.contains('snap-hold'))
-      })
-      app.glide.jump(640)
-      expect(seen).toEqual([true])
-      expect(document.documentElement.classList.contains('snap-hold')).toBe(false)
-      vi.restoreAllMocks()
-      app.dispose()
-    })
-
-    // Phase 6A TEST LIST (dispose releases the snap): tearing the app down leaves no snap on <html>.
-    it('app.dispose() calls ctrl.releaseSnap and leaves no runway-snap or snap-hold on <html>', () => {
-      const app = readyApp({ snapSupported: () => true })
-      app.ctrl.update(0)
-      const spy = vi.spyOn(app.ctrl, 'releaseSnap')
-      document.documentElement.classList.add('snap-hold')
-      app.dispose()
-      expect(spy).toHaveBeenCalled()
-      expect(document.documentElement.classList.contains('runway-snap')).toBe(false)
-      expect(document.documentElement.classList.contains('snap-hold')).toBe(false)
-    })
-
-    // Phase 6A TEST LIST (snap holds consistent): snap-hold on <html> always equals (glide hold || detent hold),
-    // including after the rail is cleared (setSnap(null)) or re-synced (setSnap(L)).
-    it('a glide hold survives setSnap(null) and setSnap(L): snap-hold stays on until the glide releases', () => {
-      const app = readyApp({ snapSupported: () => true })
-      vi.spyOn(globalThis, 'scrollTo').mockImplementation(() => {})
-      const root = document.documentElement.classList
-      app.glide.to(2000)
-      expect(root.contains('snap-hold')).toBe(true)
-      app.ctrl.releaseSnap()
-      expect(root.contains('snap-hold'), 'after setSnap(null)').toBe(true)
-      app.ctrl.update(0)
-      expect(root.contains('runway-snap')).toBe(true)
-      expect(root.contains('snap-hold'), 'after setSnap(L)').toBe(true)
-      app.glide.cancel()
-      expect(root.contains('snap-hold'), 'after the glide releases').toBe(false)
-      vi.restoreAllMocks()
-      app.dispose()
-    })
-
-    it('a detent hold does not outlive releaseSnap: snap-hold is off after the release, and stays off on the next glide write', () => {
-      const app = readyApp({ snapSupported: () => true })
-      app.ctrl.update(0)
-      vi.spyOn(globalThis, 'scrollTo').mockImplementation(() => {})
-      const root = document.documentElement.classList
-      app.ctrl.onWheel({ deltaY: 1200, deltaMode: 0, timeStamp: 0 })
-      expect(root.contains('snap-hold')).toBe(true)
-      app.ctrl.releaseSnap()
-      expect(root.contains('snap-hold'), 'after releaseSnap').toBe(false)
-      app.glide.jump(640)
-      expect(root.contains('snap-hold'), 'after a later glide write').toBe(false)
-      vi.restoreAllMocks()
-      app.dispose()
-    })
+  it('the glide adds no class to <html> on to(), jump() or cancel()', () => {
+    const app = createApp()
+    vi.spyOn(globalThis, 'scrollTo').mockImplementation(() => {})
+    const before = document.documentElement.className
+    app.glide.to(1000)
+    expect(document.documentElement.className).toBe(before)
+    app.glide.jump(640)
+    expect(document.documentElement.className).toBe(before)
+    app.glide.cancel()
+    expect(document.documentElement.className).toBe(before)
+    vi.restoreAllMocks()
+    app.dispose()
   })
 })
