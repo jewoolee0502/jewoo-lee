@@ -38,6 +38,8 @@
 .rar{font:11px var(--f-px)}
 .term{height:100%;background:#06110A;color:#7CFFA0;font:21px/1.25 var(--f-vt);padding:12px 14px;display:flex;flex-direction:column;text-shadow:0 0 6px rgba(124,255,160,.45);cursor:text}
 .t-out{flex:1;overflow:auto;white-space:pre-wrap;word-break:break-word}
+/* plan-r3 V15: on a mouse or trackpad, a wheel burst at the terminal edge must not chain into the page and close the laptop; touch keeps native chaining. */
+@media (hover:hover) and (pointer:fine){.t-out{overscroll-behavior-y:contain}}
 .t-out .c{color:#FFB86B}.t-out .d{color:#4f9e66}.t-out .w{color:#FF8A7A}.t-out .b{color:#7FD4FF}
 .t-out pre{margin:0;font:inherit;line-height:1.05}
 .t-line{display:flex;gap:8px;align-items:baseline}

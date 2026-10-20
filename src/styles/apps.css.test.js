@@ -15,10 +15,27 @@ describe('styles/apps.css terminal input focus', () => {
   })
 
   // Round 2 Phase 2 TEST LIST item 9: the terminal output lets the page scroll at its edge.
-  it('.t-out does not declare overscroll-behavior', () => {
-    const tOut = rules.filter((r) => r.selector.split(',').some((p) => /\.t-out(?![\w-])/.test(p)))
-    expect(tOut.length).toBeGreaterThan(0)
-    for (const r of tOut) expect(r.body, r.selector).not.toMatch(/overscroll-behavior/)
+  // Gap B (desktop wheel chaining, plan V15): containment applies to fine pointers only; touch keeps the chaining.
+  const FINE = /\(\s*hover\s*:\s*hover\s*\)\s*and\s*\(\s*pointer\s*:\s*fine\s*\)/
+  const mediaBlocks = [...css.matchAll(/@media([^{]*)\{((?:[^{}]*\{[^{}]*\})*)\}/g)]
+  const fineInner = mediaBlocks.filter((m) => FINE.test(m[1])).map((m) => m[2]).join('\n')
+  const otherInner = mediaBlocks.filter((m) => !FINE.test(m[1])).map((m) => m[2]).join('\n')
+  const outsideMedia = css.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*\}/g, '')
+  const tOutRules = (text) =>
+    [...text.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map((m) => ({ selector: m[1].trim(), body: m[2] }))
+      .filter((r) => r.selector.split(',').some((p) => /\.t-out(?![\w-])/.test(p.trim())))
+
+  it('.t-out sets overscroll-behavior-y: contain only inside a (hover:hover) and (pointer:fine) block', () => {
+    const inside = tOutRules(fineInner).filter((r) => /overscroll-behavior/.test(r.body))
+    expect(inside.length).toBeGreaterThan(0)
+    expect(inside.some((r) => /overscroll-behavior-y\s*:\s*contain\b/.test(r.body)), 'contain on the y axis').toBe(true)
+  })
+
+  it('.t-out declares no overscroll-behavior outside that fine-pointer block (touch keeps the chaining)', () => {
+    for (const text of [outsideMedia, otherInner]) {
+      for (const r of tOutRules(text)) expect(r.body, r.selector).not.toMatch(/overscroll-behavior/)
+    }
   })
 
   // Phase 5 TEST LIST item 5: the project window shows the whole screenshot, not a cropped strip.

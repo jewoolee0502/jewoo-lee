@@ -28,10 +28,24 @@ describe('styles/os.css desktop icon columns', () => {
       .map((m) => ({ selector: m[1].trim(), body: m[2] }))
       .filter((r) => r.selector.split(',').some((part) => new RegExp(cls.replace('.', '\\.') + '(?![\\w-])').test(part)))
 
-  it('.wb does not declare overscroll-behavior, so the page scrolls when a window reaches its edge', () => {
-    const rules = rulesMentioning(css, '.wb')
-    expect(rules.length).toBeGreaterThan(0)
-    for (const r of rules) expect(r.body, r.selector).not.toMatch(/overscroll-behavior/)
+  // Gap B (desktop wheel chaining, plan V15): a wheel burst inside a short window must not chain into the page
+  // and close the laptop. Containment applies to fine pointers only, so touch devices keep the chaining.
+  const FINE = /\(\s*hover\s*:\s*hover\s*\)\s*and\s*\(\s*pointer\s*:\s*fine\s*\)/
+  const mediaBlocks = [...css.matchAll(/@media([^{]*)\{((?:[^{}]*\{[^{}]*\})*)\}/g)]
+  const fineInner = mediaBlocks.filter((m) => FINE.test(m[1])).map((m) => m[2]).join('\n')
+  const otherInner = mediaBlocks.filter((m) => !FINE.test(m[1])).map((m) => m[2]).join('\n')
+  const outsideMedia = css.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*\}/g, '')
+  const declaring = (text, cls) => rulesMentioning(text, cls).filter((r) => /overscroll-behavior/.test(r.body))
+
+  it('.wb sets overscroll-behavior-y: contain only inside a (hover:hover) and (pointer:fine) block', () => {
+    const inside = declaring(fineInner, '.wb')
+    expect(inside.length).toBeGreaterThan(0)
+    expect(inside.some((r) => /overscroll-behavior-y\s*:\s*contain\b/.test(r.body)), 'contain on the y axis').toBe(true)
+  })
+
+  it('.wb declares no overscroll-behavior outside that fine-pointer block (touch keeps the chaining)', () => {
+    expect(declaring(outsideMedia, '.wb')).toEqual([])
+    expect(declaring(otherInner, '.wb')).toEqual([])
   })
 
   // The menubar sound button is hidden on phones (compact) and in the no-WebGL fallback, and kept
