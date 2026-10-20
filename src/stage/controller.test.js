@@ -296,13 +296,63 @@ describe('stage/controller', () => {
       expect(glide.jump).toHaveBeenCalledWith(1170)
     })
 
-    it('(d) open at 1120 with the taller layout: already on its plateau, no jump', () => {
+    it('(d) open mid-plateau at 1060 (not the end) with the taller layout: already on its plateau, no jump', () => {
       const { env, glide, at } = setup()
-      at(1120)
+      at(1060)
       env.stageH = 1050
       env.trackH = 2220
-      at(1120)
+      at(1060)
       expect(glide.jump).not.toHaveBeenCalled()
+    })
+
+    // Gap C: open at the document end, a small growth moves the end, so the page follows it.
+    it('(h) open at the document end (1120) with a small growth (900 → 960, end 1020 → 1080): glide.jump to the new end, interactive stays true', () => {
+      const { env, glide, at, ctrl } = setup()
+      env.stageH = 900
+      env.trackH = 2 * 900 + 120
+      at(1020)
+      expect(ctrl.store.get().interactive).toBe(true)
+      env.stageH = 960
+      env.trackH = 2 * 960 + 120
+      at(1020)
+      expect(glide.jump).toHaveBeenCalledWith(1080)
+      expect(ctrl.store.get().interactive).toBe(true)
+    })
+
+    // Review follow-up: the end-follow applies only to a page at rest, never while the visitor scrolls.
+    it('(i) open at the end, s moves by a few px (1020 → 1024) in the same frame as a small growth: no jump', () => {
+      const { env, glide, at } = setup()
+      env.stageH = 900
+      env.trackH = 2 * 900 + 120
+      at(1020)
+      env.stageH = 960
+      env.trackH = 2 * 960 + 120
+      at(1024)
+      expect(glide.jump).not.toHaveBeenCalled()
+    })
+
+    it('(j) arriving at the old end (1016 → 1020) in the same frame as a small growth: no jump', () => {
+      const { env, glide, at } = setup()
+      env.stageH = 900
+      env.trackH = 2 * 900 + 120
+      at(1016)
+      env.stageH = 960
+      env.trackH = 2 * 960 + 120
+      at(1020)
+      expect(glide.jump).not.toHaveBeenCalled()
+    })
+
+    it('(k) open at the end, s unchanged across the frame of a small growth: glide.jump to the new end (1080)', () => {
+      const { env, glide, at } = setup()
+      env.stageH = 900
+      env.trackH = 2 * 900 + 120
+      at(1020)
+      at(1020)
+      env.stageH = 960
+      env.trackH = 2 * 960 + 120
+      at(1020)
+      expect(glide.jump).toHaveBeenCalledTimes(1)
+      expect(glide.jump).toHaveBeenCalledWith(1080)
     })
 
     it('(e) an open glide started by enter() is re-aimed at the new open end when the layout changes', () => {

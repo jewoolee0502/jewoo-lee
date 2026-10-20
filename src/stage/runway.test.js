@@ -129,8 +129,8 @@ describe('stage/runway', () => {
     const L2 = runwayLayout({ trackH: 2220, stageH: 1050 })
     const L3 = runwayLayout({ trackH: 2720, stageH: 1300 })
 
-    it('open, on the plateau of the new layout (1120 ≥ 1050): nothing moves', () => {
-      expect(relayout(1120, L0, L2, true)).toBeNull()
+    it('open, mid-plateau of the new layout (1060 ≥ 1050, not at the end): nothing moves', () => {
+      expect(relayout(1060, L0, L2, true)).toBeNull()
     })
 
     it('open, dive end of the new layout not yet reached (1000 < 1050): jumps to the new R (1170)', () => {
@@ -139,6 +139,45 @@ describe('stage/runway', () => {
 
     it('open, growth larger than the plateau (1120 < 1300): jumps to the new R (1420)', () => {
       expect(relayout(1120, L0, L3, true)).toBe(1420)
+    })
+
+    // Gap C: an open laptop resting at the document end (s ≥ L0.R − 1) stays at the end after a layout
+    // that grows R by less than the plateau; it must follow the new end, or one notch up closes it.
+    it('open at the old end, desktop 900 → 960 (s 1020 = old R): jumps to the new R (1080)', () => {
+      const d0 = runwayLayout({ trackH: 2 * 900 + 120, stageH: 900 })
+      const d1 = runwayLayout({ trackH: 2 * 960 + 120, stageH: 960 })
+      expect(d0).toMatchObject({ R: 1020, diveEnd: 900 })
+      expect(d1).toMatchObject({ R: 1080, diveEnd: 960 })
+      expect(relayout(1020, d0, d1, true)).toBe(1080)
+    })
+
+    it('open at the old end, phone toolbar 844 → 924 (s 964 = old R): jumps to the new R (1044)', () => {
+      const shown = runwayLayout({ trackH: 2 * 844 + 120, stageH: 844 })
+      const hidden = runwayLayout({ trackH: 2 * 924 + 120, stageH: 924 })
+      expect(shown).toMatchObject({ R: 964, diveEnd: 844 })
+      expect(hidden).toMatchObject({ R: 1044, diveEnd: 924 })
+      expect(relayout(964, shown, hidden, true)).toBe(1044)
+    })
+
+    it('open at the old end, phone toolbar 924 → 844 (s 1044 = old R): jumps to the new R (964)', () => {
+      const hidden = runwayLayout({ trackH: 2 * 924 + 120, stageH: 924 })
+      const shown = runwayLayout({ trackH: 2 * 844 + 120, stageH: 844 })
+      expect(relayout(1044, hidden, shown, true)).toBe(964)
+    })
+
+    it('open at the old end but the page moved this frame (still = false): nothing moves', () => {
+      const d0 = runwayLayout({ trackH: 2 * 900 + 120, stageH: 900 })
+      const d1 = runwayLayout({ trackH: 2 * 960 + 120, stageH: 960 })
+      expect(relayout(1020, d0, d1, true, false)).toBeNull()
+    })
+
+    it('open short of the new dive end while the page moved (still = false): still jumps to the new R', () => {
+      expect(relayout(1000, L0, L2, true, false)).toBe(1170)
+    })
+
+    it('open mid-plateau, not at the end (s 1060 = L0.R − 60, still ≥ the new dive end 1050): nothing moves', () => {
+      const L1050 = runwayLayout({ trackH: 2220, stageH: 1050 })
+      expect(relayout(L0.R - 60, L0, L1050, true)).toBeNull()
     })
 
     it('open, and already past the new dive end (720 ≥ 600): nothing moves', () => {

@@ -59,6 +59,9 @@ export function createController({
   let pendingOpen = false
   // The scene status the last unparked update saw, to catch the loading → ready transition.
   let lastStatus = null
+  // The track-relative scroll the last unparked update ended at, so the resize rule can tell a page
+  // at rest from one the visitor is scrolling (V5).
+  let lastS = null
 
   /** Measures the track: its layout, the track-relative scroll `s` and the track's document top. */
   function measure() {
@@ -105,12 +108,14 @@ export function createController({
       // V5: a layout change (rotation, window resize, the mobile toolbar). A glide this controller
       // started is re-aimed at its end; otherwise the resize rule may move the page once. That jump
       // is an own scroll, so the idle still settles a mid-dive page by the user's last direction and
-      // travel (U6, U7). The fallback has no runway to keep, and an unmeasured track (R 1) is not a
-      // layout.
+      // travel (U6, U7). Following a moved document end needs a page at rest (`s` unchanged since
+      // the last frame), so a visitor scrolling through a resize is never pulled. The fallback has
+      // no runway to keep, and an unmeasured track (R 1) is not a layout.
       if (status !== 'unavailable' && prev && prev.R > 1 && m.L.R > 1 && !sameLayout(prev, m.L)) {
         if (glide.active && glideEnd) glideTo(m, glideEnd)
         else {
-          const t = relayout(s, prev, m.L, store.get().interactive)
+          const still = lastS !== null && Math.abs(s - lastS) < 1
+          const t = relayout(s, prev, m.L, store.get().interactive, still)
           if (t !== null) {
             glide.jump(m.trackTopDoc + t)
             s = t
@@ -118,6 +123,7 @@ export function createController({
         }
       }
       ctrl.layout = m.L
+      lastS = s
       // A scroll off the desk is the visitor moving on: no open later. Checked before the status
       // branches, so it also holds on the frame the scene turns ready.
       if (pendingOpen && Math.abs(s) >= 1) pendingOpen = false
