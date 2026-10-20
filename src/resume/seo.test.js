@@ -87,6 +87,30 @@ describe('SEO head (index.html through Vite)', () => {
     expect(rule[1]).toMatch(/height\s*:\s*0|display\s*:\s*none/)
   })
 
+  // Gap A (headless UX pass): Vite injects the bundled resume.css link after the head's <noscript>, so the
+  // noscript rule must out-specify resume.css's `#app:empty` (same specificity would lose on source order).
+  it('no-JS: the noscript #app:empty rule out-specifies resume.css #app:empty, so the bundled track height cannot win', () => {
+    // Simple count: ids, then classes/attributes/pseudo-classes, then type selectors.
+    const specificity = (sel) => [
+      (sel.match(/#[\w-]+/g) ?? []).length,
+      (sel.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+/g) ?? []).length,
+      (sel.match(/(^|[\s>+~])[a-zA-Z][\w-]*/g) ?? []).length,
+    ]
+    const greater = (a, b) => {
+      for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]
+      return false
+    }
+    const noscript = [...RAW.matchAll(/<noscript>([\s\S]*?)<\/noscript>/g)].map((m) => m[1]).join('\n')
+    const noscriptRule = noscript.match(/<style>\s*([^{}]*#app:empty)\s*\{([^}]*)\}/)
+    expect(noscriptRule, 'noscript #app:empty selector').not.toBeNull()
+    const resumeCss = readFileSync(resolve(root, 'src/styles/resume.css'), 'utf8')
+    const bundled = resumeCss.match(/(#app:empty)\s*\{([^}]*height[^}]*)\}/)
+    expect(bundled, 'resume.css #app:empty rule').not.toBeNull()
+    expect(bundled[2]).toMatch(/height:\s*var\(--track-h\)/)
+    expect(greater(specificity(noscriptRule[1].trim()), specificity(bundled[1].trim())), `${noscriptRule[1].trim()} vs ${bundled[1].trim()}`).toBe(true)
+    expect(noscriptRule[2]).toMatch(/height\s*:\s*0\b/)
+  })
+
   // Round 3 Phase R3-2 (plan-r3 V10): the first-paint script is classic and inline, so Vite leaves it verbatim.
   it('the transformed head keeps the inline view script verbatim', async () => {
     const raw = RAW.match(/<script>[\s\S]*?<\/script>/)[0]
