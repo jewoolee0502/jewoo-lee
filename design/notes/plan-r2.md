@@ -1,5 +1,7 @@
 # Implementation plan, round 2: native scroll, removals, camera polish, McGill mug, sharp images
 
+> **Superseded in part by round 3** (`design/notes/plan-r3.md`, two views: laptop / résumé). R2, R5, R10's note on the scroll after the stage, §2.1 geometry, the §2.2 rows for the résumé, PageDown/End, Tab and `#resume`, and U1–U5, U8 and U9's tail/out wording no longer hold; D11 ("résumé below") is replaced by plan-r3 V1. Read plan-r3 §1–§2 for the current scroll model.
+
 Branch `feat/website-revamp`, worktree `.worktrees/feat-website-revamp`. Base: HEAD `c90ecff` plus the image commits on top.
 Inputs: owner's manual-test feedback and final decisions (quoted in the task brief), `design/notes/r2-explore-{scroll,removal,images,camera,mcgill}.md`, the round-1 plan `design/notes/plan.md` (vocabulary: D-numbers, B-numbers, phases, TEST LIST).
 

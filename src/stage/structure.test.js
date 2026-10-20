@@ -315,3 +315,18 @@ describe('round 3 structure', () => {
     expect(filesImporting(/runway-snap|snap-hold|createDetent|snapPoints|syncSnapRail|arrowStep/)).toEqual([])
   })
 })
+
+// Round 3 Phase R3-3 TEST LIST (plan-r3 §5 R3-3, V14, §7): the README describes the two views, not the
+// old scroll-down résumé, and plan-r2 points at plan-r3 for what it superseded.
+describe('round 3 phase R3-3 docs', () => {
+  it('README.md does not contain "Keep scrolling" or "Résumé ↓"', () => {
+    const text = readFileSync(abs('README.md'), 'utf8')
+    expect(text).not.toContain('Keep scrolling')
+    expect(text).not.toContain('Résumé ↓')
+  })
+
+  it('design/notes/plan-r2.md points at plan-r3.md near its top (its superseded sections)', () => {
+    const head = readFileSync(abs('design/notes/plan-r2.md'), 'utf8').split('\n').slice(0, 12).join('\n')
+    expect(head).toMatch(/plan-r3\.md/)
+  })
+})
