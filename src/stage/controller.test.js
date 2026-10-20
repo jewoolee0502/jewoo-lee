@@ -3,8 +3,9 @@
 // Harness: stage H = 1000, track 2120 (R 1120, diveEnd 1000), rect.top = −scrollY unless env.trackTop is set.
 // `at(y)` sets scrollY and runs one update(). `glide` is a fake { to, cancel, jump, owns, active }.
 // Round 3 (plan-r3 V2–V5): the document ends at the open laptop. Enter and settle target R, not diveEnd;
-// the resize rule jumps through glide.jump; nothing snaps or detents. goToResume (test 9) stays until
-// the two views (R3-2) replace it.
+// the resize rule jumps through glide.jump; nothing snaps or detents.
+// Round 3 Phase R3-2 (plan-r3 V6–V7, I9–I10): park/unpark freeze the laptop while the résumé view is
+// shown. goToResume is gone (the views switch it, not the controller), so its test 9 is removed.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createController } from './controller.js'
 
@@ -12,17 +13,26 @@ function setup() {
   const env = { scrollY: 0, status: 'ready', reduce: false, trackTop: null, trackH: 2120, stageH: 1000 }
   const os = { state: 'standby', boot: vi.fn(), setFlat: vi.fn(), setLive: vi.fn() }
   const ui = { setCue: vi.fn(), setZoomed: vi.fn(), setRunway: vi.fn(), setHud: vi.fn() }
-  const glide = { to: vi.fn(), cancel: vi.fn(), jump: vi.fn(), owns: vi.fn(() => false), active: false }
-  const scrollToResume = vi.fn()
-  const ctrl = createController({
-    getTrackRect: () => ({
-      top: env.trackTop ?? -env.scrollY,
-      height: env.trackH,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      width: 0,
+  // jump() moves the page as the browser would, so a phase read after it sees the new position.
+  const glide = {
+    to: vi.fn(),
+    cancel: vi.fn(),
+    jump: vi.fn((top) => {
+      env.scrollY = top
     }),
+    owns: vi.fn(() => false),
+    active: false,
+  }
+  const getTrackRect = vi.fn(() => ({
+    top: env.trackTop ?? -env.scrollY,
+    height: env.trackH,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: 0,
+  }))
+  const ctrl = createController({
+    getTrackRect,
     getStageHeight: () => env.stageH,
     scrollY: () => env.scrollY,
     glide,
@@ -30,7 +40,6 @@ function setup() {
     sceneStatus: () => env.status,
     os,
     ui,
-    scrollToResume,
   })
   const at = (y) => {
     env.scrollY = y
@@ -38,7 +47,7 @@ function setup() {
   }
   const phase = () => ctrl.store.get().phase
   const lastTo = () => glide.to.mock.calls.at(-1)?.[0]
-  return { env, os, ui, glide, scrollToResume, ctrl, at, phase, lastTo }
+  return { env, os, ui, glide, getTrackRect, ctrl, at, phase, lastTo }
 }
 
 describe('stage/controller', () => {
@@ -157,15 +166,14 @@ describe('stage/controller', () => {
     expect(glide.to).not.toHaveBeenCalled()
   })
 
-  // Interim until R3-2: the résumé still follows the track, so from there the fallback's enter()
-  // glides (smooth, or instant under reduced motion through the glide) back up to the track top.
-  it('7c. enter() with no scene, scrolled past the track (the résumé below), glides to the track top', () => {
+  // R3-2: the fallback is always the open flat OS, so enter() does nothing there, even when the
+  // page is scrolled past the track (the résumé view is shown by the views, not by a glide).
+  it('7c. enter() with no scene does nothing, even scrolled past the track: no glide and no jump', () => {
     const { env, glide, ctrl, at } = setup()
     env.status = 'unavailable'
     at(300)
     ctrl.enter()
-    expect(glide.to).toHaveBeenCalledTimes(1)
-    expect(glide.to).toHaveBeenLastCalledWith(0)
+    expect(glide.to).not.toHaveBeenCalled()
     expect(glide.jump).not.toHaveBeenCalled()
   })
 
@@ -179,21 +187,6 @@ describe('stage/controller', () => {
     b.at(0)
     b.ctrl.exit()
     expect(b.glide.to).not.toHaveBeenCalled()
-  })
-
-  it('9. goToResume() cancels any glide first, then scrolls to the résumé (smooth, or auto with reduced motion)', () => {
-    const a = setup()
-    a.at(1000)
-    a.ctrl.goToResume()
-    expect(a.glide.cancel).toHaveBeenCalledTimes(1)
-    expect(a.scrollToResume).toHaveBeenCalledWith('smooth')
-    expect(a.glide.cancel.mock.invocationCallOrder[0]).toBeLessThan(a.scrollToResume.mock.invocationCallOrder[0])
-
-    const b = setup()
-    b.env.reduce = true
-    b.at(0)
-    b.ctrl.goToResume()
-    expect(b.scrollToResume).toHaveBeenLastCalledWith('auto')
   })
 
   it('10. settle({dir, travel}) glides by the user direction: down at 100 px travel to the open laptop, up at 200 px to the desk, a tiny travel returns; the plateau, beyond R and a running glide never settle', () => {
@@ -394,5 +387,170 @@ describe('stage/controller', () => {
     ctrl.enter()
     at(1000)
     expect(os.boot).not.toHaveBeenCalled()
+  })
+
+  // Round 3 Phase R3-2 (plan-r3 V6, V7, I9, I10): parking freezes the laptop while the résumé view is
+  // shown; unparking re-measures and jumps to the place the visitor left.
+  describe('park and unpark (V6, V7, I9, I10)', () => {
+    it('P1: park() at 1120 returns open, cancels the glide and sets store.parked; while parked, update() does not measure and writes no cue or live flip', () => {
+      const { ctrl, glide, ui, os, at, getTrackRect } = setup()
+      at(1120)
+      expect(ctrl.park()).toBe('open')
+      expect(ctrl.store.get().parked).toBe(true)
+      expect(glide.cancel).toHaveBeenCalled()
+
+      getTrackRect.mockClear()
+      const cues = ui.setCue.mock.calls.length
+      const lives = os.setLive.mock.calls.length
+      at(300)
+      expect(getTrackRect).not.toHaveBeenCalled()
+      expect(ui.setCue.mock.calls.length).toBe(cues)
+      expect(os.setLive.mock.calls.length).toBe(lives)
+      expect(ctrl.store.get().parked).toBe(true)
+    })
+
+    it('P2: park() at 300 returns desk, and at 500 returns open (the dive fraction decides, z ≥ .5 is open)', () => {
+      const a = setup()
+      a.at(300)
+      expect(a.ctrl.park()).toBe('desk')
+
+      const b = setup()
+      b.at(500)
+      expect(b.ctrl.park()).toBe('open')
+    })
+
+    it('P3: a glide in flight from enter() is parked at its end: park() returns open', () => {
+      const { ctrl, glide, at } = setup()
+      at(100)
+      ctrl.enter()
+      glide.active = true
+      expect(ctrl.park()).toBe('open')
+    })
+
+    it('P4: park() at 1120, the stage shrinks to 600/1320, then unpark() jumps to the new open end (720), stays inside, and a later at(720) makes no further jump', () => {
+      const { env, ctrl, glide, at, phase } = setup()
+      at(1120)
+      ctrl.park()
+      env.stageH = 600
+      env.trackH = 1320
+      expect(ctrl.unpark()).toBe('open')
+      expect(glide.jump).toHaveBeenLastCalledWith(720)
+      expect(phase()).toBe('inside')
+      glide.jump.mockClear()
+      at(720)
+      expect(glide.jump).not.toHaveBeenCalled()
+      expect(phase()).toBe('inside')
+    })
+
+    it('P5: unpark("desk") jumps to the track top and the phase is desk', () => {
+      const { ctrl, glide, at, phase } = setup()
+      at(1120)
+      ctrl.park()
+      glide.jump.mockClear()
+      expect(ctrl.unpark('desk')).toBe('desk')
+      expect(glide.jump).toHaveBeenLastCalledWith(0)
+      expect(phase()).toBe('desk')
+    })
+
+    it('P6: unavailable: park() returns desk, and unpark("open") still jumps to the track top and returns desk', () => {
+      const { env, ctrl, glide, at } = setup()
+      env.status = 'unavailable'
+      at(0)
+      expect(ctrl.park()).toBe('desk')
+      glide.jump.mockClear()
+      expect(ctrl.unpark('open')).toBe('desk')
+      expect(glide.jump).toHaveBeenLastCalledWith(0)
+    })
+
+    it('P7: park("desk") with an explicit place does not measure the track', () => {
+      const { ctrl, at, getTrackRect } = setup()
+      at(1120)
+      getTrackRect.mockClear()
+      expect(ctrl.park('desk')).toBe('desk')
+      expect(getTrackRect).not.toHaveBeenCalled()
+    })
+
+    it('P8: parked, exit() makes no glide, sets returnTo to desk, and unpark() then lands at the desk', () => {
+      const { ctrl, glide, at } = setup()
+      at(1120)
+      ctrl.park()
+      glide.to.mockClear()
+      ctrl.exit()
+      expect(glide.to).not.toHaveBeenCalled()
+      expect(ctrl.returnTo).toBe('desk')
+      glide.jump.mockClear()
+      ctrl.unpark()
+      expect(glide.jump).toHaveBeenLastCalledWith(0)
+    })
+
+    // A Back during the résumé fade-in (the laptop was never hidden): it comes back where it was.
+    // unpark('here') returns the end the page is at or settling to, for the views' focus fallback.
+    it('P10: unpark("here") after park() on the plateau jumps back to the exact parked s, stays open and returns open', () => {
+      const { ctrl, glide, at, phase } = setup()
+      at(1060)
+      ctrl.park()
+      glide.jump.mockClear()
+      glide.to.mockClear()
+      expect(ctrl.unpark('here')).toBe('open')
+      expect(glide.jump).toHaveBeenLastCalledWith(1060)
+      expect(glide.to).not.toHaveBeenCalled()
+      expect(phase()).toBe('inside')
+    })
+
+    it('P11: unpark("here") mid-dive (z .3) restores that s instead of jumping to the desk, then settles it by glide (never half-open) and returns that end, desk', () => {
+      const { ctrl, glide, at } = setup()
+      at(300)
+      expect(ctrl.park()).toBe('desk')
+      glide.jump.mockClear()
+      expect(ctrl.unpark('here')).toBe('desk')
+      expect(glide.jump).toHaveBeenLastCalledWith(300)
+      expect(glide.jump).not.toHaveBeenCalledWith(0)
+      expect(glide.to).toHaveBeenLastCalledWith(0)
+    })
+
+    it('P11b: unpark("here") at z .7 settles toward the open laptop and returns open; at the desk it returns desk', () => {
+      const a = setup()
+      a.at(700)
+      a.ctrl.park()
+      expect(a.ctrl.unpark('here')).toBe('open')
+      expect(a.glide.jump).toHaveBeenLastCalledWith(700)
+      expect(a.glide.to).toHaveBeenLastCalledWith(1120)
+
+      const b = setup()
+      b.at(0)
+      b.ctrl.park()
+      b.glide.to.mockClear()
+      expect(b.ctrl.unpark('here')).toBe('desk')
+      expect(b.glide.to).not.toHaveBeenCalled()
+    })
+
+    it('P12: unpark("here") with nothing measured at park (an explicit place, or a glide in flight) uses returnTo', () => {
+      const a = setup()
+      a.at(1120)
+      a.ctrl.park('desk')
+      a.glide.jump.mockClear()
+      expect(a.ctrl.unpark('here')).toBe('desk')
+      expect(a.glide.jump).toHaveBeenLastCalledWith(0)
+
+      const b = setup()
+      b.at(100)
+      b.ctrl.enter()
+      b.glide.active = true
+      b.ctrl.park()
+      b.glide.active = false
+      b.glide.jump.mockClear()
+      expect(b.ctrl.unpark('here')).toBe('open')
+      expect(b.glide.jump).toHaveBeenLastCalledWith(1120)
+    })
+
+    it('P9: parked, settle() and enter() make no glide', () => {
+      const { ctrl, glide, at } = setup()
+      at(400)
+      ctrl.park()
+      glide.to.mockClear()
+      ctrl.settle({ dir: 1, travel: 100 })
+      ctrl.enter()
+      expect(glide.to).not.toHaveBeenCalled()
+    })
   })
 })

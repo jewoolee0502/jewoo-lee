@@ -1,6 +1,8 @@
 // Round 2 Phase 2 TEST LIST: stage/keys.test.js. Konami (L1039), key handler (L1040–1042), Escape.
 // Escape exits whenever the laptop is open (phase inside or dive), not on the interactive flag.
 // Round 2 §7 6B TEST LIST item 3 (U12): Escape closes the ◆ menu first and returns focus to ◆ JAY-OS.
+// Round 3 Phase R3-2 (plan-r3 V16, I18): in the résumé view, keys press nothing and Esc does nothing;
+// Konami still unlocks. The view comes from app.views.get() (absent means the laptop view).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { pushKonami, createKeyHandler } from './keys.js'
 import { createStore } from '../core/store.js'
@@ -16,8 +18,9 @@ function feed(buf, keys) {
   return { buf, matched }
 }
 
-function makeApp({ osState = 'on', reduce = false, status = 'ready', phase = 'inside', recOpen = false, menuOpen = false, sndOn = false, api = true } = {}) {
+function makeApp({ osState = 'on', reduce = false, status = 'ready', phase = 'inside', recOpen = false, menuOpen = false, sndOn = false, api = true, view } = {}) {
   return {
+    views: view === undefined ? undefined : { get: () => view },
     ach: { unlock: vi.fn() },
     toasts: { toast: vi.fn() },
     snd: { store: createStore({ on: sndOn }), click: vi.fn() },
@@ -249,5 +252,58 @@ describe('stage/keys: the Konami code holds the idle settle while it is typed', 
     expect(held()).toBe(true)
     vi.advanceTimersByTime(500)
     expect(held()).toBe(false)
+  })
+})
+
+// Round 3 Phase R3-2 (plan-r3 V16, I18): the résumé view takes the keys for scrolling, not the 3D
+// laptop. Esc changes nothing there, keys do not press 3D keys or play clicks, and Konami unlocks.
+describe('stage/keys: the résumé view (V16, I18)', () => {
+  it('Escape in the résumé view does not exit the laptop, even at phase inside, and closes nothing', () => {
+    const app = makeApp({ view: 'resume', phase: 'inside', status: 'ready', recOpen: true, menuOpen: true })
+    createKeyHandler({ app })({ key: 'Escape' })
+    expect(app.ctrl.exit).not.toHaveBeenCalled()
+    expect(app.ui.store.get().recOpen).toBe(true)
+    expect(app.os.setMenu).not.toHaveBeenCalled()
+  })
+
+  it('Escape in the résumé view with the Recruiter view closed changes no store', () => {
+    const app = makeApp({ view: 'resume', phase: 'inside', status: 'ready', recOpen: false })
+    const before = app.ui.store.get()
+    createKeyHandler({ app })({ key: 'Escape' })
+    expect(app.ui.store.get()).toBe(before)
+    expect(app.ctrl.exit).not.toHaveBeenCalled()
+  })
+
+  it('a key in the résumé view is not pressed on the 3D keyboard, and a single character makes no key click with sound on', () => {
+    const app = makeApp({ view: 'resume', sndOn: true })
+    createKeyHandler({ app })({ key: 'a' })
+    expect(app.scene.api.pressKey).not.toHaveBeenCalled()
+    expect(app.snd.click).not.toHaveBeenCalled()
+  })
+
+  it('the Konami code still unlocks in the résumé view, with its toast and disco', () => {
+    const app = makeApp({ view: 'resume', osState: 'on' })
+    const h = createKeyHandler({ app })
+    KONAMI.forEach((key) => h({ key }))
+    expect(app.ach.unlock).toHaveBeenCalledWith('konami')
+    expect(app.toasts.toast).toHaveBeenCalledWith('Cheat code', 'Disco mode enabled. You’re welcome.', 'info')
+    expect(app.os.disco).toHaveBeenCalledTimes(1)
+    expect(app.scene.api.pressKey).not.toHaveBeenCalled()
+  })
+
+  it('in the laptop view the keys still press, click and exit (tests 5b, 3a and 6 with views.get() laptop)', () => {
+    const exits = makeApp({ view: 'laptop', phase: 'inside', status: 'ready' })
+    createKeyHandler({ app: exits })({ key: 'Escape' })
+    expect(exits.ctrl.exit).toHaveBeenCalledTimes(1)
+
+    const menu = makeApp({ view: 'laptop', menuOpen: true, phase: 'inside', status: 'ready' })
+    createKeyHandler({ app: menu })({ key: 'Escape' })
+    expect(menu.os.setMenu).toHaveBeenCalledWith(false)
+    expect(menu.ctrl.exit).not.toHaveBeenCalled()
+
+    const typed = makeApp({ view: 'laptop', sndOn: true })
+    createKeyHandler({ app: typed })({ key: 'a' })
+    expect(typed.scene.api.pressKey).toHaveBeenLastCalledWith('a')
+    expect(typed.snd.click).toHaveBeenCalledTimes(1)
   })
 })

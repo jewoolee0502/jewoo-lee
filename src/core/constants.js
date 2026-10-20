@@ -32,3 +32,6 @@ export const SETTLE_TINY_PX = 16
 export const DIR_MIN_PX = 8
 /** V5: a mid-dive resize keeps its dive fraction only when R changed by more than this fraction. */
 export const REMAP_THRESHOLD = 0.15
+/** plan-r3 V9: a button switch between the two views fades the veil in this long, swaps, and
+ *  fades it out as long again (views.css transitions over the same .15 s). */
+export const VIEW_FADE_MS = 150

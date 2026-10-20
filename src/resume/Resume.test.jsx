@@ -174,12 +174,12 @@ describe('resume/Resume', () => {
     container.remove()
   })
 
-  it('10. "Open the laptop ↑" calls nav.openLaptop once, synchronously, and does not call window.scrollTo', () => {
+  it('10. "Open the laptop" calls nav.openLaptop once, synchronously, and does not call window.scrollTo', () => {
     const openLaptop = vi.fn()
     const goToResume = vi.fn()
     renderWithApp(<Resume />, { nav: { openLaptop, goToResume } })
     window.scrollTo.mockClear()
-    fireEvent.click(screen.getByText('Open the laptop ↑'))
+    fireEvent.click(screen.getByText('Open the laptop'))
     expect(openLaptop).toHaveBeenCalledTimes(1)
     expect(window.scrollTo).not.toHaveBeenCalled()
   })
@@ -194,11 +194,39 @@ describe('resume/Resume', () => {
     server.remove()
   })
 
-  it('12. "Open the laptop ↑" is a no-JS link to #top in the prerendered markup', () => {
+  it('12. "Open the laptop" is a no-JS link to #top in the prerendered markup', () => {
     const server = toContainer(serverMarkup())
-    const link = within(server).getByRole('link', { name: 'Open the laptop ↑' })
+    const link = within(server).getByRole('link', { name: 'Open the laptop' })
     expect(link.tagName).toBe('A')
     expect(link).toHaveAttribute('href', '#top')
     server.remove()
+  })
+
+  // Round 3 Phase R3-2 (plan-r3 V13): the way back is a button named "Laptop view" (its arrow is
+  // aria-hidden). Entering the view focuses #resume-title, so the button comes right after it in the
+  // DOM: the first Tab from the title reaches it (CSS pins it in the top-left corner).
+  it('13. the prerendered markup has button#r-back.r-back[type=button] named "Laptop view" as the first control after #resume-title', () => {
+    const server = toContainer(serverMarkup())
+    const back = within(server).getByRole('button', { name: 'Laptop view' })
+    expect(back.tagName).toBe('BUTTON')
+    expect(back.id).toBe('r-back')
+    expect(back).toHaveClass('r-back')
+    expect(back).toHaveAttribute('type', 'button')
+    const title = server.querySelector('#resume-title')
+    expect(title.compareDocumentPosition(back) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const controls = [...server.querySelectorAll('a[href], button')]
+    const firstAfterTitle = controls.find((el) => title.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(firstAfterTitle).toBe(back)
+    expect(controls.filter((el) => title.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING)).toEqual([])
+    server.remove()
+  })
+
+  it('14. clicking "Laptop view" calls nav.backToLaptop once and not nav.openLaptop', () => {
+    const openLaptop = vi.fn()
+    const backToLaptop = vi.fn()
+    renderWithApp(<Resume />, { nav: { openLaptop, goToResume: vi.fn(), backToLaptop } })
+    fireEvent.click(screen.getByRole('button', { name: 'Laptop view' }))
+    expect(backToLaptop).toHaveBeenCalledTimes(1)
+    expect(openLaptop).not.toHaveBeenCalled()
   })
 })

@@ -4,6 +4,10 @@
 // nothing intercepts the wheel or the keys: the laptop document ends at the open laptop (plan-r3
 // V2), so the browser's own scroll clamp is the stop. Scrolls the glide wrote are reported to the
 // idle as its own, so they never count as user direction (U7).
+// While the controller is parked (the résumé view, plan-r3 V6, I9) the stage is display:none: the
+// ticker stops (WebGL and the wallpaper rest), and the window scroll (the résumé's own), the idle
+// settle and the stage's 0 × 0 resize are ignored. Unparking restarts the ticker at once, and the
+// shown stage reports its real size to the resize observer before the next paint.
 import { useEffect, useLayoutEffect } from 'react'
 import { NARROW_PX, SHORT_PX, SETTLE_GRACE_MS } from '../core/constants.js'
 import { createTicker } from './ticker.js'
@@ -69,19 +73,33 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
         app.wallpaperEngine?.tick?.(t)
       },
     })
+    const isParked = () => Boolean(ctrl.store.get().parked)
     const io = new IntersectionObserver(
       (entries) => {
         for (const en of entries) {
-          ui.store.set({ stageVisible: en.isIntersecting })
-          if (en.isIntersecting) ticker.start()
+          const on = en.isIntersecting && !isParked()
+          ui.store.set({ stageVisible: on })
+          if (on) ticker.start()
           else ticker.stop()
         }
       },
       { threshold: 0 },
     )
     io.observe(stage)
+    // Parking hides the stage; unparking shows it at a pinned place, so the ticker need not wait for
+    // the observer's next report.
+    let parked = isParked()
+    const offPark = ctrl.store.subscribe((s) => {
+      if (Boolean(s.parked) === parked) return
+      parked = Boolean(s.parked)
+      ui.store.set({ stageVisible: !parked })
+      if (parked) ticker.stop()
+      else ticker.start()
+    })
 
+    // A hidden (parked) stage measures 0 × 0, which would flip `narrow` and compact the OS.
     const ro = new ResizeObserver(() => {
+      if (isParked()) return
       ctrl.setNarrow(stage.clientWidth < NARROW_PX || stage.clientHeight < SHORT_PX)
       app.os.refit?.()
     })
@@ -95,7 +113,7 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
     // scroll), and a glide must not open the laptop behind the dialog. The rest still counts, so the
     // next one after it closes measures its travel from here.
     const onIdle = (info) => {
-      if (!ui.store.get().recOpen) ctrl.settle(info)
+      if (!ui.store.get().recOpen && !isParked()) ctrl.settle(info)
     }
     const idle = createScrollIdle({ timers, onIdle, y: window.scrollY })
     // The wheel and the scroll keys come in bursts (momentum, key repeat) with gaps where the page
@@ -133,7 +151,9 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
       konamiTail?.()
       konamiTail = null
     }
+    // Parked, the window scroll is the résumé's, never the laptop's direction or travel.
     listen(window, 'scroll', () => {
+      if (isParked()) return
       const y = window.scrollY
       const own = Boolean(app.glide.owns?.(y))
       app.glide.onScroll(y)
@@ -184,6 +204,7 @@ export function useStageBindings(app, { trackRef, stageRef, cueRef, flatHostRef,
       ro.disconnect()
       io.disconnect()
       ticker.stop()
+      offPark()
       offScene()
       offClasses()
     }

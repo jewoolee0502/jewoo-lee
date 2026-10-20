@@ -1,4 +1,6 @@
 // Global keys (L1038–1042): the 3D keyboard, key clicks, the Konami code and Escape.
+// In the résumé view (plan-r3 V16, I18) the keys only scroll it: no 3D key presses, no key clicks,
+// and Esc does nothing (only a click returns to the laptop). The Konami code still unlocks.
 export const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']
 const KONAMI_STR = KONAMI.join()
 /** The idle settle is held once this many keys of the code are in, until it completes or breaks. */
@@ -57,8 +59,11 @@ export function createKeyHandler({ app, hold, timers }) {
 
   return function onKeyDown(e) {
     const key = typeof e.key === 'string' ? e.key : ''
-    app.scene?.api?.pressKey?.(key)
-    if (app.snd.store.get().on && key.length === 1) app.snd.click()
+    const inResume = app.views?.get?.() === 'resume'
+    if (!inResume) {
+      app.scene?.api?.pressKey?.(key)
+      if (app.snd.store.get().on && key.length === 1) app.snd.click()
+    }
     if (hold) track(key)
     const r = pushKonami(buf, key)
     buf = r.buf
@@ -68,7 +73,7 @@ export function createKeyHandler({ app, hold, timers }) {
       if (app.os.state === 'on') app.os.disco()
       else if (!app.motion.reduce()) app.scene?.api?.disco?.(6) // B11
     }
-    if (key === 'Escape') {
+    if (key === 'Escape' && !inResume) {
       // plan-r2 §7 U12: the recruiter view, then the ◆ menu, then the laptop.
       if (app.ui.store.get().recOpen) app.ui.store.set({ recOpen: false })
       else if (app.os.store?.get().menuOpen) {

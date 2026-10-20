@@ -249,4 +249,8 @@ afterEach(() => {
   setReducedMotion(false)
   intersectionObservers.clear()
   resizeObservers.clear()
+  // Round 3 Phase R3-2 (plan-r3 V1, V9): a test's view, its fade veil and its history entry do not leak.
+  document.documentElement.removeAttribute('data-view')
+  document.querySelectorAll('.view-veil').forEach((el) => el.remove())
+  history.replaceState(null, '', '/')
 })

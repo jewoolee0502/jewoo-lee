@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- plan-r3 V10: a résumé link shows the résumé view from the first paint. Ids = RESUME_IDS (src/stage/views.js). -->
+    <script>/^#(resume|about|experience|projects|skills|contact|trophies)$/.test(location.hash)&&document.documentElement.setAttribute('data-view','resume')</script>
     <title>Jewoo (Jay) Lee · Full-stack developer</title>
     <meta name="description" content="Jewoo (Jay) Lee is a full-stack developer from McGill Computer Engineering in Montréal. Step into JAY-OS, a 3D 90s laptop portfolio, or read the résumé." />
     <meta name="theme-color" content="#141C2E" />

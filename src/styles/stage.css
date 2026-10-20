@@ -43,7 +43,7 @@
 .hud button:hover{border-color:#EAF2FB}
 .hud .exit{display:none}
 .stage.zoomed .hud{display:none}
-/* plan-r2 phase 2: "Go to résumé ↓", shown only while inside the laptop. */
+/* plan-r2 phase 2, plan-r3 V14: "Read the résumé", shown only while inside the laptop. */
 .exit-pill{display:none;position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:20;font:12px var(--f-px);background:rgba(10,16,28,.82);color:#EAF2FB;border:1.5px solid #FFD15C;padding:9px 12px;cursor:pointer;box-shadow:3px 3px 0 rgba(0,0,0,.45)}
 .exit-pill:hover,.exit-pill:focus-visible{background:#FFD15C;color:#122030}
 .stage.zoomed .exit-pill{display:inline-flex}

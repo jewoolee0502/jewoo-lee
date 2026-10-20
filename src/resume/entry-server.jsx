@@ -14,7 +14,7 @@ const noop = () => {}
 export function createServerApp() {
   return {
     ach: { list: ACH, store: createStore({ got: new Set() }), unlock: () => false },
-    nav: { goToResume: noop, openLaptop: noop },
+    nav: { goToResume: noop, openLaptop: noop, backToLaptop: noop },
   }
 }
 

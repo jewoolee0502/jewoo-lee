@@ -2,6 +2,9 @@
 // Native scroll: the window carries the idle settle and the wheel grace hold.
 // Round 3 Phase R3-1 (plan-r3 V4): the page is native; the window wheel is passive, nothing is non-passive.
 // onIdle passes { dir, travel }.
+// Round 3 Phase R3-2 (plan-r3 V6, I9): the HUD, the pill and the Recruiter view switch to the résumé
+// view (labels without the arrow); while the controller is parked the bindings stop the ticker and
+// ignore window scrolls and stage resizes.
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { StrictMode } from 'react'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
@@ -34,11 +37,11 @@ describe('stage/Stage', () => {
     vi.restoreAllMocks()
   })
 
-  it('1. the HUD shows Recruiter view, Résumé ↓, ★ 0/12 and Sound: off with aria-pressed false', () => {
+  it('1. the HUD shows Recruiter view, Résumé, ★ 0/12 and Sound: off with aria-pressed false', () => {
     const { container } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
     const hud = within(container)
     expect(hud.getByRole('button', { name: 'Recruiter view' })).toBeInTheDocument()
-    expect(hud.getByRole('button', { name: 'Résumé ↓' })).toBeInTheDocument()
+    expect(hud.getByRole('button', { name: 'Résumé' })).toBeInTheDocument()
     expect(hud.getByRole('button', { name: '★ 0/12' })).toBeInTheDocument()
     const sound = hud.getByRole('button', { name: /Sound: off/ })
     expect(sound).toHaveAttribute('aria-pressed', 'false')
@@ -119,10 +122,23 @@ describe('stage/Stage', () => {
       expect(dialog).not.toBeVisible()
     })
 
-    it('Full résumé ↓ calls nav.goToResume and closes the view', () => {
-      const { dialog, app } = openRec()
-      fireEvent.click(screen.getByRole('button', { name: 'Full résumé ↓' }))
+    // R3-2 (V8, V14): the return focus goes back to the Recruiter button, so it is passed as the opener.
+    it('Full résumé calls nav.goToResume with the Recruiter button as the opener, after the view has closed', () => {
+      const seen = []
+      const result = renderWithApp(<Stage />, {
+        loadScene: vi.fn(pending),
+        nav: {
+          goToResume: vi.fn(() => seen.push(result.app.ui.store.get().recOpen)),
+          openLaptop: vi.fn(),
+        },
+      })
+      const { app, container } = result
+      fireEvent.click(within(container).getByRole('button', { name: 'Recruiter view' }))
+      const dialog = screen.getByRole('dialog', { name: 'Recruiter view' })
+      fireEvent.click(screen.getByRole('button', { name: 'Full résumé' }))
       expect(app.nav.goToResume).toHaveBeenCalledTimes(1)
+      expect(app.nav.goToResume).toHaveBeenCalledWith({ opener: within(container).getByRole('button', { name: 'Recruiter view' }) })
+      expect(seen).toEqual([false])
       expect(dialog).not.toBeVisible()
     })
   })
@@ -335,13 +351,15 @@ describe('stage/Stage', () => {
     expect(wb.scrollTop).toBe(120)
   })
   // Round 2: the pill that leaves the laptop for the résumé (shown only while the stage is zoomed).
-  it('15. the Go to résumé ↓ pill is #hud-exit and calls nav.goToResume on click', () => {
+  // R3-2 (V14): the label names the view, and the title says what Esc does.
+  it('15. the Read the résumé pill is #hud-exit, titled for the view switch, and calls nav.goToResume on click', () => {
     const { container, app } = renderWithApp(<Stage />, {
       loadScene: vi.fn(pending),
       nav: { goToResume: vi.fn(), openLaptop: vi.fn() },
     })
-    const pill = within(container).getByRole('button', { name: 'Go to résumé ↓' })
+    const pill = within(container).getByRole('button', { name: 'Read the résumé' })
     expect(pill).toHaveAttribute('id', 'hud-exit')
+    expect(pill).toHaveAttribute('title', 'Switch to the résumé (Esc closes the laptop)')
     fireEvent.click(pill)
     expect(app.nav.goToResume).toHaveBeenCalledTimes(1)
   })
@@ -689,6 +707,107 @@ describe('stage/Stage', () => {
         vi.useRealTimers()
         restore()
       }
+    })
+  })
+
+  // Round 3 Phase R3-2 (plan-r3 V6, I9): while the controller is parked (the résumé view is shown)
+  // the bindings ignore the window scroll, the stage resize and the ticker's frames, and an
+  // intersection does not restart the ticker.
+  describe('parked gating (I9)', () => {
+    // A fake requestAnimationFrame: frames wait in a queue until run(), and cancel removes them.
+    function fakeFrames() {
+      const queue = new Map()
+      let next = 1
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+        const id = next++
+        queue.set(id, cb)
+        return id
+      })
+      vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+        queue.delete(id)
+      })
+      return {
+        run() {
+          const cbs = [...queue.values()]
+          queue.clear()
+          for (const cb of cbs) cb(performance.now())
+        },
+        pending: () => queue.size,
+      }
+    }
+
+    it('the window scroll does not reach the idle settle while parked; once unparked it does', () => {
+      vi.useFakeTimers()
+      Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: 0 })
+      try {
+        const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+        const settle = vi.spyOn(app.ctrl, 'settle')
+        app.ctrl.park('desk')
+        window.scrollY = 300
+        window.dispatchEvent(new Event('scroll'))
+        vi.advanceTimersByTime(IDLE_MS + SETTLE_GRACE_MS + 1)
+        expect(settle).not.toHaveBeenCalled()
+
+        app.ctrl.unpark('desk')
+        window.scrollY = 340
+        window.dispatchEvent(new Event('scroll'))
+        vi.advanceTimersByTime(IDLE_MS + 1)
+        expect(settle).toHaveBeenCalledTimes(1)
+      } finally {
+        delete window.scrollY
+      }
+    })
+
+    it('a 0 × 0 resize (a hidden stage) while parked neither flips narrow nor refits the OS; unparked, it does', () => {
+      const { app, container, unmount } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      try {
+        const stage = container.querySelector('#stage')
+        const refit = vi.spyOn(app.os, 'refit')
+        app.ctrl.park('desk')
+        triggerResize(stage, { width: 0, height: 0 })
+        expect(app.ctrl.store.get().narrow).toBe(false)
+        expect(refit).not.toHaveBeenCalled()
+
+        app.ctrl.unpark('desk')
+        triggerResize(stage, { width: 0, height: 0 })
+        expect(app.ctrl.store.get().narrow).toBe(true)
+        expect(refit).toHaveBeenCalled()
+      } finally {
+        unmount()
+      }
+    })
+
+    it('parking stops the frame loop and sets the stage hidden; unparking restarts it with no intersection', () => {
+      const frames = fakeFrames()
+      const { app, container } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      const stage = container.querySelector('#stage')
+      const update = vi.spyOn(app.ctrl, 'update')
+      triggerIntersection(stage, true)
+      expect(app.ui.store.get().stageVisible).toBe(true)
+      frames.run()
+      frames.run()
+      expect(update.mock.calls.length).toBeGreaterThanOrEqual(2)
+
+      app.ctrl.park('desk')
+      expect(app.ui.store.get().stageVisible).toBe(false)
+      const parked = update.mock.calls.length
+      frames.run()
+      frames.run()
+      frames.run()
+      expect(update.mock.calls.length).toBe(parked)
+
+      app.ctrl.unpark('desk')
+      const unparked = update.mock.calls.length
+      frames.run()
+      expect(update.mock.calls.length).toBeGreaterThan(unparked)
+    })
+
+    it('an intersection while parked does not start the ticker', () => {
+      const frames = fakeFrames()
+      const { app, container } = renderWithApp(<Stage />, { loadScene: vi.fn(pending) })
+      app.ctrl.park('desk')
+      triggerIntersection(container.querySelector('#stage'), true)
+      expect(frames.pending()).toBe(0)
     })
   })
 

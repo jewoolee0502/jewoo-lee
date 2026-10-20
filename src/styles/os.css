@@ -85,7 +85,7 @@
 .os.compact .pol{max-width:180px}
 .os.compact .log summary{grid-template-columns:minmax(0,1fr)}
 .os.compact .log details p{margin-left:0}
-.os.compact.live:not(.fallback) .win{/* plan-r2 §7 U13: inside on a compact layout, windows and icons end 12px above the "Go to résumé ↓" pill (36px tall, bottom max(16px, safe-area inset)); the window starts at 38px. */height:calc(100% - 86px - max(16px,env(safe-area-inset-bottom,0px)))!important}
+.os.compact.live:not(.fallback) .win{/* plan-r2 §7 U13: inside on a compact layout, windows and icons end 12px above the "Read the résumé" pill (36px tall, bottom max(16px, safe-area inset)); the window starts at 38px. */height:calc(100% - 86px - max(16px,env(safe-area-inset-bottom,0px)))!important}
 .os.compact.live:not(.fallback) .icons{bottom:calc(48px + max(16px,env(safe-area-inset-bottom,0px)))}
 
 /* Addition (not in the prototype): the desk ignores clicks during the shutdown collapse. */

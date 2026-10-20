@@ -1,0 +1,23 @@
+/* plan-r3 V1: two views, switched on <html data-view> by src/stage/views.js. No data-view (no JS)
+   shows both, for crawlers and no-JS readers. The laptop view's page is the scene colour, so root
+   rubber-banding never shows the light grid (V15). */
+html[data-view="laptop"] #resume-root{display:none}
+html[data-view="laptop"] body{background:var(--scene)}
+html[data-view="resume"] #app,html[data-view="resume"] .skip{display:none}
+
+/* V13: the way back, pinned in the top-left corner of the résumé view only. It is 40 px tall plus a
+   3 px shadow below max(12px, safe area), so the header starts 60 px under that edge and the button
+   never covers the eyebrow or the name at the top of the page (phone and desktop alike). This is the
+   header's only top-padding override; resume.css keeps its 72 px for every width. */
+.r-back{display:none}
+html[data-view="resume"] .r-back{display:inline-flex;align-items:center;gap:6px;position:fixed;z-index:60;top:max(12px,env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));min-height:40px;font:12px var(--f-px);letter-spacing:.02em;padding:9px 12px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;box-shadow:3px 3px 0 var(--line)}
+html[data-view="resume"] .r-back:hover,html[data-view="resume"] .r-back:focus-visible{background:var(--ink);color:var(--paper)}
+html[data-view="resume"] .r-head{padding-top:max(72px,calc(max(12px,env(safe-area-inset-top,0px)) + 60px))}
+
+/* V9: the switch veil, in the destination's background. */
+.view-veil{position:fixed;inset:0;z-index:1000;opacity:0;pointer-events:none;background:var(--scene);transition:opacity .15s ease}
+.view-veil[data-to="resume"]{background:var(--bg)}
+.view-veil.on{opacity:1;pointer-events:auto}
+
+/* V18: the résumé prints from either view, without the scene, the way back or the veil. */
+@media print{html[data-view] #app{display:none}html[data-view] #resume-root{display:block}.r-back,.view-veil{display:none!important}}

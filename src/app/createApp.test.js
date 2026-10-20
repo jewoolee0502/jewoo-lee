@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createApp } from './createApp.js'
+import { setReducedMotion } from '../test/setup.js'
 
 describe('createApp', () => {
   it('returns motion, toasts, snd, ach and wallpaper', () => {
@@ -103,5 +104,111 @@ describe('createApp', () => {
     expect(document.documentElement.className).toBe(before)
     vi.restoreAllMocks()
     app.dispose()
+  })
+
+  // Round 3 Phase R3-2 (plan-r3 §3, V8, V11): the two views and the navigation over them.
+  describe('views and nav (R3-2)', () => {
+    // A stand-in for app.views: the nav calls it by name, and get() decides which view it is in.
+    function fakeViews(view = 'laptop') {
+      return {
+        get: vi.fn(() => view),
+        toResume: vi.fn(),
+        toLaptop: vi.fn(),
+        dispose: vi.fn(),
+      }
+    }
+
+    it('app.views is the laptop view before any init, and the page has no data-view yet', () => {
+      const app = createApp()
+      expect(app.views.get()).toBe('laptop')
+      expect(document.documentElement.hasAttribute('data-view')).toBe(false)
+      app.dispose()
+    })
+
+    it('nav.goToResume passes its options (the opener) on to views.toResume', () => {
+      const views = fakeViews()
+      const app = createApp({ views })
+      const opener = document.createElement('button')
+      app.nav.goToResume({ opener })
+      expect(views.toResume).toHaveBeenCalledTimes(1)
+      expect(views.toResume).toHaveBeenCalledWith({ opener })
+      app.dispose()
+    })
+
+    it('nav.openLaptop enters the laptop (ctrl.enter) from the laptop view', () => {
+      const views = fakeViews('laptop')
+      const app = createApp({ views })
+      const enter = vi.spyOn(app.ctrl, 'enter')
+      app.nav.openLaptop()
+      expect(enter).toHaveBeenCalledTimes(1)
+      expect(views.toLaptop).not.toHaveBeenCalled()
+      app.dispose()
+    })
+
+    it('nav.openLaptop from the résumé view returns to the laptop, open, through views.toLaptop', () => {
+      const views = fakeViews('resume')
+      const app = createApp({ views })
+      const enter = vi.spyOn(app.ctrl, 'enter')
+      app.nav.openLaptop()
+      expect(views.toLaptop).toHaveBeenCalledTimes(1)
+      expect(views.toLaptop).toHaveBeenCalledWith({ place: 'open' })
+      expect(enter).not.toHaveBeenCalled()
+      app.dispose()
+    })
+
+    it('nav.backToLaptop goes through views.toLaptop with no place', () => {
+      const views = fakeViews('resume')
+      const app = createApp({ views })
+      app.nav.backToLaptop()
+      expect(views.toLaptop).toHaveBeenCalledTimes(1)
+      expect(views.toLaptop.mock.calls[0]).toEqual([])
+      app.dispose()
+    })
+
+    it('dispose tears down the views', () => {
+      const views = fakeViews()
+      const app = createApp({ views })
+      app.dispose()
+      expect(views.dispose).toHaveBeenCalledTimes(1)
+    })
+
+    // The OS windows are display:none while the résumé shows, which drops their scroll offsets.
+    it('a round trip through the résumé view keeps the OS window and terminal scroll offsets', () => {
+      setReducedMotion(true)
+      vi.spyOn(window.history, 'back').mockImplementation(() => {})
+      const app = createApp()
+      const wb = document.createElement('div')
+      wb.className = 'wb'
+      const out = document.createElement('div')
+      out.className = 't-out'
+      app.host.osEl.append(wb, out)
+      document.body.appendChild(app.host.osEl)
+      wb.scrollTop = 300
+      out.scrollTop = 40
+      app.nav.goToResume()
+      expect(document.documentElement.getAttribute('data-view')).toBe('resume')
+      // What the browser does to a display:none subtree.
+      wb.scrollTop = 0
+      out.scrollTop = 0
+      app.nav.backToLaptop()
+      expect(document.documentElement.getAttribute('data-view')).toBe('laptop')
+      expect(wb.scrollTop).toBe(300)
+      expect(out.scrollTop).toBe(40)
+      app.host.osEl.remove()
+      vi.restoreAllMocks()
+      app.dispose()
+    })
+
+    it('the real views close the Recruiter view and the ◆ menu when they leave the laptop', () => {
+      setReducedMotion(true)
+      const app = createApp()
+      app.ui.store.set({ recOpen: true })
+      const setMenu = vi.spyOn(app.os, 'setMenu')
+      app.views.toResume()
+      expect(app.ui.store.get().recOpen).toBe(false)
+      expect(setMenu).toHaveBeenCalledWith(false)
+      expect(document.documentElement.getAttribute('data-view')).toBe('resume')
+      app.dispose()
+    })
   })
 })

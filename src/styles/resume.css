@@ -1,4 +1,4 @@
-/* Résumé below the scene. Blueprint blocks verbatim from design/revamp-lab.html L241–256, L266–269;
+/* The résumé view (plan-r3 V1; views.css switches the views). Blueprint blocks verbatim from design/revamp-lab.html L241–256, L266–269;
    the .r-* additions use the same tokens (tokens.css). */
 section.block{padding-block:60px 8px}
 .sec-head{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:baseline;justify-content:space-between;margin-bottom:22px}
@@ -23,7 +23,8 @@ footer{padding-block:56px 64px;color:var(--muted);font-size:13.5px}
 @media (max-width:600px){.ach-grid,.cols{grid-template-columns:minmax(0,1fr)}}
 
 /* ---------- phase 8 additions ---------- */
-/* Until the stage mounts, reserve its track (stage.css .track) so the prerendered résumé does not jump down (CLS). */
+/* Until the stage mounts, reserve its track (stage.css .track) so the prerendered résumé does not jump down (CLS).
+   The laptop view hides the résumé once main.jsx runs, and the résumé view hides #app with this block. */
 #app:empty{height:var(--track-h);background:var(--scene)}
 #resume{display:block}
 #resume-title:focus:not(:focus-visible){outline:none}
@@ -63,4 +64,4 @@ footer{padding-block:56px 64px;color:var(--muted);font-size:13.5px}
 .r-note{color:var(--muted);margin-top:14px;font-size:15px}
 .r-foot a{color:inherit}
 @media (max-width:900px){.r-projects{grid-template-columns:repeat(2,minmax(0,1fr))}.r-skills{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:600px){.r-projects,.r-skills{grid-template-columns:minmax(0,1fr)}.r-head{padding-top:48px}}
+@media (max-width:600px){.r-projects,.r-skills{grid-template-columns:minmax(0,1fr)}}

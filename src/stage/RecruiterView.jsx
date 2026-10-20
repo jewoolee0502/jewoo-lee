@@ -77,11 +77,12 @@ export default function RecruiterView({ returnFocusRef }) {
           <button
             type="button"
             onClick={() => {
+              // plan-r3 V12: the return from the résumé view focuses the Recruiter view button.
               close()
-              app.nav.goToResume()
+              app.nav.goToResume({ opener: returnFocusRef?.current ?? null })
             }}
           >
-            Full résumé ↓
+            Full résumé
           </button>
           <span style={{ flex: 1 }} />
           <button type="button" id="rec-close" ref={closeRef} onClick={close}>

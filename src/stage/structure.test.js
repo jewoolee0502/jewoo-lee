@@ -3,8 +3,12 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as constants from '../core/constants.js'
+import { renderResumeHtml } from '../resume/entry-server.jsx'
 
 // Vitest runs from the project root (vite.config.js sits there).
+// views.js is a module of phase R3-2: a glob (as renderWithApp does) leaves it undefined until it exists,
+// so only the tests that need it fail, not the whole file.
+const viewsModule = Object.values(import.meta.glob('./views.js', { eager: true }))[0]
 const root = process.cwd()
 const abs = (rel) => resolve(root, rel)
 
@@ -77,6 +81,51 @@ describe('phase 8 structure', () => {
 
   it('three is imported only by src/scene/createScene.js', () => {
     expect(filesImporting(/['"]three(\/[^'"]*)?['"]/)).toEqual(['src/scene/createScene.js'])
+  })
+})
+
+// Round 3 Phase R3-2 TEST LIST (plan-r3 V10, V11, V4): the first-paint script, the résumé ids and the
+// removed scroll-to-résumé helper.
+describe('round 3 phase R3-2 structure', () => {
+  const text = () => readFileSync(abs('index.html'), 'utf8')
+  // Classic inline scripts: no src and no type attribute.
+  const inlineScripts = () =>
+    [...text().matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g)].filter(
+      (m) => !/\bsrc\s*=/.test(m[1] ?? '') && !/\btype\s*=/.test(m[1] ?? ''),
+    )
+
+  it('index.html has exactly one inline classic script, and it comes before the first stylesheet link', () => {
+    const found = inlineScripts()
+    expect(found).toHaveLength(1)
+    expect(text().indexOf(found[0][0])).toBeLessThan(text().indexOf('<link rel="stylesheet"'))
+  })
+
+  it('the inline script matches exactly the résumé ids, sets only data-view to resume, and holds no "</"', () => {
+    const RESUME_IDS = viewsModule?.RESUME_IDS
+    expect(RESUME_IDS, 'views.js RESUME_IDS').toBeDefined()
+    const body = inlineScripts()[0][2]
+    const m = body.match(/\^#\(([^)]*)\)\$/)
+    expect(m).not.toBeNull()
+    expect(m[1].split('|').sort()).toEqual([...RESUME_IDS].sort())
+    expect(body.match(/setAttribute\(/g)).toHaveLength(1)
+    expect(body).toMatch(/setAttribute\(\s*['"]data-view['"]\s*,\s*['"]resume['"]\s*\)/)
+    expect(body).not.toContain('laptop')
+    expect(body).not.toContain('</')
+  })
+
+  it('RESUME_IDS is #resume plus the ids of the résumé sections in the rendered markup', () => {
+    const RESUME_IDS = viewsModule?.RESUME_IDS
+    expect(RESUME_IDS, 'views.js RESUME_IDS').toBeDefined()
+    const ids = [...renderResumeHtml().matchAll(/<section\b([^>]*)>/g)]
+      .filter((m) => /class="block"/.test(m[1]))
+      .map((m) => /id="([^"]+)"/.exec(m[1])[1])
+    expect(ids.length).toBeGreaterThan(0)
+    expect(RESUME_IDS).toEqual(['resume', ...ids])
+  })
+
+  it('scrollToResume.js is gone and no source calls ctrl.goToResume', () => {
+    expect(existsSync(abs('src/stage/scrollToResume.js'))).toBe(false)
+    expect(filesImporting(/\bctrl\??\.goToResume\b/)).toEqual([])
   })
 })
 

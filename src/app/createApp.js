@@ -12,7 +12,8 @@ import { registry } from '../os/registry.js'
 import { createStore } from '../core/store.js'
 import { createController } from '../stage/controller.js'
 import { createGlide } from '../stage/glide.js'
-import { scrollToResume } from '../stage/scrollToResume.js'
+import { createViews } from '../stage/views.js'
+import { saveScroll, restoreScroll } from '../os/keepScroll.js'
 import { loadScene } from '../scene/loadScene.js'
 
 const NO_RECT = { top: 0, height: 0, bottom: 0, left: 0, right: 0, width: 0 }
@@ -91,7 +92,6 @@ export function createApp(overrides = {}) {
       getStageHeight: () => app.dom.stage?.clientHeight || globalThis.innerHeight,
       scrollY: () => globalThis.scrollY,
       glide: app.glide,
-      reduce: () => app.motion.reduce(),
       sceneStatus: () => app.scene.store.get().status,
       os: app.os,
       ui: {
@@ -116,12 +116,43 @@ export function createApp(overrides = {}) {
         setZoomed: (v) => app.dom.stage?.classList.toggle('zoomed', Boolean(v)),
         setRunway: (flat) => app.dom.track?.classList.toggle('flat-runway', Boolean(flat)),
       },
-      scrollToResume: (behavior) => scrollToResume(behavior),
     }),
   )
+  // The two views (plan-r3 V1, V6): the laptop is parked while the résumé view is shown. Leaving
+  // the laptop closes its dialogs, so nothing is left open (or focused) behind display:none. The
+  // OS windows' and terminal's scroll offsets are dropped by display:none, so they are saved at
+  // park (still shown) and written back right after unpark (shown again, before the next frame).
+  // main.jsx calls views.init() once; until then nothing reads the URL or listens to history.
+  let osScroll = null
+  app.views = pick('views', () =>
+    createViews({
+      laptop: {
+        park: (w) => {
+          osScroll = saveScroll(app.host?.osEl)
+          return app.ctrl.park(w)
+        },
+        unpark: (w) => {
+          const where = app.ctrl.unpark(w)
+          restoreScroll(osScroll)
+          osScroll = null
+          return where
+        },
+        beforeLeave: () => {
+          app.ui.store.set({ recOpen: false })
+          app.os.setMenu?.(false)
+        },
+      },
+      reduce: () => app.motion.reduce(),
+      timers: app.timers.child(),
+    }),
+  )
+  // Every way between the views: the HUD, the pill, the Recruiter view, ◆ Résumé, ResumeApp and the
+  // skip link go to the résumé; "← Laptop view" goes back; "Open the laptop" goes back, open (or
+  // just opens it from the laptop view).
   app.nav = pick('nav', () => ({
-    goToResume: () => app.ctrl.goToResume(),
-    openLaptop: () => app.ctrl.enter(),
+    goToResume: (o) => app.views.toResume(o),
+    openLaptop: () => (app.views.get() === 'resume' ? app.views.toLaptop({ place: 'open' }) : app.ctrl.enter()),
+    backToLaptop: () => app.views.toLaptop(),
   }))
 
   // Any extra override fields (later phases' modules or test fakes) are kept as given.
@@ -135,8 +166,9 @@ export function createApp(overrides = {}) {
     return () => stopWp?.()
   }
 
-  /** Tears everything down: timers, media listeners. */
+  /** Tears everything down: timers, media and history listeners. */
   app.dispose = () => {
+    app.views?.dispose?.()
     app.glide?.cancel?.()
     app.os?.dispose?.()
     app.timers.clearAll?.()

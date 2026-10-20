@@ -1,4 +1,4 @@
-// Scroll / camera controller (plan-r2 section 2, R1–R8; plan-r3 V2–V5).
+// Scroll / camera controller (plan-r2 section 2, R1–R8; plan-r3 V2–V7).
 //
 // The camera pose is a pure function of the page scroll (R1): every frame measures the track,
 // builds the runway layout from the measured pinned range (R3) and reads z off it, so wheel,
@@ -15,6 +15,13 @@
 // before `ctrl.layout` takes the new layout: an open laptop stays open, the desk stays the desk, and
 // a mid-dive position keeps its fraction only across a large change. The settle follows the last
 // user direction (`settle({ dir, travel })`, U6), and the cue shows only at the top and in the dive.
+//
+// While the résumé view is shown the laptop is parked (V6): `park()` records where to come back to
+// (`returnTo`, V7: a glide's end, else the nearer end by z, the desk without a scene) and freezes
+// everything, so update, settle and enter do nothing and the timers that still fire (terminal exit,
+// shutdown) only move `returnTo` to the desk. `unpark()` re-measures the shown track and jumps there;
+// `unpark('here')` (a Back during the switch's fade-in, so the laptop was never hidden) puts the page
+// back exactly where it was parked instead.
 import { createStore } from '../core/store.js'
 import { ss } from '../core/math.js'
 import { HUD_FADE } from '../core/constants.js'
@@ -27,20 +34,21 @@ export function createController({
   getStageHeight,
   scrollY,
   glide,
-  reduce,
   sceneStatus,
   os,
   ui,
-  scrollToResume,
 }) {
-  const store = createStore({ phase: 'desk', interactive: false, narrow: false })
-  const isReduced = () => Boolean(reduce?.())
+  const store = createStore({ phase: 'desk', interactive: false, narrow: false, parked: false })
   let runwayFlat = false
   let fallbackBooted = false
   let fallbackLive = false
   // The end ('open' | 'desk') of the glide this controller last started; meaningful only while
   // that glide is active.
   let glideEnd = null
+  // V7: where unpark() lands by default ('open' | 'desk'), recorded by park().
+  let returnTo = 'desk'
+  // The track-relative scroll park() measured (null when it measured nothing), for unpark('here').
+  let parkedS = null
 
   /** Measures the track: its layout, the track-relative scroll `s` and the track's document top. */
   function measure() {
@@ -69,7 +77,14 @@ export function createController({
     seg: 'top',
     layout: null,
 
+    /** V7: where the next unpark() lands by default. */
+    get returnTo() {
+      return returnTo
+    },
+
     update() {
+      // I9: a parked laptop is display:none; measuring it would read a 0 × 0 track.
+      if (store.get().parked) return
       const m = measure()
       let { s } = m
       const prev = ctrl.layout
@@ -147,40 +162,70 @@ export function createController({
     },
 
     /** V3: glide to the open laptop (the document end R) from wherever the page is (the laptop, a
-     *  hotspot, ★, "Open the laptop"). The fallback (no scene) is already in, and a loading scene
-     *  has no laptop yet. Until the two views (plan-r3 R3-2) the résumé still follows the track, so a
-     *  page scrolled past R is not on the laptop: from there the fallback glides back up to the
-     *  track top, and an "interactive" laptop that has scrolled away glides back to R. */
+     *  hotspot, ★, "Open the laptop" in the laptop view). The fallback (no scene) is already in, a
+     *  loading scene has no laptop yet, and a parked laptop is not on screen. */
     enter() {
-      const status = sceneStatus()
-      if (status === 'unavailable') {
-        const m = measure()
-        if (m.s > 0) glide.to(m.trackTopDoc)
-        return
-      }
-      if (status !== 'ready') return
-      const m = measure()
-      if (store.get().interactive && m.s <= m.L.R + 1) return
-      glideTo(m, 'open')
+      if (store.get().parked || sceneStatus() !== 'ready' || store.get().interactive) return
+      glideTo(measure(), 'open')
     },
 
-    /** Esc, ⏏ Close laptop, Shut Down…: glide back to the closed laptop. */
+    /** Esc, ⏏ Close laptop, Shut Down…: glide back to the closed laptop. Parked (a terminal `exit`
+     *  or a shutdown landing while the résumé is shown), it only makes the return land closed. */
     exit() {
+      if (store.get().parked) {
+        returnTo = 'desk'
+        return
+      }
       if (sceneStatus() !== 'ready' || store.get().phase === 'desk') return
       glideTo(measure(), 'desk')
     },
 
-    /** D11: the résumé is still below the track (until the two views); the browser's own smooth
-     *  scroll takes the reader there. */
-    goToResume() {
+    /** V6, V7: freezes the laptop before it is hidden and records where to return: `where` if given,
+     *  else the end of a glide in flight, else the nearer end (z ≥ .5 is open); the desk with no
+     *  scene. Returns that place. */
+    park(where) {
+      if (store.get().parked) return returnTo
+      parkedS = null
+      if (where) returnTo = where
+      else if (sceneStatus() === 'unavailable') returnTo = 'desk'
+      else if (glide.active && glideEnd) returnTo = glideEnd
+      else {
+        const m = measure()
+        parkedS = m.s
+        returnTo = poseAt(m.s, m.L).z >= 0.5 ? 'open' : 'desk'
+      }
       glide.cancel()
-      scrollToResume?.(isReduced() ? 'auto' : 'smooth')
+      glideEnd = null
+      store.set({ parked: true })
+      return returnTo
+    },
+
+    /** V6, I10: after the laptop is shown again, re-measures it (the window may have changed while
+     *  hidden) and jumps to `where` (the open end R or the desk), with no glide. The fallback always
+     *  lands at the desk, its only place. `'here'` is the scroll park() measured, when it measured
+     *  one (else `returnTo`): a rest there mid-dive (its idle settle was skipped while parked) then
+     *  settles by glide, so the laptop is never left half-open. Returns the end used: for 'here',
+     *  the end that settle glides to, else 'open' on the plateau (z 1) and 'desk' otherwise. */
+    unpark(where = returnTo) {
+      if (!store.get().parked) return null
+      store.set({ parked: false })
+      const m = measure()
+      ctrl.layout = m.L
+      let w = sceneStatus() === 'unavailable' ? 'desk' : where
+      if (w === 'here' && parkedS === null) w = returnTo
+      const s = w === 'here' ? Math.min(Math.max(parkedS, 0), m.L.R) : w === 'open' ? m.L.R : 0
+      parkedS = null
+      glide.jump(m.trackTopDoc + s)
+      ctrl.update()
+      if (w !== 'here') return w
+      ctrl.settle()
+      return glideEnd ?? (poseAt(s, m.L).z >= 1 ? 'open' : 'desk')
     },
 
     /** R6, U6: called once the page is at rest with the last user direction and the travel since
      *  the last rest; finishes a half-open dive that way, to the desk or the open laptop. */
     settle({ dir = 0, travel } = {}) {
-      if (sceneStatus() !== 'ready' || glide.active) return
+      if (store.get().parked || sceneStatus() !== 'ready' || glide.active) return
       const m = measure()
       const t = settleTarget(m.s, m.L, dir, travel)
       if (t !== null) glideTo(m, t === 0 ? 'desk' : 'open')

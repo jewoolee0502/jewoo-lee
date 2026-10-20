@@ -1,5 +1,7 @@
 // Phase 8 TEST LIST: scripts/prerender.test.mjs (injectResume, pure, on a fixture template).
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { injectResume } from './prerender-lib.mjs'
 
 const TEMPLATE =
@@ -31,6 +33,16 @@ describe('scripts/prerender injectResume', () => {
 
   it('throws when the outlet is missing', () => {
     expect(() => injectResume('<!doctype html><html><head></head><body></body></html>', MARKUP, LD)).toThrow()
+  })
+
+  // Round 3 Phase R3-2 (plan-r3 V10): the first-paint script stays ahead of the JSON-LD and </head>.
+  it('keeps the inline view script before the JSON-LD and </head> when run on the real index.html', () => {
+    const real = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8')
+    const inline = real.match(/<script>[\s\S]*?<\/script>/)[0]
+    const out = injectResume(real, MARKUP, LD)
+    expect(out).toContain(inline)
+    expect(out.indexOf(inline)).toBeLessThan(out.indexOf('<script type="application/ld+json">'))
+    expect(out.indexOf(inline)).toBeLessThan(out.indexOf('</head>'))
   })
 
   it('escapes "</script>" sequences inside the JSON-LD so the block cannot be broken out of', () => {

@@ -1,7 +1,9 @@
-// The plain-HTML résumé below the scene (D12), in the blueprint style of L241–269. It is
-// prerendered at build time (entry-server.jsx) and hydrated as a second root (main.jsx), so the
-// render must not touch `window`; only event handlers may. The "draft blurb" chip never shows
-// here (D15).
+// The plain-HTML résumé, the résumé view (D12, plan-r3 V1), in the blueprint style of L241–269.
+// It is prerendered at build time (entry-server.jsx) and hydrated as a second root (main.jsx), so
+// the render must not touch `window`; only event handlers may. The first control after its title
+// (which the switch focuses) is the way back to the laptop view ("← Laptop view", V13), which
+// views.css pins in the corner and shows only in the résumé view. The "draft blurb" chip never
+// shows here (D15).
 import { useApp } from '../app/AppContext.jsx'
 import { PROFILE, PROJECTS, ROLES, SKILLS, CAT, projectDims, projectImage, projectSrcSet } from '../content/index.js'
 import TrophiesGrid, { useGotTrophies } from './TrophiesGrid.jsx'
@@ -95,7 +97,7 @@ function TrophyCount() {
 export default function Resume() {
   const app = useApp()
 
-  // A plain link to #top without JS; with JS it glides up and into the open laptop.
+  // A plain link to #top without JS; with JS it switches to the laptop view, open.
   function openLaptop(e) {
     e.preventDefault()
     app.nav.openLaptop()
@@ -116,6 +118,11 @@ export default function Resume() {
             <h1 id="resume-title" tabIndex={-1}>
               {PROFILE.name}
             </h1>
+            {/* plan-r3 V13: right after the focused title, so the first Tab reaches it; views.css pins
+                it in the top-left corner and shows it only in the résumé view. */}
+            <button type="button" className="r-back" id="r-back" onClick={() => app.nav.backToLaptop?.()}>
+              <span aria-hidden="true">←</span> Laptop view
+            </button>
             <p className="r-tagline">{PROFILE.tagline}</p>
             <div className="r-actions">
               {cvLink}
@@ -132,7 +139,7 @@ export default function Resume() {
                 {'Instagram (@' + PROFILE.instagramHandle + ')'}
               </a>
               <a className="r-btn r-primary" href="#top" onClick={openLaptop}>
-                Open the laptop ↑
+                Open the laptop
               </a>
             </div>
           </div>

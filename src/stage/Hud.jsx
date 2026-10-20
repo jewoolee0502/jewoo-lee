@@ -1,5 +1,5 @@
 // Stage HUD (L275–280, without the prototype's dead #hud-exit, B12; round 2's #hud-exit is
-// ExitPill.jsx) plus the "Résumé ↓" button (D11).
+// ExitPill.jsx) plus the "Résumé" button, which switches to the résumé view (plan-r3 V14).
 import { useApp } from '../app/AppContext.jsx'
 import { useStore } from '../core/store.js'
 
@@ -15,7 +15,7 @@ export default function Hud({ recButtonRef }) {
         Recruiter view
       </button>
       <button id="hud-resume" onClick={() => app.nav.goToResume()}>
-        Résumé ↓
+        Résumé
       </button>
       <button
         id="hud-ach"

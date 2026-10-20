@@ -38,7 +38,7 @@ Where a decision departs from the suggested direction, the "Why" column explains
 | V10 | **The first paint has no flash and the no-JS case stays safe.** A tiny classic inline `<script>` in `<head>` sets `data-view="resume"` only for a résumé hash. `data-view="laptop"` is set by `views.init()` in `main.jsx`. **Challenge:** the inline script does not also set "laptop". | Hiding the résumé before JS proves it runs would leave a blank page if the bundle fails. Until `main.jsx` runs, the résumé sits below the reserved `#app:empty` block (off-screen), so hiding it then is invisible: no CLS, nothing visible changes. |
 | V11 | **Résumé section hashes count as the résumé view:** `RESUME_IDS = ['resume','about','experience','projects','skills','contact','trophies']`. A section hash scrolls to that section. | Otherwise `/#projects` would land in the laptop view on a hidden target. A test keeps index.html, `RESUME_IDS` and `Resume.jsx` in sync. |
 | V12 | **Focus.** Entering by `#resume` focuses `#resume-title` (`preventScroll`). A section hash scrolls only. Return focuses the opener if it is visible, else `#hud-exit` (open) or `#hud-resume` (desk / fallback). The initial load moves no focus. | Focus must never be left on a hidden element. Safari does not focus buttons on click, so the fallbacks matter there. |
-| V13 | **The "← Laptop view" button lives in `Resume.jsx`** (prerendered, before `<main>`). It is hidden by CSS unless `html[data-view="resume"]`, and is `position:fixed` in the top-left corner. The skip link is hidden in the résumé view. | It is first in the Tab order of the résumé view, its hydration matches the prerendered markup, and without JS it never shows. |
+| V13 | **The "← Laptop view" button lives in `Resume.jsx`** (prerendered, right after `h1#resume-title`). It is hidden by CSS unless `html[data-view="resume"]`, and is `position:fixed` in the top-left corner. The skip link is hidden in the résumé view. | The switch focuses the title, so the button is the first Tab stop after it; its hydration matches the prerendered markup, and without JS it never shows. |
 | V14 | **Labels drop "↓"**, because the résumé is no longer below. HUD `Résumé`, pill `Read the résumé`, Recruiter `Full résumé`, résumé header `Open the laptop`; ◆ `Résumé` and ResumeApp `Read the full résumé` stay. | They are views now, not scroll destinations. |
 | V15 | **Inner scrollers keep native chaining** (no `overscroll-behavior` on `.wb`/`.t-out`). The laptop view's canvas background is `--scene`. | Browser latching keeps momentum inside a window. A new gesture at a window edge chains to the page: downward does nothing (document end), upward enters the 120 px plateau before anything closes. `contain` would make scroll-to-close nearly impossible on phones, where compact windows fill the screen. The dark background removes the light-grid flash during root rubber-banding. |
 | V16 | **Esc in the résumé view does nothing.** Keys there do not press 3D keys or play key clicks. Konami still unlocks; its toast is in the hidden stage, so it is not seen until the laptop view. The Recruiter view and the ◆ menu are closed when leaving the laptop. | Owner: only a click returns to the laptop. Space paging through the résumé should not click. |
@@ -283,7 +283,7 @@ html[data-view="resume"] .r-back:hover,html[data-view="resume"] .r-back:focus-vi
 - **`src/styles/resume.css:1,26`:** comments ("Résumé view"). `#app:empty{height:var(--track-h)}` stays.
 - **`src/resume/Resume.jsx`:**
   - Header comment (1–4): "the résumé view".
-  - Before `<main>` (line 112): `<button type="button" className="r-back" id="r-back" onClick={() => app.nav.backToLaptop?.()}><span aria-hidden="true">←</span> Laptop view</button>`. The accessible name is "Laptop view".
+  - Right after `h1#resume-title` (not before `<main>`, which Tab from the focused title would skip): `<button type="button" className="r-back" id="r-back" onClick={() => app.nav.backToLaptop?.()}><span aria-hidden="true">←</span> Laptop view</button>`. The accessible name is "Laptop view".
   - Lines 98–102 comment: "switches to the laptop view, open".
   - Line 135: `Open the laptop`. `href="#top"` stays for no-JS.
 - **`src/resume/entry-server.jsx:17`:** `nav: { goToResume: noop, openLaptop: noop, backToLaptop: noop }`.
@@ -487,7 +487,7 @@ html[data-view="resume"] .r-back:hover,html[data-view="resume"] .r-back:focus-vi
    - Test 10: `Open the laptop` calls `nav.openLaptop` once and does not call `scrollTo`.
    - Test 12: the link `Open the laptop` has `href="#top"`.
    - New:
-     - the server markup has `button#r-back.r-back[type=button]` named "Laptop view" before `main#resume`;
+     - the server markup has `button#r-back.r-back[type=button]` named "Laptop view" as the first control after `#resume-title`;
      - a click calls `nav.backToLaptop` once;
      - hydration test 9 still has no mismatch.
 6. **`src/stage/keys.test.js`:** with `app.views = { get: () => 'resume' }`:
@@ -641,7 +641,7 @@ html[data-view="resume"] .r-back:hover,html[data-view="resume"] .r-back:focus-vi
 23. bfcache: in the résumé, navigate to `/robots.txt`, then go back. Record `pageshow.persisted`: if true, the view is still the résumé and the veil is off; if headless disables bfcache, record that.
 24. Recruiter view: open it, click `Full résumé` → résumé, focus on the title. Back → laptop at the desk, the dialog hidden, focus on `#hud-rec`.
 25. Esc in the résumé → view, `scrollY` and `activeElement` unchanged. Konami in the résumé → the `#trophies` count goes up by 1; no console errors.
-26. Keyboard only: load `/`, Tab → the skip link, Enter → résumé. Tab → `#r-back` is the first focus. Enter → laptop.
+26. Keyboard only: load `/`, Tab → the skip link, Enter → résumé (focus on `#resume-title`). Tab → `#r-back` is the next focus. Enter → laptop.
 27. No WebGL (`--disable-webgl --disable-3d-apis`), at 1440×900 and 390×844:
     - laptop view `scrollHeight === innerHeight`;
     - HUD `Résumé` → résumé; `← Laptop view` → the flat OS with focus on `#hud-resume`;

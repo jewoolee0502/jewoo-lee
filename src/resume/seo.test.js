@@ -87,6 +87,14 @@ describe('SEO head (index.html through Vite)', () => {
     expect(rule[1]).toMatch(/height\s*:\s*0|display\s*:\s*none/)
   })
 
+  // Round 3 Phase R3-2 (plan-r3 V10): the first-paint script is classic and inline, so Vite leaves it verbatim.
+  it('the transformed head keeps the inline view script verbatim', async () => {
+    const raw = RAW.match(/<script>[\s\S]*?<\/script>/)[0]
+    const doc = await headDocument(undefined)
+    const scripts = [...doc.querySelectorAll('script:not([src]):not([type])')]
+    expect(scripts.map((s) => s.outerHTML)).toContain(raw)
+  })
+
   it('URL consistency: buildPersonJsonLd(PROFILE).url equals the canonical href in the built index', async () => {
     const doc = await headDocument(undefined)
     const canonical = doc.querySelector('link[rel="canonical"]')?.getAttribute('href')
