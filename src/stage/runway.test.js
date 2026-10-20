@@ -171,8 +171,32 @@ describe('stage/runway', () => {
       expect(relayout(1020, d0, d1, true, false)).toBeNull()
     })
 
-    it('open short of the new dive end while the page moved (still = false): still jumps to the new R', () => {
-      expect(relayout(1000, L0, L2, true, false)).toBe(1170)
+    it('open short of the new dive end while the page moved (still = false): nothing moves, the settle finishes it', () => {
+      expect(relayout(1000, L0, L2, true, false)).toBeNull()
+    })
+
+    // Gap (wasOpen, moving page): a visitor who scrolls up in the frame of a layout change is not
+    // pulled back open; the idle settle takes the page from wherever it rests.
+    describe('open and moving (still = false) in a shrink 960 → 900', () => {
+      const d0 = runwayLayout({ trackH: 2 * 960 + 120, stageH: 960 })
+      const d1 = runwayLayout({ trackH: 2 * 900 + 120, stageH: 900 })
+
+      it('the layouts are R 1080 / diveEnd 960 and R 1020 / diveEnd 900', () => {
+        expect(d0).toMatchObject({ R: 1080, diveEnd: 960 })
+        expect(d1).toMatchObject({ R: 1020, diveEnd: 900 })
+      })
+
+      it('s 0 (the visitor scrolled to the desk in the same frame): nothing moves, not the new R (1020)', () => {
+        expect(relayout(0, d0, d1, true, false)).toBeNull()
+      })
+
+      it('s 500 (the visitor scrolled up mid-dive in the same frame): nothing moves', () => {
+        expect(relayout(500, d0, d1, true, false)).toBeNull()
+      })
+    })
+
+    it('open at rest short of the new dive end (still = true, new diveEnd 1050 past s 1000): jumps to the new R (1170), as before', () => {
+      expect(relayout(1000, L0, L2, true, true)).toBe(1170)
     })
 
     it('open mid-plateau, not at the end (s 1060 = L0.R − 60, still ≥ the new dive end 1050): nothing moves', () => {

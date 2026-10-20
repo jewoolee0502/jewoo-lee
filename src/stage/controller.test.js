@@ -399,6 +399,40 @@ describe('stage/controller', () => {
       expect(os.setLive).not.toHaveBeenCalledWith(true)
       expect(Math.abs(ctrl.z - z0)).toBeLessThan(0.01)
     })
+
+    // Gap (wasOpen, moving page): the open laptop rests at the old end (1080 of 960 → 1080). In one
+    // update the layout shrinks to 900 and the visitor scrolls, so s moves. The page is not pulled
+    // back open: no glide.jump to the new end, and the phase follows the pose.
+    it('(l) open at rest, then in one update the layout shrinks 960 → 900 and s moves to 0: no glide.jump, phase desk', () => {
+      const { env, glide, at, ctrl, phase } = setup()
+      env.stageH = 960
+      env.trackH = 2 * 960 + 120
+      at(1080)
+      expect(phase()).toBe('inside')
+      glide.jump.mockClear()
+      env.stageH = 900
+      env.trackH = 2 * 900 + 120
+      at(0)
+      expect(glide.jump).not.toHaveBeenCalled()
+      expect(phase()).toBe('desk')
+      expect(ctrl.z).toBe(0)
+      expect(ctrl.store.get().interactive).toBe(false)
+    })
+
+    it('(m) open at rest, then the layout shrinks 960 → 900 and s moves to 500 (mid-dive): no glide.jump, phase dive', () => {
+      const { env, glide, at, ctrl, phase } = setup()
+      env.stageH = 960
+      env.trackH = 2 * 960 + 120
+      at(1080)
+      expect(phase()).toBe('inside')
+      glide.jump.mockClear()
+      env.stageH = 900
+      env.trackH = 2 * 900 + 120
+      at(500)
+      expect(glide.jump).not.toHaveBeenCalled()
+      expect(phase()).toBe('dive')
+      expect(ctrl.store.get().interactive).toBe(false)
+    })
   })
 
   it('14. the document end is the open laptop: at trackH − stageH the phase is inside and every s from diveEnd to R has z 1, at three viewport sizes', () => {

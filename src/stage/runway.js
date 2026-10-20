@@ -62,19 +62,20 @@ export function cueOpacity({ seg, z }) {
 }
 
 /**
- * V5: the resize rule. Where `s` (laid out by L0) should move to in L1, or null to stay. An open
- * laptop (`wasOpen`) jumps to the new R when the new layout would leave it short of its dive end.
- * It also jumps when it was `still` (the page has not moved since the last frame) at the old
- * document end (s ≥ L0.R − 1) and that end moved, so it stays at the end and one notch up does not
- * close it; a page the visitor is scrolling is left alone. The desk and the rest of the plateau
- * stay where they are. A mid-dive position keeps its dive fraction when R changed by more than
- * REMAP_THRESHOLD, and also after a small change (the mobile toolbar) that would leave it on the
- * new plateau, which would open the laptop without a settle; any other small change is left alone.
- * A kept fraction always stays inside the new dive, so the settle finishes it.
+ * V5: the resize rule. Where `s` (laid out by L0) should move to in L1, or null to stay. Both
+ * open rules need a page at rest (`still`: it has not moved since the last frame). An open laptop
+ * (`wasOpen`) at rest jumps to the new R when the new layout would leave it short of its dive end,
+ * or when it sat at the old document end (s ≥ L0.R − 1) and that end moved, so it stays at the end
+ * and one notch up does not close it. A page the visitor is moving is never pulled: the idle
+ * settle finishes it by direction. The desk and the rest of the plateau stay where they are. A
+ * mid-dive position keeps its dive fraction when R changed by more than REMAP_THRESHOLD, and also
+ * after a small change (the mobile toolbar) that would leave it on the new plateau, which would
+ * open the laptop without a settle; any other small change is left alone. A kept fraction always
+ * stays inside the new dive, so the settle finishes it.
  */
 export function relayout(s, L0, L1, wasOpen, still = true) {
   if (wasOpen) {
-    if (s < L1.diveEnd) return L1.R
+    if (s < L1.diveEnd) return still ? L1.R : null
     return still && s >= L0.R - 1 && Math.abs(L1.R - L0.R) >= 1 ? L1.R : null
   }
   if (s <= 0 || s >= L0.diveEnd) return null
