@@ -119,7 +119,7 @@ describe('stage/glide', () => {
 
   // R3-1 (V4): nothing the glide does suspends anything any more. On every write path (frames, the
   // last frame, a cancel mid-glide, jump, a reduced-motion to), a stale `hold` option is never called,
-  // <html> keeps its classes and attributes (no snap-hold), and the only effect is instant scrollTo writes.
+  // <html> keeps its classes and attributes (no hold class), and the only effect is instant scrollTo writes.
   it('has no snap hold: a stale hold option is never called, <html> never changes, and every write is an instant scrollTo', () => {
     const html = document.documentElement
     const attrs = () => [...html.attributes].map((a) => `${a.name}=${a.value}`).sort()

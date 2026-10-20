@@ -2,13 +2,14 @@
 // Native scroll: the window carries the idle settle and the wheel grace hold.
 // Round 3 Phase R3-1 (plan-r3 V4): the page is native; the window wheel is passive, nothing is non-passive.
 // onIdle passes { dir, travel }.
+// Round 3 Phase R3-3 (plan-r3 V19, I16): the no-WebGL fallback works as the two views (section 5b).
 // Round 3 Phase R3-2 (plan-r3 V6, I9): the HUD, the pill and the Recruiter view switch to the résumé
 // view (labels without the arrow); while the controller is parked the bindings stop the ticker and
 // ignore window scrolls and stage resizes.
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { StrictMode } from 'react'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { triggerIntersection, triggerResize } from '../test/setup.js'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { setReducedMotion, triggerIntersection, triggerResize } from '../test/setup.js'
 import { renderWithApp } from '../test/renderWithApp.jsx'
 import Stage from './Stage.jsx'
 import OsPortal from '../os/OsPortal.jsx'
@@ -208,6 +209,51 @@ describe('stage/Stage', () => {
     it('the OS host element also has class live in the fallback, so window bodies scroll', async () => {
       const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(async () => null) })
       await waitFor(() => expect(app.scene.store.get().status).toBe('unavailable'))
+      expect(app.host.osEl).toHaveClass('flat')
+      expect(app.host.osEl).toHaveClass('live')
+    })
+  })
+
+  // Round 3 Phase R3-3 TEST LIST (plan-r3 V19): with no WebGL the two views still switch, the fallback
+  // OS stays flat, and the switch is instant (reduced motion, so no veil timers).
+  describe('5b. no-WebGL fallback as two views (V19)', () => {
+    beforeEach(() => {
+      setReducedMotion(true)
+    })
+
+    it('app.nav.goToResume shows the résumé view (data-view resume) with no scene loaded', async () => {
+      const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(async () => null) })
+      await waitFor(() => expect(app.scene.store.get().status).toBe('unavailable'))
+      act(() => app.nav.goToResume())
+      expect(document.documentElement.getAttribute('data-view')).toBe('resume')
+    })
+
+    it('app.nav.backToLaptop shows the laptop view, jumps the glide to the track top and focuses #hud-resume', async () => {
+      // The HUD and its focus target count as visible (jsdom has no layout).
+      vi.spyOn(Element.prototype, 'getClientRects').mockImplementation(function getClientRects() {
+        return this.closest('[hidden]') ? [] : [{}]
+      })
+      vi.spyOn(window.history, 'back').mockImplementation(() => {})
+      const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(async () => null) })
+      await waitFor(() => expect(app.scene.store.get().status).toBe('unavailable'))
+      act(() => app.nav.goToResume())
+      expect(document.documentElement.getAttribute('data-view')).toBe('resume')
+      const jump = vi.spyOn(app.glide, 'jump')
+
+      act(() => app.nav.backToLaptop())
+
+      expect(document.documentElement.getAttribute('data-view')).toBe('laptop')
+      expect(jump).toHaveBeenCalledWith(0)
+      expect(document.getElementById('hud-resume')).toHaveFocus()
+    })
+
+    it('app.nav.openLaptop from the résumé lands on the laptop view, not interactive, with the OS still live', async () => {
+      const { app } = renderWithApp(<Stage />, { loadScene: vi.fn(async () => null) })
+      await waitFor(() => expect(app.scene.store.get().status).toBe('unavailable'))
+      act(() => app.nav.goToResume())
+      act(() => app.nav.openLaptop())
+      expect(document.documentElement.getAttribute('data-view')).toBe('laptop')
+      expect(app.ctrl.store.get().interactive).toBe(false)
       expect(app.host.osEl).toHaveClass('flat')
       expect(app.host.osEl).toHaveClass('live')
     })

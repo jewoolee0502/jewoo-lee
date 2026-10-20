@@ -1,6 +1,8 @@
 // Round 3 Phase R3-2 TEST LIST: styles/views.css (plan-r3 V1, V9, V13). The two views are CSS
 // switches on <html data-view>: the laptop view hides #resume-root, the résumé view hides #app,
 // the way back is pinned in the corner, and the veil fades in its destination's background.
+// Round 3 Phase R3-3 TEST LIST (plan-r3 V18): the print block shows the résumé from either view,
+// placed after the laptop rule it overrides.
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -39,6 +41,20 @@ function declarations(selector, text = css) {
 }
 
 const screen = withoutPrint(css)
+
+// The inside of the `@media print { … }` block (empty when there is none).
+function printBlock(text) {
+  const at = text.indexOf('@media print')
+  if (at < 0) return ''
+  const open = text.indexOf('{', at)
+  let depth = 0
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === '{') depth++
+    else if (text[i] === '}' && --depth === 0) return text.slice(open + 1, i)
+  }
+  return ''
+}
+const print = printBlock(css)
 
 describe('styles/views.css', () => {
   it('the laptop view hides the résumé root', () => {
@@ -92,5 +108,33 @@ describe('styles/views.css', () => {
       (r) => r.selectors.includes('#resume-root') && /display:\s*(?!none)/.test(r.body),
     )
     expect(unconditional).toEqual([])
+  })
+})
+
+// Round 3 Phase R3-3 TEST LIST (plan-r3 V18): print shows the résumé, without the scene, the way back
+// or the veil.
+describe('styles/views.css print (V18)', () => {
+  it('the print block exists', () => {
+    expect(print.trim()).not.toBe('')
+  })
+
+  it('print shows #resume-root', () => {
+    expect(declarations('html[data-view] #resume-root', print)).toMatch(/display:\s*block/)
+  })
+
+  it('print hides the app (the scene) from either view', () => {
+    expect(declarations('html[data-view] #app', print)).toMatch(/display:\s*none/)
+  })
+
+  // Same specificity as the screen rule, so it must come later in the file to win.
+  it('the print block comes after the laptop view rule that hides #resume-root (cascade order)', () => {
+    const hide = css.indexOf('html[data-view="laptop"] #resume-root')
+    expect(hide).toBeGreaterThanOrEqual(0)
+    expect(css.indexOf('@media print')).toBeGreaterThan(hide)
+  })
+
+  it('print hides the way back and the veil', () => {
+    expect(declarations('.r-back', print)).toMatch(/display:\s*none/)
+    expect(declarations('.view-veil', print)).toMatch(/display:\s*none/)
   })
 })
