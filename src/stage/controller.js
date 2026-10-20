@@ -22,6 +22,12 @@
 // shutdown) only move `returnTo` to the desk. `unpark()` re-measures the shown track and jumps there;
 // `unpark('here')` (a Back during the switch's fade-in, so the laptop was never hidden) puts the page
 // back exactly where it was parked instead.
+//
+// A deep link's scene loads only on the first unpark (V17), so unpark('open') can land while the
+// scene is still loading, when every position shows z 0. It lands at the desk instead and leaves an
+// open pending: the first update with the scene ready runs enter(), so the lid opens with the normal
+// glide. A user scroll off the desk, a park or an exit drops it. That same loading → ready update
+// settles a page the visitor left mid-dive while loading (no idle settle runs without a scene).
 import { createStore } from '../core/store.js'
 import { ss } from '../core/math.js'
 import { HUD_FADE } from '../core/constants.js'
@@ -49,6 +55,10 @@ export function createController({
   let returnTo = 'desk'
   // The track-relative scroll park() measured (null when it measured nothing), for unpark('here').
   let parkedS = null
+  // unpark('open') while the scene loads: open once it is ready (V17).
+  let pendingOpen = false
+  // The scene status the last unparked update saw, to catch the loading → ready transition.
+  let lastStatus = null
 
   /** Measures the track: its layout, the track-relative scroll `s` and the track's document top. */
   function measure() {
@@ -89,6 +99,8 @@ export function createController({
       let { s } = m
       const prev = ctrl.layout
       const status = sceneStatus()
+      const nowReady = lastStatus === 'loading' && status === 'ready'
+      lastStatus = status
       if (!glide.active) glideEnd = null
       // V5: a layout change (rotation, window resize, the mobile toolbar). A glide this controller
       // started is re-aimed at its end; otherwise the resize rule may move the page once. That jump
@@ -106,8 +118,13 @@ export function createController({
         }
       }
       ctrl.layout = m.L
+      // A scroll off the desk is the visitor moving on: no open later. Checked before the status
+      // branches, so it also holds on the frame the scene turns ready.
+      if (pendingOpen && Math.abs(s) >= 1) pendingOpen = false
 
       if (status === 'unavailable') {
+        // No scene will come: nothing left to open.
+        pendingOpen = false
         // R10: no scene, no runway. The flat OS is live from the first frame.
         if (!fallbackBooted) {
           fallbackBooted = true
@@ -136,6 +153,15 @@ export function createController({
       if (phase !== store.get().phase) store.set({ phase })
       ui.setCue(cueOpacity(pose))
       ui.setHud?.(1 - ss(HUD_FADE[0], HUD_FADE[1], pose.z))
+
+      // The scene just became ready: open it if an unpark asked for that while it loaded, else
+      // finish a dive left half-open while loading (the nearer end; no-op at the desk or open).
+      if (nowReady) {
+        if (pendingOpen) {
+          pendingOpen = false
+          ctrl.enter()
+        } else ctrl.settle({ dir: 0 })
+      }
     },
 
     /** Inside is always flat (R4): compact on narrow screens, scaled to fill otherwise. The
@@ -172,6 +198,7 @@ export function createController({
     /** Esc, ⏏ Close laptop, Shut Down…: glide back to the closed laptop. Parked (a terminal `exit`
      *  or a shutdown landing while the résumé is shown), it only makes the return land closed. */
     exit() {
+      pendingOpen = false
       if (store.get().parked) {
         returnTo = 'desk'
         return
@@ -186,6 +213,7 @@ export function createController({
     park(where) {
       if (store.get().parked) return returnTo
       parkedS = null
+      pendingOpen = false
       if (where) returnTo = where
       else if (sceneStatus() === 'unavailable') returnTo = 'desk'
       else if (glide.active && glideEnd) returnTo = glideEnd
@@ -205,7 +233,9 @@ export function createController({
      *  lands at the desk, its only place. `'here'` is the scroll park() measured, when it measured
      *  one (else `returnTo`): a rest there mid-dive (its idle settle was skipped while parked) then
      *  settles by glide, so the laptop is never left half-open. Returns the end used: for 'here',
-     *  the end that settle glides to, else 'open' on the plateau (z 1) and 'desk' otherwise. */
+     *  the end that settle glides to, else 'open' on the plateau (z 1) and 'desk' otherwise.
+     *  'open' while the scene is still loading lands at the desk (returns 'desk') and glides open
+     *  once the scene is ready, unless the visitor moves first (V17). */
     unpark(where = returnTo) {
       if (!store.get().parked) return null
       store.set({ parked: false })
@@ -213,6 +243,10 @@ export function createController({
       ctrl.layout = m.L
       let w = sceneStatus() === 'unavailable' ? 'desk' : where
       if (w === 'here' && parkedS === null) w = returnTo
+      if (w === 'open' && sceneStatus() === 'loading') {
+        w = 'desk'
+        pendingOpen = true
+      }
       const s = w === 'here' ? Math.min(Math.max(parkedS, 0), m.L.R) : w === 'open' ? m.L.R : 0
       parkedS = null
       glide.jump(m.trackTopDoc + s)

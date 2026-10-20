@@ -6,6 +6,9 @@
 // the resize rule jumps through glide.jump; nothing snaps or detents.
 // Round 3 Phase R3-2 (plan-r3 V6–V7, I9–I10): park/unpark freeze the laptop while the résumé view is
 // shown. goToResume is gone (the views switch it, not the controller), so its test 9 is removed.
+// Round 3 Phase R3-3 review (plan-r3 V17): a deep link's scene loads only on the first unpark, so
+// unpark('open') can land while the scene is still loading. It lands at the desk and opens with the
+// normal glide once the scene is ready (L1–L5); a page left mid-dive while loading settles on ready.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createController } from './controller.js'
 
@@ -551,6 +554,165 @@ describe('stage/controller', () => {
       ctrl.settle({ dir: 1, travel: 100 })
       ctrl.enter()
       expect(glide.to).not.toHaveBeenCalled()
+    })
+  })
+
+  // plan-r3 V17: the scene loads on the first unpark, so "Open the laptop" from a deep-linked résumé
+  // unparks while it is still loading. A loading scene shows z 0 everywhere, so landing at R would
+  // show a blank stage at the document end and then snap open with no dive.
+  describe('unpark while the scene is loading (V17)', () => {
+    it('L1: unpark("open") while loading lands at the desk (0), returns desk and makes no glide', () => {
+      const { env, ctrl, glide, at, phase } = setup()
+      env.status = 'loading'
+      at(0)
+      ctrl.park('desk')
+      glide.jump.mockClear()
+      expect(ctrl.unpark('open')).toBe('desk')
+      expect(glide.jump).toHaveBeenLastCalledWith(0)
+      expect(glide.jump).not.toHaveBeenCalledWith(1120)
+      expect(glide.to).not.toHaveBeenCalled()
+      expect(phase()).toBe('desk')
+    })
+
+    it('L2: the first update once the scene is ready glides to the open laptop (R 1120), once', () => {
+      const { env, ctrl, glide, at } = setup()
+      env.status = 'loading'
+      at(0)
+      ctrl.park('desk')
+      ctrl.unpark('open')
+      at(0)
+      expect(glide.to).not.toHaveBeenCalled()
+      env.status = 'ready'
+      at(0)
+      expect(glide.to).toHaveBeenCalledTimes(1)
+      expect(glide.to).toHaveBeenLastCalledWith(1120)
+      at(0)
+      expect(glide.to).toHaveBeenCalledTimes(1)
+    })
+
+    it('L3: a user scroll while loading cancels the pending open: on ready nothing glides open', () => {
+      const { env, ctrl, glide, at } = setup()
+      env.status = 'loading'
+      at(0)
+      ctrl.park('desk')
+      ctrl.unpark('open')
+      at(80)
+      at(0)
+      env.status = 'ready'
+      at(0)
+      expect(glide.to).not.toHaveBeenCalled()
+    })
+
+    it('L4: park() or exit() while loading cancels the pending open', () => {
+      const a = setup()
+      a.env.status = 'loading'
+      a.at(0)
+      a.ctrl.park('desk')
+      a.ctrl.unpark('open')
+      a.ctrl.exit()
+      a.env.status = 'ready'
+      a.at(0)
+      expect(a.glide.to).not.toHaveBeenCalled()
+
+      const b = setup()
+      b.env.status = 'loading'
+      b.at(0)
+      b.ctrl.park('desk')
+      b.ctrl.unpark('open')
+      b.ctrl.park('desk')
+      b.ctrl.unpark('desk')
+      b.env.status = 'ready'
+      b.at(0)
+      expect(b.glide.to).not.toHaveBeenCalled()
+    })
+
+    it('L3b: a scroll off the desk in the same update the scene turns ready cancels the pending open; the mid-dive settle applies instead (80 → desk)', () => {
+      const { env, ctrl, glide, at } = setup()
+      env.status = 'loading'
+      at(0)
+      ctrl.park('desk')
+      ctrl.unpark('open')
+      env.status = 'ready'
+      at(80)
+      expect(glide.to).not.toHaveBeenCalledWith(1120)
+      expect(glide.to).toHaveBeenCalledTimes(1)
+      expect(glide.to).toHaveBeenLastCalledWith(0)
+    })
+
+    it('L4b: the scene turning unavailable drops the pending open (nothing opens on a later ready)', () => {
+      const { env, ctrl, glide, at } = setup()
+      env.status = 'loading'
+      at(0)
+      ctrl.park('desk')
+      ctrl.unpark('open')
+      env.status = 'unavailable'
+      at(0)
+      env.status = 'loading'
+      at(0)
+      env.status = 'ready'
+      at(0)
+      expect(glide.to).not.toHaveBeenCalled()
+    })
+
+    it('L5: unpark("open") once the scene is ready still jumps straight to R (no pending)', () => {
+      const { ctrl, glide, at, phase } = setup()
+      at(0)
+      ctrl.park('desk')
+      expect(ctrl.unpark('open')).toBe('open')
+      expect(glide.jump).toHaveBeenLastCalledWith(1120)
+      expect(phase()).toBe('inside')
+      expect(glide.to).not.toHaveBeenCalled()
+    })
+
+    it('L6: unavailable still lands at the desk with no glide later (nothing pending)', () => {
+      const { env, ctrl, glide, at } = setup()
+      env.status = 'unavailable'
+      at(0)
+      ctrl.park('desk')
+      expect(ctrl.unpark('open')).toBe('desk')
+      at(0)
+      expect(glide.to).not.toHaveBeenCalled()
+    })
+  })
+
+  // No idle settle runs while the scene loads (settle needs a ready scene), so a rest mid-dive then
+  // would be left half-open when the laptop appears. The loading → ready update settles it (dir 0:
+  // the nearer end).
+  describe('loading → ready settles a mid-dive page', () => {
+    it('R1: mid-dive at 400 while loading, then ready: glides to the desk (0), once', () => {
+      const { env, glide, at } = setup()
+      env.status = 'loading'
+      at(400)
+      env.status = 'ready'
+      at(400)
+      expect(glide.to).toHaveBeenCalledTimes(1)
+      expect(glide.to).toHaveBeenLastCalledWith(0)
+      at(400)
+      expect(glide.to).toHaveBeenCalledTimes(1)
+    })
+
+    it('R2: mid-dive at 700 while loading, then ready: glides to the open laptop (1120)', () => {
+      const { env, glide, at } = setup()
+      env.status = 'loading'
+      at(700)
+      env.status = 'ready'
+      at(700)
+      expect(glide.to).toHaveBeenLastCalledWith(1120)
+    })
+
+    it('R3: no settle without a loading→ready transition, and none at the desk or on the plateau when it happens', () => {
+      for (const y of [0, 1060]) {
+        const f = setup()
+        f.env.status = 'loading'
+        f.at(y)
+        f.env.status = 'ready'
+        f.at(y)
+        expect(f.glide.to).not.toHaveBeenCalled()
+      }
+      const g = setup()
+      g.at(400)
+      g.at(400)
+      expect(g.glide.to).not.toHaveBeenCalled()
     })
   })
 })

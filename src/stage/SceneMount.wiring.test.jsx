@@ -1,10 +1,15 @@
 // Phase 7 TEST LIST: stage/SceneMount.wiring.test.jsx. `wireScene(api, app)` is the thin helper
 // that createScene uses to subscribe the scene to the stores (exported from scene/createScene.js).
 // SceneMount is rendered through renderWithApp with a fake loadScene, so no WebGL is needed.
+// Round 3 Phase R3-3 (plan-r3 V17, I17): the scene loads on the first unpark, never while the laptop
+// is parked (a deep link to the résumé), and a later park does not dispose it. Review: the main.jsx
+// order (views.init() on a #resume URL, then mount) defers the scene, and "Open the laptop" while the
+// scene is still loading lands at the desk and glides open once it is ready.
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { StrictMode, createRef } from 'react'
-import { render, waitFor } from '@testing-library/react'
+import { act, render, waitFor } from '@testing-library/react'
 import { renderWithApp } from '../test/renderWithApp.jsx'
+import { setReducedMotion } from '../test/setup.js'
 import { createApp } from '../app/createApp.js'
 import { AppProvider } from '../app/AppContext.jsx'
 import { MODE_KEYS } from '../wallpaper/modes.js'
@@ -123,6 +128,165 @@ describe('stage/SceneMount loading', () => {
     expect(counter.created - counter.disposed).toBe(1)
     unmount()
     expect(counter.created - counter.disposed).toBe(0)
+    app.dispose()
+  })
+})
+
+// Round 3 Phase R3-3 TEST LIST (plan-r3 V17, I17): the scene is deferred until the laptop is first shown.
+describe('stage/SceneMount deferral (V17)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // One macrotask: past the microtasks SceneMount's loader chain needs.
+  const flush = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+  const refs = () => ({ sceneLayerRef: createRef(), stageRef: createRef(), tipRef: createRef() })
+
+  it('with the laptop parked before mount (a deep link to the résumé), loadScene is not called', async () => {
+    const loadScene = vi.fn(async () => ({ createScene: () => ({ dispose: vi.fn() }) }))
+    const app = createApp({ loadScene })
+    app.ctrl.park('desk')
+    render(
+      <AppProvider app={app}>
+        <SceneMount {...refs()} />
+      </AppProvider>,
+    )
+    await flush()
+    expect(loadScene).not.toHaveBeenCalled()
+    expect(app.scene.store.get().status).toBe('loading')
+    app.dispose()
+  })
+
+  it('after the first unpark, loadScene is called once and the scene becomes ready', async () => {
+    const createScene = vi.fn(() => ({ dispose: vi.fn() }))
+    const loadScene = vi.fn(async () => ({ createScene }))
+    const app = createApp({ loadScene })
+    app.ctrl.park('desk')
+    render(
+      <AppProvider app={app}>
+        <SceneMount {...refs()} />
+      </AppProvider>,
+    )
+    await flush()
+    expect(loadScene).not.toHaveBeenCalled()
+
+    act(() => app.ctrl.unpark())
+    await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
+    await flush()
+    expect(loadScene).toHaveBeenCalledTimes(1)
+    expect(createScene).toHaveBeenCalledTimes(1)
+    app.dispose()
+  })
+
+  it('a later park after the scene is ready does not dispose it', async () => {
+    const dispose = vi.fn()
+    const app = createApp({ loadScene: vi.fn(async () => ({ createScene: () => ({ dispose }) })) })
+    app.ctrl.park('desk')
+    render(
+      <AppProvider app={app}>
+        <SceneMount {...refs()} />
+      </AppProvider>,
+    )
+    await flush()
+    act(() => app.ctrl.unpark())
+    await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
+
+    act(() => app.ctrl.park('desk'))
+    await flush()
+    expect(dispose).not.toHaveBeenCalled()
+    expect(app.scene.api).not.toBeNull()
+    app.dispose()
+  })
+
+  it('StrictMode: after the first unpark exactly one scene is alive; unmount disposes it', async () => {
+    const counter = { created: 0, disposed: 0 }
+    const app = createApp({
+      loadScene: vi.fn(async () => ({
+        createScene: () => {
+          counter.created += 1
+          return { dispose: () => (counter.disposed += 1) }
+        },
+      })),
+    })
+    app.ctrl.park('desk')
+    const { unmount } = render(
+      <StrictMode>
+        <AppProvider app={app}>
+          <SceneMount {...refs()} />
+        </AppProvider>
+      </StrictMode>,
+    )
+    await flush()
+    expect(counter.created).toBe(0)
+
+    act(() => app.ctrl.unpark())
+    await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
+    await flush()
+    expect(counter.created - counter.disposed).toBe(1)
+    unmount()
+    expect(counter.created - counter.disposed).toBe(0)
+    app.dispose()
+  })
+
+  // As main.jsx does it: createApp(), then views.init() reads the #resume URL and parks the laptop,
+  // then the tree mounts.
+  function deepLinkApp(loadScene) {
+    setReducedMotion(true)
+    history.replaceState(null, '', '/#resume')
+    const app = createApp({ loadScene })
+    app.views.init()
+    render(
+      <AppProvider app={app}>
+        <SceneMount {...refs()} />
+      </AppProvider>,
+    )
+    return app
+  }
+
+  it('a #resume URL through views.init() (the main.jsx order) defers the scene; backToLaptop loads it once', async () => {
+    const loadScene = vi.fn(async () => ({ createScene: () => ({ dispose: vi.fn() }) }))
+    const app = deepLinkApp(loadScene)
+    expect(document.documentElement.getAttribute('data-view')).toBe('resume')
+    expect(app.ctrl.store.get().parked).toBe(true)
+    await flush()
+    expect(loadScene).not.toHaveBeenCalled()
+
+    act(() => app.nav.backToLaptop())
+    expect(document.documentElement.getAttribute('data-view')).toBe('laptop')
+    await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
+    await flush()
+    expect(loadScene).toHaveBeenCalledTimes(1)
+    app.dispose()
+  })
+
+  it('openLaptop from a deep-linked résumé while the scene loads: lands at the desk, then glides open once it is ready', async () => {
+    let resolve
+    const loadScene = vi.fn(() => new Promise((r) => (resolve = r)))
+    const app = deepLinkApp(loadScene)
+    // A measured laptop: stage 1000, track 2120, so the open end is R 1120 (jsdom has no layout).
+    app.dom.track = { getBoundingClientRect: () => ({ top: -window.scrollY, height: 2120 }) }
+    app.dom.stage = { clientHeight: 1000, classList: { toggle: vi.fn() }, style: { setProperty: vi.fn(), removeProperty: vi.fn() } }
+    const jump = vi.spyOn(app.glide, 'jump').mockImplementation(() => {})
+    const to = vi.spyOn(app.glide, 'to').mockImplementation(() => {})
+    await flush()
+
+    act(() => app.nav.openLaptop())
+    expect(document.documentElement.getAttribute('data-view')).toBe('laptop')
+    expect(jump).toHaveBeenLastCalledWith(0)
+    expect(jump).not.toHaveBeenCalledWith(1120)
+    await flush()
+    expect(loadScene).toHaveBeenCalledTimes(1)
+    expect(app.scene.store.get().status).toBe('loading')
+    app.ctrl.update()
+    expect(to).not.toHaveBeenCalled()
+
+    await act(async () => resolve({ createScene: () => ({ dispose: vi.fn() }) }))
+    await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
+    app.ctrl.update()
+    expect(to).toHaveBeenCalledTimes(1)
+    expect(to).toHaveBeenLastCalledWith(1120)
+    app.dom.track = null
+    app.dom.stage = null
     app.dispose()
   })
 })
