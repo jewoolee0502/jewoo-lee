@@ -1094,6 +1094,141 @@ describe('scene/createScene pick: a real mesh beats a hit proxy', () => {
   })
 })
 
+// Effect meshes are never pick targets (bug: the hidden lid sheen, child of the hinge, was hit first, so
+// "Sticky note" never showed on the lid and "Laptop · open me" won; a hidden deck glow could take the
+// Keyboard and Power button hits mid-dive). In three r128 a hidden object is still tested by the
+// raycaster (only the renderer skips it), and a mesh whose raycast is a no-op is never returned. The
+// mock returns whatever `state.hits` holds, so `threeHits` filters the candidates the way three would:
+// a mesh with a no-op raycast drops out, a hidden mesh stays. Either fix passes: a no-op raycast on the
+// effect meshes, or a pick that skips hidden objects (and their ancestors). The always-visible contact
+// shadow and cable can only pass with the no-op raycast.
+describe('scene/createScene pick: effect meshes are never pick targets (R4-3 sheen, deck glow, contact, cable)', () => {
+  beforeEach(() => {
+    state.calls = []
+    state.created = []
+    state.failOn = null
+    state.seq = 0
+    state.hits = []
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const hotOf = (label) => state.created.find((o) => o.userData?.hot?.label === label)
+  const canvasOf = (env) => env.mount.querySelector('canvas.gl')
+  const pointer = (el, type, x = 10) => el.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: 10 }))
+  const sized = (env) => {
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+  }
+  const isProxy = (m) => m.material?.__args?.[0]?.visible === false
+  const planeOf = (w, h) => state.created.find((o) => o.__kind === 'Mesh' && o.geometry?.__kind === 'PlaneGeometry' && o.geometry.__args?.[0] === w && o.geometry.__args?.[1] === h)
+  /** The lid sheen: an additive plane whose map is the 256 × 64 band (as in the R4-3 block). */
+  const sheenMesh = () =>
+    state.created.find(
+      (o) =>
+        o.__kind === 'Mesh' &&
+        o.material?.map?.__kind === 'CanvasTexture' &&
+        o.material.map.__args[0]?.width === 256 &&
+        o.material.map.__args[0]?.height === 64 &&
+        o.material.__args?.[0]?.blending === ADDITIVE_BLENDING,
+    )
+  const deckGlowMesh = () => planeOf(2.8, 1)
+  const contactMesh = () => planeOf(3.4, 2.5)
+  const cableMesh = () => state.created.find((o) => o.__kind === 'Mesh' && o.geometry?.__kind === 'TubeGeometry')
+  /** A mock mesh's raycast does something only if it is a recording member: a no-op records no call. */
+  const raycastIsLive = (m) => {
+    const before = state.calls.length
+    m.raycast()
+    const live = state.calls.length !== before
+    state.calls.length = before
+    return live
+  }
+  /** What three's raycaster returns for these candidates: a no-op raycast returns nothing, a hidden mesh is still tested. */
+  const threeHits = (cands) => cands.filter(raycastIsLive).map((object) => ({ object }))
+  /** Gives a mock mesh the parent and userData a real scene has (the mock's add() sets neither). */
+  const under = (m, parent) => {
+    m.parent = parent
+    m.userData = {}
+    return m
+  }
+  /** Moves the pointer over the stage with the candidates under the ray, then reads the tooltip. */
+  const pickWith = (env, cands) => {
+    state.hits = threeHits(cands)
+    pointer(canvasOf(env), 'pointermove')
+    return env.tipEl.hidden ? null : env.tipEl.textContent
+  }
+  const open = () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.ctrl.z = 0
+    return { env, api }
+  }
+
+  it('a hidden lid sheen in front of the sticky note does not win the pick: the note resolves to Sticky note', () => {
+    const { env, api } = open()
+    const sheen = under(sheenMesh(), hotOf('Laptop · open me'))
+    const note = hotOf('Sticky note')
+    expect(sheen, 'the lid sheen plane').toBeDefined()
+    expect(note, 'sticky note').toBeDefined()
+    expect(sheen.visible, 'the sheen is hidden at rest').not.toBe(true)
+
+    expect(pickWith(env, [sheen, note])).toBe('Sticky note')
+    api.dispose()
+  })
+
+  it('a lid sheen visible during its sweep is still not a target: the sticky note under it resolves to Sticky note', () => {
+    const { env, api } = open()
+    const hinge = hotOf('Laptop · open me')
+    const sheen = under(sheenMesh(), hinge)
+    const note = hotOf('Sticky note')
+    // Hovering the lid at the desk starts the sweep (D5), so the sheen is shown for its 0.9 s.
+    pickWith(env, [hinge])
+    api.frame(0, 0.016)
+    expect(sheen.visible, 'the sheen is sweeping').toBe(true)
+
+    expect(pickWith(env, [sheen, note])).toBe('Sticky note')
+    api.dispose()
+  })
+
+  it('a hidden deck glow over the keyboard does not win the pick: a keycap under it resolves to Keyboard', () => {
+    const { env, api } = open()
+    const kbHot = hotOf('Keyboard')
+    const glow = under(deckGlowMesh(), undefined)
+    const keycap = under(kbHot.children.find((c) => c.__kind === 'Mesh' && !isProxy(c)), kbHot)
+    expect(glow, 'the deck glow plane 2.8 × 1.0').toBeDefined()
+    expect(glow.visible, 'the deck glow is hidden at rest').not.toBe(true)
+
+    expect(pickWith(env, [glow, keycap])).toBe('Keyboard')
+    api.dispose()
+  })
+
+  it('a hidden deck glow over Touch ID does not win the pick: the Touch ID mesh resolves to Power button', () => {
+    const { env, api } = open()
+    const pbtn = hotOf('Power button')
+    const glow = under(deckGlowMesh(), undefined)
+    const touch = under(pbtn.children.find((c) => c.__kind === 'Mesh' && !isProxy(c)), pbtn)
+    expect(glow.visible, 'the deck glow is hidden at rest').not.toBe(true)
+
+    expect(pickWith(env, [glow, touch])).toBe('Power button')
+    api.dispose()
+  })
+
+  it('the contact shadow and the MagSafe cable never take a pick, visible or not: a keycap under them resolves to Keyboard', () => {
+    const { env, api } = open()
+    const keycap = under(hotOf('Keyboard').children.find((c) => c.__kind === 'Mesh' && !isProxy(c)), hotOf('Keyboard'))
+    const effects = { 'contact shadow': under(contactMesh(), undefined), 'MagSafe cable': under(cableMesh(), undefined) }
+    for (const [name, m] of Object.entries(effects)) {
+      expect(m, name + ' mesh').toBeDefined()
+      expect(pickWith(env, [m, keycap]), name + ' must not be the chosen hit').toBe('Keyboard')
+    }
+    api.dispose()
+  })
+})
+
 // Round 4 Phase R4-2 TEST LIST (plan-r4 §5 R4-2 item 8): the MacBook body, the keycap mesh, the PMREM env
 // (laptop only, with the no-env fallback), the key presses, the backlight, the laptop glow and the textures.
 // The laptop library is read with vi.importActual inside each test, so a missing export fails only that test.

@@ -298,6 +298,14 @@ export function buildLaptop(T, ctx) {
   const stickerM = part(new THREE.PlaneGeometry(0.5, 0.125), stickerMat, -0.85, 0.42, back - 0.001, hinge)
   stickerM.rotation.set(0, PI, PI - 0.06)
 
+  // Purely decorative meshes are never pick targets: three r128's Raycaster still tests meshes with
+  // visible = false, so the hidden sheen (just outside the lid back) took the sticky note's hits and
+  // the hidden deck glow (above the cap tops) took the keyboard's and Touch ID's.
+  const noPick = (m) => {
+    m.raycast = () => {}
+    return m
+  }
+
   // Effects, built hidden: the frame shows them only while they are lit (D4, D5), so a resting frame
   // draws neither. Both are additive, unlit and do not write depth.
   const fx = (map, extra) => {
@@ -318,17 +326,20 @@ export function buildLaptop(T, ctx) {
   const sheen = part(sheenGeo, fx(band.t, { opacity: SHEEN.opacity }), 0, LID.h / 2, back - 0.003, hinge)
   sheen.rotation.set(0, PI, PI)
   sheen.visible = false
+  noPick(sheen)
   // The screen's glow on the deck (D4), in front of the hinge over the keyboard, tinted the screen
   // light's colour; the frame sets its opacity.
   const glowTex = canvasTex(512, 180, drawDeckGlow)
   const deckGlow = part(flatDown(new THREE.PlaneGeometry(2.8, 1), 0, 0, 0), fx(glowTex.t, { color: 0x7cc4ff, opacity: 0 }), 0, BASE.deckY + 0.004, -0.55, base)
   deckGlow.visible = false
+  noPick(deckGlow)
 
   // ---------- in the rig: the braided MagSafe cable (M18) and the contact shadow (M21) ----------
   const cableM = new THREE.MeshStandardMaterial({ color: MATERIALS.cable.color, roughness: MATERIALS.cable.roughness, metalness: 0 })
   const curve = new THREE.CatmullRomCurve3(CABLE.points.map((p) => new THREE.Vector3(...p)))
   const cable = mk(new THREE.TubeGeometry(curve, 64, CABLE.r, 6, false), cableM, 0, 0, 0)
   cable.castShadow = false
+  noPick(cable)
   const shadowTex = canvasTex(256, 192, drawContactShadow)
   const contact = mk(
     flatDown(new THREE.PlaneGeometry(3.4, 2.5), 0, 0, 0),
@@ -338,6 +349,7 @@ export function buildLaptop(T, ctx) {
     BASE.pos[2],
   )
   contact.castShadow = contact.receiveShadow = false
+  noPick(contact)
 
   return {
     base,
