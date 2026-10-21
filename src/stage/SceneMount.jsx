@@ -4,10 +4,19 @@
 // plan-r3 V17 (I17): a deep link to the résumé parks the laptop before the Stage mounts, so the scene
 // (the three.js chunk and the GPU init) waits for the first unparked moment. `live` is a one-way
 // latch: the loading effect depends on it, not on `parked`, so a later park never disposes the scene.
+// plan-r4 §6: with `?stats` in the URL, the live scene api is also `globalThis.__jayScene`, so a
+// headless probe can read `info()` (draw calls and triangles).
 import { useEffect, useState } from 'react'
 import { useApp } from '../app/AppContext.jsx'
 
 const isParked = (app) => Boolean(app.ctrl?.store?.get?.().parked)
+const wantsStats = () => {
+  try {
+    return new URLSearchParams(globalThis.location?.search ?? '').has('stats')
+  } catch {
+    return false
+  }
+}
 
 export default function SceneMount({ sceneLayerRef, stageRef, tipRef, parkRef }) {
   const app = useApp()
@@ -49,6 +58,7 @@ export default function SceneMount({ sceneLayerRef, stageRef, tipRef, parkRef })
               reduce: () => app.motion.reduce(),
             })
             app.scene.setApi(api)
+            if (wantsStats()) globalThis.__jayScene = api
             app.scene.setStatus('ready')
           } catch (e) {
             console.error(e)
@@ -64,6 +74,7 @@ export default function SceneMount({ sceneLayerRef, stageRef, tipRef, parkRef })
       )
     return () => {
       cancelled = true
+      if (api && globalThis.__jayScene === api) delete globalThis.__jayScene
       api?.dispose?.()
       api = null
       app.scene.setApi(null)

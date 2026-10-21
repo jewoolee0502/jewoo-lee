@@ -132,6 +132,50 @@ describe('stage/SceneMount loading', () => {
   })
 })
 
+// Round 4 R4-1 (plan-r4 §5 step 1): with `?stats` in the URL the live api is globalThis.__jayScene,
+// for the headless draw-count probe; without it nothing is exposed.
+describe('stage/SceneMount ?stats hook (R4-1)', () => {
+  const refs = () => ({ sceneLayerRef: createRef(), stageRef: createRef(), tipRef: createRef() })
+  const at = (url) => window.history.replaceState(null, '', url)
+  afterEach(() => {
+    at('/')
+    delete globalThis.__jayScene
+    vi.restoreAllMocks()
+  })
+
+  it('with ?stats the scene api is globalThis.__jayScene, and unmount removes it', async () => {
+    at('/?stats')
+    const api = { dispose: vi.fn(), onOS: vi.fn() }
+    const { app, unmount } = renderWithApp(<SceneMount {...refs()} />, { loadScene: vi.fn(async () => ({ createScene: () => api })) })
+    await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
+    expect(globalThis.__jayScene).toBe(api)
+    unmount()
+    expect('__jayScene' in globalThis).toBe(false)
+  })
+
+  it('without ?stats nothing is exposed', async () => {
+    at('/?other=1')
+    const { app, unmount } = renderWithApp(<SceneMount {...refs()} />, {
+      loadScene: vi.fn(async () => ({ createScene: () => ({ dispose: vi.fn(), onOS: vi.fn() }) })),
+    })
+    await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
+    expect('__jayScene' in globalThis).toBe(false)
+    unmount()
+  })
+
+  it('unmount leaves __jayScene alone when it is no longer this api', async () => {
+    at('/?stats')
+    const api = { dispose: vi.fn(), onOS: vi.fn() }
+    const { app, unmount } = renderWithApp(<SceneMount {...refs()} />, { loadScene: vi.fn(async () => ({ createScene: () => api })) })
+    await waitFor(() => expect(app.scene.store.get().status).toBe('ready'))
+    const other = { info: () => null }
+    globalThis.__jayScene = other
+    unmount()
+    expect(globalThis.__jayScene).toBe(other)
+    expect(api.dispose).toHaveBeenCalledTimes(1)
+  })
+})
+
 // Round 3 Phase R3-3 TEST LIST (plan-r3 V17, I17): the scene is deferred until the laptop is first shown.
 describe('stage/SceneMount deferral (V17)', () => {
   afterEach(() => {
