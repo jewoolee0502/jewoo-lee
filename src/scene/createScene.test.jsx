@@ -1799,3 +1799,121 @@ describe('scene/createScene R4-3 LEDs, cable, contact shadow, lid overshoot, she
     api.dispose()
   })
 })
+
+// Round 4 R4-4 polish: only the two aluminium bodies cast shadows, api.info() is null-safe before the
+// first render, and the lid J monogram is polished and lighter than the lid aluminium so it reads.
+describe('scene/createScene R4-4 polish: shadow casters, api.info() guard, lid J monogram', () => {
+  beforeEach(() => {
+    state.calls = []
+    state.created = []
+    state.failOn = null
+    state.seq = 0
+    state.hits = []
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const hotOf = (label) => state.created.find((o) => o.__kind === 'Group' && o.userData?.hot?.label === label)
+  const optsOf = (m) => m?.__args?.[0] ?? {}
+  /** A material or geometry option, from its constructor arguments or a property set after it. */
+  const propOf = (m, k) => optsOf(m)[k] ?? Reflect.getOwnPropertyDescriptor(m, k)?.value
+  const parentOf = (o) => state.created.find((p) => p.children?.includes(o))
+  const subtree = (o) => [o, ...(o.children ?? []).flatMap(subtree)]
+  const cableMesh = () => state.created.find((o) => o.__kind === 'Mesh' && o.geometry?.__kind === 'TubeGeometry')
+  const contactMesh = () => state.created.find((o) => o.__kind === 'Mesh' && o.geometry?.__kind === 'PlaneGeometry' && o.geometry.__args?.[0] === 3.4 && o.geometry.__args?.[1] === 2.5)
+  /** Relative luminance of a 0xRRGGBB colour (Rec. 709 weights on the sRGB channels). */
+  const luminance = (hex) => {
+    const [r, g, b] = [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255].map((v) => v / 255)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+
+  it('the laptop casts shadows from exactly two meshes, the base and lid aluminium, once the cable and the contact shadow are counted', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build()
+    const base = parentOf(hotOf('Laptop · open me'))
+    const cable = cableMesh()
+    const contact = contactMesh()
+    expect(cable, 'the braided cable mesh').toBeDefined()
+    expect(contact, 'the contact shadow plane').toBeDefined()
+    const laptop = [...new Set([...subtree(base), cable, contact])].filter((o) => o.__kind === 'Mesh')
+    // Only an explicit `true` counts: three's castShadow defaults to false.
+    const casters = laptop.filter((m) => m.castShadow === true)
+    expect(casters).toHaveLength(2)
+    for (const m of casters) expect(propOf(m.material, 'color')).toBe(LP.MATERIALS.alu.color)
+    const parents = casters.map((m) => parentOf(m))
+    expect(parents).toContain(base)
+    expect(parents.some((p) => p !== base && parentOf(p) === base)).toBe(true)
+    api.dispose()
+  })
+
+  it('api.info() is null before the first render: a renderer with no info, or an info with no render, gives null and does not throw', () => {
+    const env = setup()
+    const api = env.build()
+    const renderer = state.created.find((o) => o.__kind === 'WebGLRenderer')
+    renderer.info = undefined
+    expect(() => api.info()).not.toThrow()
+    expect(api.info()).toBeNull()
+    renderer.info = {}
+    expect(() => api.info()).not.toThrow()
+    expect(api.info()).toBeNull()
+    api.dispose()
+  })
+
+  it('the PMREM env build is timed: a performance measure named scene:buildEnv spans the buildEnv call (plan-r4 §6)', () => {
+    const marks = []
+    vi.spyOn(performance, 'mark').mockImplementation((n) => marks.push(['mark', n, state.calls.length]))
+    vi.spyOn(performance, 'measure').mockImplementation((n, from) => marks.push(['measure', n, state.calls.length, from]))
+    const env = setup()
+    const api = env.build()
+    const from = state.calls.findIndex((c) => c.kind === 'PMREMGenerator' && c.method === 'fromScene')
+    expect(from).toBeGreaterThanOrEqual(0)
+    const measure = marks.find(([k, n]) => k === 'measure' && n === 'scene:buildEnv')
+    expect(measure, 'the scene:buildEnv measure').toBeDefined()
+    const start = marks.find(([k, n]) => k === 'mark' && n === measure[3])
+    expect(start, 'its start mark').toBeDefined()
+    expect(start[2]).toBeLessThanOrEqual(from)
+    expect(measure[2]).toBeGreaterThan(from)
+    api.dispose()
+  })
+
+  it('rebuilding the scene keeps a single scene:buildEnv measure and leaves no start mark behind', () => {
+    const entries = []
+    vi.spyOn(performance, 'mark').mockImplementation((name) => entries.push({ type: 'mark', name }))
+    vi.spyOn(performance, 'measure').mockImplementation((name) => entries.push({ type: 'measure', name }))
+    vi.spyOn(performance, 'clearMarks').mockImplementation((name) => {
+      for (let i = entries.length - 1; i >= 0; i--) if (entries[i].type === 'mark' && entries[i].name === name) entries.splice(i, 1)
+    })
+    vi.spyOn(performance, 'clearMeasures').mockImplementation((name) => {
+      for (let i = entries.length - 1; i >= 0; i--) if (entries[i].type === 'measure' && entries[i].name === name) entries.splice(i, 1)
+    })
+    for (let i = 0; i < 3; i++) setup().build().dispose()
+    expect(entries.filter((e) => e.type === 'measure' && e.name === 'scene:buildEnv')).toHaveLength(1)
+    expect(entries.filter((e) => e.type === 'mark')).toHaveLength(0)
+  })
+
+  it('a performance API that throws does not stop the scene from building', () => {
+    vi.spyOn(performance, 'measure').mockImplementation(() => {
+      throw new Error('no measure')
+    })
+    const env = setup()
+    expect(() => env.build().dispose()).not.toThrow()
+  })
+
+  it('the lid J monogram is polished (metalness at least 0.9, roughness at most 0.1) and lighter than the lid aluminium, so it reads on the lid', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build()
+    const jMat = state.created.find((o) => o.__kind === 'MeshStandardMaterial' && propOf(o, 'color') === LP.MATERIALS.j.color)
+    expect(jMat, 'the J monogram material').toBeDefined()
+    expect(propOf(jMat, 'metalness')).toBeGreaterThanOrEqual(0.9)
+    expect(propOf(jMat, 'roughness')).toBeLessThanOrEqual(0.1)
+    const aluMat = state.created.find((o) => o.__kind === 'MeshStandardMaterial' && propOf(o, 'color') === LP.MATERIALS.alu.color)
+    expect(aluMat, 'the lid aluminium material').toBeDefined()
+    expect(luminance(propOf(jMat, 'color'))).toBeGreaterThan(luminance(propOf(aluMat, 'color')))
+    api.dispose()
+  })
+})

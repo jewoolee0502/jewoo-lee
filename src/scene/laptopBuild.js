@@ -17,6 +17,7 @@ import {
   MATERIALS,
   ENV,
   J_PATH,
+  J_EXTRUDE,
   extrudeSpec,
   keyboardLayout,
   keycapBuffers,
@@ -281,7 +282,12 @@ export function buildLaptop(T, ctx) {
   const jShape = new THREE.Shape()
   for (const [op, ...args] of J_PATH) jShape[op](...args)
   const back = -LID.t
-  part(new THREE.ShapeGeometry(jShape, 12), jMat, 0, LID.h / 2, back - 0.0008, hinge).rotation.set(0, PI, PI)
+  // R4-4: a bevelled extrude, so its hairline chamfer mirrors another part of the room than its
+  // face and the J has a crisp polished edge. Turned (0, π, π), shape z becomes −z: the side wall
+  // (shape z 0…depth) is buried 0.0001 inside the lid back, and only the chamfer and the cap stand
+  // out of it, by bevelThickness − 0.0001.
+  const jGeo = new THREE.ExtrudeGeometry(jShape, { ...J_EXTRUDE, bevelEnabled: true, bevelSegments: 1, curveSegments: 12 })
+  part(jGeo, jMat, 0, LID.h / 2, back + 0.0001 + J_EXTRUDE.depth, hinge).rotation.set(0, PI, PI)
   const note = canvasTex(256, 256, drawNote)
   // Hued with their paper colours, so the lid's hover glow tints them instead of washing them out.
   const noteMat = hued(new THREE.MeshStandardMaterial({ map: note.t, roughness: 0.85 }), 0xffe36e)
@@ -301,14 +307,15 @@ export function buildLaptop(T, ctx) {
   }
   // The lid sheen (D5): a band swept across the lid back by its texture offset. The shape's UVs are
   // its own coordinates (0…w, 0…h), so repeat scales them to 0…1 and the offset slides the clamped
-  // band (transparent at its edges) from one side to the other. It covers the lid back inside the bevel.
+  // band (transparent at its edges) from one side to the other. It covers the lid back inside the
+  // bevel, 0.003 out: clear of the raised J (R4-4), so the band passes over it.
   const sw = LID.w - 2 * LID.bevel
   const sh = LID.h - 2 * LID.bevel
   const band = canvasTex(256, 64, drawSheen)
   band.t.wrapS = band.t.wrapT = THREE.ClampToEdgeWrapping
   band.t.repeat.set(1 / sw, 1 / sh)
   const sheenGeo = new THREE.ShapeGeometry(roundRect(new THREE.Shape(), sw, sh, LID.r - LID.bevel, sw / 2, sh / 2), 6).translate(-sw / 2, -sh / 2, 0)
-  const sheen = part(sheenGeo, fx(band.t, { opacity: SHEEN.opacity }), 0, LID.h / 2, back - 0.0016, hinge)
+  const sheen = part(sheenGeo, fx(band.t, { opacity: SHEEN.opacity }), 0, LID.h / 2, back - 0.003, hinge)
   sheen.rotation.set(0, PI, PI)
   sheen.visible = false
   // The screen's glow on the deck (D4), in front of the hinge over the keyboard, tinted the screen

@@ -12,6 +12,8 @@ import { OS_W, OS_H } from '../core/constants.js'
 import { SCREEN, LID, BASE, HINGE, lidOpenTop, extrudeSpec } from './laptop.js'
 // R4-2 names are read through the namespace, so a missing export fails only the test that uses it.
 import * as LP from './laptop.js'
+import { widePose } from './sceneMath.js'
+import { PEEK } from './props.js'
 
 const DEG = Math.PI / 180
 
@@ -445,6 +447,76 @@ describe('scene/laptop MATERIALS and ENV (R4-2, M5 and M6)', () => {
     const [cr, , cb] = rgb(cool.color)
     expect(wr, 'warm panel is red-heavy').toBeGreaterThan(wb)
     expect(cb, 'cool panel is blue-heavy').toBeGreaterThan(cr)
+  })
+})
+
+// R4-4: from the desk camera the polished J (roughness 0.06) mirrors one direction of the env, which
+// used to land on the dim back wall, so it read faint. A soft warm-white glint panel now sits there.
+describe('scene/laptop the J mirrors a bright env panel at the desk (R4-4, M14)', () => {
+  const hexLum = (hex) => (((hex >> 16) & 255) * 0.2126 + ((hex >> 8) & 255) * 0.7152 + (hex & 255) * 0.0722) / 255
+  /**
+   * The env panel the lid centre mirrors from the camera at `wp`, with the lid closed and peeking
+   * open by `peek` rad (the hinge turns to π/2 − peek), or null (the wall).
+   */
+  const mirrored = (wp, peek = 0) => {
+    // The lid-local centre of the lid back (0, h/2, −t) and its normal (0, 0, −1), turned about x by
+    // the hinge (rig coordinates; the rig sits at the origin).
+    const a = Math.PI / 2 - peek
+    const [c, s] = [Math.cos(a), Math.sin(a)]
+    const [ly, lz] = [LID.h / 2, -LID.t]
+    const j = [BASE.pos[0], HINGE.y + ly * c - lz * s, BASE.pos[2] + HINGE.z + ly * s + lz * c]
+    const nrm = [0, s, -c]
+    const d0 = j.map((v, i) => v - wp[i])
+    const d = d0.map((v) => v / Math.hypot(...d0))
+    const dn = d[0] * nrm[0] + d[1] * nrm[1] + d[2] * nrm[2]
+    const r = d.map((v, i) => v - 2 * dn * nrm[i])
+    // The env map is looked up by direction only, as seen from the env scene's origin.
+    let best = null
+    for (const p of LP.ENV.panels.filter((q) => q.side === 'back')) {
+      const t = p.pos[2] / r[2]
+      if (!(t > 0)) continue
+      const [x, y] = [r[0] * t, r[1] * t]
+      if (Math.abs(x - p.pos[0]) > p.size[0] / 2 || Math.abs(y - p.pos[1]) > p.size[1] / 2) continue
+      if (!best || t < best.t) best = { t, p }
+    }
+    return best?.p ?? null
+  }
+
+  it.each([
+    ['1440 × 900', 1440 / 900],
+    ['1280 × 720', 1280 / 720],
+    ['844 × 390', 844 / 390],
+    ['390 × 844', 390 / 844],
+  ])('at %s the J mirrors a panel at least 0.75 bright (luminance × k), brighter than the wall', (_, aspect) => {
+    const p = mirrored(widePose(aspect).wp)
+    expect(p, 'a back panel').not.toBeNull()
+    expect(hexLum(p.color) * p.k).toBeGreaterThanOrEqual(0.75)
+    expect(hexLum(p.color) * p.k).toBeGreaterThan(hexLum(LP.ENV.wall))
+  })
+
+  it.each([
+    ['1440 × 900', 1440 / 900],
+    ['390 × 844', 390 / 844],
+  ])('at %s the J still mirrors a panel at least 0.75 bright with the lid peeking open by PEEK, so the hover does not turn it faint', (_, aspect) => {
+    const p = mirrored(widePose(aspect).wp, PEEK)
+    expect(p, 'a back panel').not.toBeNull()
+    expect(hexLum(p.color) * p.k).toBeGreaterThanOrEqual(0.75)
+  })
+
+  // With no env map (PMREM failed) a metal J reflects nothing and read as a faint grey ghost on the
+  // silver lid; its fallback is a near-dielectric gloss, so its light colour shows under the lamp.
+  it('the J no-env fallback keeps it readable: metalness at most 0.2 (less than the aluminium fallback) and still glossy (roughness at most 0.3)', () => {
+    const { j, alu } = LP.MATERIALS
+    expect(j.noEnv.metalness).toBeLessThanOrEqual(0.2)
+    expect(j.noEnv.metalness).toBeLessThan(alu.noEnv.metalness)
+    expect(j.noEnv.roughness).toBeLessThanOrEqual(0.3)
+  })
+
+  it('the glint panel is warm white and stays in range: k at most 1, so the J does not clip past white', () => {
+    const p = mirrored(widePose(1440 / 900).wp)
+    const [r, , b] = [(p.color >> 16) & 255, (p.color >> 8) & 255, p.color & 255]
+    expect(r).toBeGreaterThanOrEqual(b)
+    expect(p.k).toBeLessThanOrEqual(1)
   })
 })
 

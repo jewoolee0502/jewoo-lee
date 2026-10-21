@@ -174,12 +174,48 @@ describe('scene/laptopBuild buildLaptop (R4-2)', () => {
     expect(dot[5]).toBe(out.hinge)
   })
 
-  it('the J monogram is a ShapeGeometry built from moveTo, lineTo and absarc', () => {
+  it('the J monogram is built from moveTo, lineTo and absarc', () => {
     const w = world()
     LB.buildLaptop(w.T, w.ctx)
-    expect(w.state.created.some((o) => o.__kind === 'ShapeGeometry')).toBe(true)
     const ops = w.state.calls.filter((c) => c.kind === 'Shape' || c.kind === 'Path').map((c) => c.method)
     expect(ops).toEqual(expect.arrayContaining(['moveTo', 'lineTo', 'absarc']))
+  })
+
+  // R4-4: a flat J read faint from the desk. It is now a bevelled extrude: the hairline chamfer
+  // round its edge mirrors another part of the room than its face, so the polished J has a crisp
+  // edge instead of reading as a flat print, and it stays nearly flush (it is not a raised sticker).
+  it('R4-4: the J is a bevelled ExtrudeGeometry on the hinge, in the J material, with a hairline chamfer that rises under 0.002 off the lid back', () => {
+    const w = world()
+    const out = LB.buildLaptop(w.T, w.ctx)
+    const call = w.mk.mock.calls.find(([, mat]) => mat === out.mats.j)
+    expect(call, 'the J mesh').toBeDefined()
+    const [geo, , , , z, parent] = call
+    expect(parent).toBe(out.hinge)
+    expect(geo.__kind).toBe('ExtrudeGeometry')
+    const o = geo.__args[1]
+    expect(o.bevelEnabled).toBe(true)
+    expect(o.bevelSize).toBeGreaterThan(0)
+    expect(o.bevelSize).toBeLessThanOrEqual(0.012)
+    expect(o.bevelThickness).toBeGreaterThan(0)
+    expect(o.bevelThickness).toBeLessThanOrEqual(0.002)
+    // Turned (0, π, π), shape-local z becomes −z: the side wall (shape z 0…depth) sits at or inside
+    // the lid back (−LID.t), and only the front chamfer and the cap stand out of it.
+    const wall = z - o.depth
+    const cap = z - o.depth - o.bevelThickness
+    expect(wall).toBeGreaterThanOrEqual(-LID.t)
+    expect(-LID.t - cap).toBeGreaterThan(0)
+    expect(-LID.t - cap).toBeLessThan(0.002)
+  })
+
+  it('R4-4: the sheen sweeps outside the raised J, by more than 0.001, so the band passes over it', () => {
+    const w = world()
+    const out = LB.buildLaptop(w.T, w.ctx)
+    const [geo, , , , z] = w.mk.mock.calls.find(([, mat]) => mat === out.mats.j)
+    const o = geo.__args[1]
+    const cap = z - o.depth - o.bevelThickness
+    const i = w.mk.mock.results.findIndex((r) => r.value === out.sheen)
+    expect(i, 'the sheen mesh').toBeGreaterThanOrEqual(0)
+    expect(w.mk.mock.calls[i][4]).toBeLessThan(cap - 0.001)
   })
 
   it('merged parts: every merge input is non-indexed (toNonIndexed first if it was indexed), carries position, normal and uv, and is disposed', () => {

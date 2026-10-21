@@ -655,6 +655,13 @@ describe('scene/sceneMath R4-3 MagSafe LED, lid overshoot, sheen and deck glow',
     }
   })
 
+  // R4-4: at 0.28 the additive band added about 40/255 to a lid that is already light silver, and
+  // it did not read in the desk screenshots; it must be strong enough to show, and not blow out.
+  it('R4-4: the sheen band is strong enough to read on the light silver lid (opacity 0.4 to 0.6)', () => {
+    expect(SM.SHEEN.opacity).toBeGreaterThanOrEqual(0.4)
+    expect(SM.SHEEN.opacity).toBeLessThanOrEqual(0.6)
+  })
+
   it('deckGlowAlpha is 0.32 times the screen level, and 0 with no light', () => {
     expect(SM.deckGlowAlpha(0)).toBe(0)
     expect(SM.deckGlowAlpha(1)).toBeCloseTo(0.32, 12)

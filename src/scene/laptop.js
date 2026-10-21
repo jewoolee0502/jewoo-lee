@@ -345,6 +345,13 @@ export const J_PATH = [
 ]
 
 /**
+ * The J's extrude (R4-4): a 0.0004 slab with a hairline chamfer, 0.01 wide and 0.0015 high, whose
+ * offset keeps the outline within 0.005 of J_PATH. The chamfer mirrors another part of the room than
+ * the face, which gives the polished J a crisp edge at the desk; it stands 0.0014 off the lid.
+ */
+export const J_EXTRUDE = { depth: 0.0004, bevelThickness: 0.0015, bevelSize: 0.01, bevelOffset: -0.005 }
+
+/**
  * Laptop materials (M5). Hex values are linear in r128 (no colour management), so they come out
  * lighter through the sRGB output; they were tuned by screenshot. `noEnv` replaces the metal's
  * parameters when the env map could not be built (metal with no env renders near black); `hue` is
@@ -356,7 +363,7 @@ export const MATERIALS = {
   dark: { color: 0x0b0c0e, metalness: 0, roughness: 0.7 },
   glass: { color: 0x878c93, metalness: 0.3, roughness: 0.22, envMapIntensity: 0.7 },
   bezel: { color: 0x07080a, metalness: 0, roughness: 0.12 },
-  j: { color: 0xeef0f3, metalness: 1, roughness: 0.06, envMapIntensity: 1.3, noEnv: { metalness: 0.5, roughness: 0.3 } },
+  j: { color: 0xeef0f3, metalness: 1, roughness: 0.06, envMapIntensity: 1.3, noEnv: { metalness: 0.1, roughness: 0.25 } },
   keys: { color: 0xb4b4b4, metalness: 0, roughness: 0.6, backlight: [1, 0xf4 / 255, 0xe0 / 255] },
   touchId: { color: 0x111214, metalness: 0, roughness: 0.3, hue: 0x9fb2c8 },
   // R4-3: the braided MagSafe cable, a soft silver-white so it reads on the dark desk.
@@ -366,7 +373,7 @@ export const MATERIALS = {
 /**
  * The laptop's own env map (M6): a dark navy room box seen from inside, a warm panel on +x where
  * the lamp is, cool panels on −x and at the back where the window is, the lamp-lit patch of the
- * back wall behind the laptop (what the lid and the J mirror at the desk), and a dim ceiling. Each
+ * back wall behind the laptop (what the lid mirrors at the desk), the J's glint, and a dim ceiling. Each
  * panel's colour is multiplied by `k` (the PMREM target is HDR). `min` is the env intensity with
  * the lamp off (it rises to 1 with the lamp on).
  */
@@ -379,6 +386,13 @@ export const ENV = {
     { side: '-x', color: 0x8fb0ff, k: 2, size: [3, 2.4], pos: [-5.9, 1.8, -2] },
     { side: 'back', color: 0x8fb0ff, k: 2, size: [2.6, 2.2], pos: [-3, 1.8, -5.9] },
     { side: 'back', color: 0x5a6582, k: 1, size: [5, 3], pos: [1.2, 1.4, -5.95] },
+    // R4-4: the J's glint. The closed lid's centre mirrors this patch from every desk camera (wide
+    // and phone), at rest (15–19° up) and peeking (1–5° up), so the polished J reads bright;
+    // a dimmer halo softens its edge, so the J dims rather than snaps when the pointer parallax
+    // turns it off the glint. Each sits at its own depth (−5.88, −5.92), never coplanar with the
+    // window panel at −5.9 that they overlap.
+    { side: 'back', color: 0x9a9590, k: 1, size: [3.6, 4.4], pos: [-0.8, 1.4, -5.92] },
+    { side: 'back', color: 0xf4ede4, k: 0.9, size: [2.2, 3.4], pos: [-0.8, 1.4, -5.88] },
     { side: 'top', color: 0x3a4766, k: 1, size: [8, 8], pos: [0, 3.9, 0] },
   ],
 }

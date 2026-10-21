@@ -235,7 +235,7 @@ export const deckGlowAlpha = (level) => 0.32 * level
  * The lid sheen sweep (plan-r4 D5): the band's texture offset runs `from` → `to` over `dur` s
  * (ease in-out) at `opacity`; the first-show sweep runs `delay` s after the scene first shows.
  */
-export const SHEEN = { dur: 0.9, from: -1.2, to: 1.2, opacity: 0.28, delay: 1.2 }
+export const SHEEN = { dur: 0.9, from: -1.2, to: 1.2, opacity: 0.45, delay: 1.2 }
 
 /** The sheen band's texture offset `t` s into a sweep. */
 export const sheenOffset = (t) => SHEEN.from + (SHEEN.to - SHEEN.from) * easeQuad(clamp(t / SHEEN.dur, 0, 1))

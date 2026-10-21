@@ -230,7 +230,21 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       },
       BufferGeometryUtils,
     }
+    // Timed for the `?stats` probe (plan-r4 §6): performance.getEntriesByName('scene:buildEnv').
+    // One entry only: a rebuild replaces the last measure, and the start mark is cleared.
+    const perf = globalThis.performance
+    const timing = (f) => {
+      try {
+        f()
+      } catch {
+        // No user timing API: the env still builds.
+      }
+    }
+    timing(() => perf.clearMeasures('scene:buildEnv'))
+    timing(() => perf.mark('scene:buildEnv:start'))
     env = buildEnv(T, renderer)
+    timing(() => perf.measure('scene:buildEnv', 'scene:buildEnv:start'))
+    timing(() => perf.clearMarks('scene:buildEnv:start'))
     scene = new THREE.Scene()
     scene.background = new THREE.Color(0x141c2e)
     scene.fog = new THREE.Fog(0x141c2e, 16, 34)
