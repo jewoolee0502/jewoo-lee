@@ -2,6 +2,7 @@
 // Ported from initScene (L1082–1088, L1143–1146, L1155, L1163–1164, L1223–1230); the mirror's
 // standby and desktop drawings were reworked to match the DOM screen it crossfades with.
 import { OS_W, OS_H } from '../core/constants.js'
+import { SCREEN } from './laptop.js'
 
 /** Night sky over Mont-Royal with its cross, the city and a strip of snow (L1082–1088). */
 export function drawSky(x, w, h) {
@@ -133,14 +134,37 @@ const BIOS = ['JAY-BIOS (C) 2001-2026', 'Memory test ... OK', 'Loading JAY-OS ..
 const DESK_BLUE = '#3D98DD'
 
 /**
+ * Masks the screen's two top corners to radius r with black (arcTo paths, drawn last), so the
+ * mirror matches the rounded DOM screen (`.os:not(.flat)`, SCREEN.cornerPx OS px).
+ */
+export function maskCorners(x, w, h, r) {
+  if (!(r > 0)) return
+  x.fillStyle = '#000'
+  x.beginPath()
+  x.moveTo(0, 0)
+  x.lineTo(r, 0)
+  x.arcTo(0, 0, 0, r, r)
+  x.closePath()
+  x.moveTo(w, 0)
+  x.lineTo(w, r)
+  x.arcTo(w, 0, w - r, 0, r)
+  x.closePath()
+  x.fill()
+}
+
+/**
  * What the WebGL screen shows under (or, without CSS3D, instead of) the live DOM (L1223–1230).
  * `wall` is the wallpaper engine's canvas; without one (or before it has a size) the
  * desktop blue stands in. The DOM screen crossfades in over this drawing while the lid opens,
- * so the standby text sits where the DOM draws it (StandbyLayer: 64px logo with its baseline at
- * 337 of 675 OS px, 34px "waking up" at 398) and the desktop is only the wallpaper and the
- * menubar: drawn stand-in icons would ghost against the real ones during the fade.
+ * so everything is laid out in OS px scaled by k = w/OS_W, where the DOM draws it: the standby
+ * text is centre-relative like StandbyLayer's flex column (the 64px logo's baseline at OS_H/2 −
+ * 0.5, the 34px "waking up" at OS_H/2 + 60.5), the BIOS lines follow `.l-boot` (padding 28/34,
+ * 24px/1.25), and the desktop is only the wallpaper and the 34px menubar: drawn stand-in icons
+ * would ghost against the real ones during the fade. Every state ends with the corner mask.
  */
 export function drawMirror(x, w, h, osState, wall) {
+  const k = w / OS_W
+  const ky = (osPx) => Math.round((osPx / OS_H) * h)
   if (osState === 'on') {
     if (wall && wall.width > 0 && wall.height > 0) {
       x.imageSmoothingEnabled = false
@@ -151,14 +175,14 @@ export function drawMirror(x, w, h, osState, wall) {
       x.fillRect(0, 0, w, h)
     }
     x.fillStyle = '#F4F7FA'
-    x.fillRect(0, 0, w, 18)
+    x.fillRect(0, 0, w, Math.round(34 * k))
     x.fillStyle = '#122030'
-    x.font = '10px Silkscreen, monospace'
-    x.fillText('◆ JAY-OS', 8, 13)
-    return
+    x.font = Math.round(13 * k) + 'px Silkscreen, monospace'
+    x.fillText('◆ JAY-OS', Math.round(17 * k), Math.round(21 * k))
+  } else {
+    x.fillStyle = '#030508'
+    x.fillRect(0, 0, w, h)
   }
-  x.fillStyle = '#030508'
-  x.fillRect(0, 0, w, h)
   if (osState === 'standby') {
     // .l-standby: radial-gradient(ellipse at center, #0b1a28, #030508 70%), farthest-corner.
     x.save()
@@ -170,21 +194,21 @@ export function drawMirror(x, w, h, osState, wall) {
     x.fillStyle = g
     x.fillRect(-w / 2, -w / 2, w, w)
     x.restore()
-    const k = w / OS_W
     x.fillStyle = '#7FD4FF'
     x.textAlign = 'center'
     x.font = Math.round(64 * k) + 'px Silkscreen, monospace'
     x.shadowColor = 'rgba(127,212,255,.6)'
     x.shadowBlur = 18 * k
-    x.fillText('JAY-OS', w / 2, Math.round((337 / OS_H) * h))
+    x.fillText('JAY-OS', w / 2, ky(OS_H / 2 - 0.5))
     x.shadowBlur = 0
     x.font = Math.round(34 * k) + 'px VT323, monospace'
-    x.fillText('waking up …', w / 2, Math.round((398 / OS_H) * h))
+    x.fillText('waking up …', w / 2, ky(OS_H / 2 + 60.5))
     x.textAlign = 'left'
   }
   if (osState === 'boot') {
     x.fillStyle = '#C9D6E3'
-    x.font = '20px VT323, monospace'
-    BIOS.forEach((l, i) => x.fillText(l, 20, 36 + i * 24))
+    x.font = Math.round(24 * k) + 'px VT323, monospace'
+    BIOS.forEach((l, i) => x.fillText(l, Math.round(34 * k), Math.round((52 + 30 * i) * k)))
   }
+  maskCorners(x, w, h, Math.round(SCREEN.cornerPx * k))
 }

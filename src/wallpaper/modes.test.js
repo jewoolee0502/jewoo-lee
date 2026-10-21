@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { MODES, isMode, autoWp, clampWidth } from './modes.js'
+import { OS_W, OS_H } from '../core/constants.js'
 
 describe('autoWp in July (EDT)', () => {
   it.each([
@@ -27,9 +28,10 @@ describe('autoWp edge cases', () => {
 })
 
 describe('clampWidth', () => {
-  it('clamps the pixel-city width to 160..420 and uses 900x675 defaults', () => {
+  it('clamps the pixel-city width to 160..420 and uses OS_W x OS_H (1040 x 676) defaults', () => {
     expect(clampWidth(900, 675)).toBe(240)
-    expect(clampWidth(0, 0)).toBe(240)
+    expect(clampWidth(0, 0)).toBe(clampWidth(OS_W, OS_H))
+    expect(clampWidth(0, 0)).toBe(277)
     expect(clampWidth(100, 675)).toBe(160)
     expect(clampWidth(2000, 675)).toBe(420)
   })

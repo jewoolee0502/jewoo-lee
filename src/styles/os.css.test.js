@@ -1,7 +1,8 @@
 // Guards the desktop icon columns: long labels such as EXPERIENCE.LOG must not clip at the screen edge.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { OS_W, OS_H } from '../core/constants.js'
 
 const css = readFileSync(resolve(process.cwd(), 'src/styles/os.css'), 'utf8')
 const ruleBody = (selector) => {
@@ -83,6 +84,30 @@ describe('styles/os.css vignette transition', () => {
     const idx = css.indexOf('prefers-reduced-motion')
     expect(idx).toBeGreaterThanOrEqual(0)
     expect(css.slice(idx)).toMatch(/\.os::after\s*\{[^}]*transition:\s*none/)
+  })
+})
+
+// Round 4 R4-1 (plan §3): the OS is the 20:13 Air panel, 1040 × 676, and its top corners round
+// with the vignette (radius SCREEN.cornerPx = 10 px) until the flat swap, which has none.
+describe('styles/os.css 20:13 OS size and rounded corners (R4-1)', () => {
+  it('.os is OS_W × OS_H (1040px × 676px) and still clips its content', () => {
+    const body = ruleBody('.os')
+    expect(body).toMatch(new RegExp(`width:\\s*${OS_W}px`))
+    expect(body).toMatch(new RegExp(`height:\\s*${OS_H}px`))
+    expect(body).toMatch(/width:\s*1040px/)
+    expect(body).toMatch(/height:\s*676px/)
+    expect(body).toMatch(/overflow:\s*hidden/)
+  })
+
+  it('.os:not(.flat) rounds only its top corners, by var(--vig) times SCREEN.cornerPx (10px)', async () => {
+    // Loaded here, not at the top, so a missing laptop.js fails only this test (R4-1).
+    const { SCREEN } = await vi.importActual('../scene/laptop.js')
+    const rule = css.match(/\.os:not\(\.flat\)\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(rule).toMatch(/border-radius:/)
+    expect(rule).toMatch(/border-radius:[^;]*var\(--vig/)
+    expect(rule).toContain(`${SCREEN.cornerPx}px`)
+    expect(SCREEN.cornerPx).toBe(10)
+    expect(rule).toMatch(/border-radius:[^;]*\b0\s+0\s*(;|$)/)
   })
 })
 

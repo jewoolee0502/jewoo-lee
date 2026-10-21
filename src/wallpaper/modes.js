@@ -1,5 +1,6 @@
 // Wallpaper modes and pure helpers (L486–494, L594, L608).
 import { own } from '../core/own.js'
+import { OS_W, OS_H } from '../core/constants.js'
 
 export const CITY_H = 180
 
@@ -31,5 +32,5 @@ export function autoWp(date = new Date(), tz = 'America/Toronto') {
   return h >= 7 && h < 17 ? 'day' : h >= 17 && h < 20 ? 'golden' : 'night'
 }
 
-/** Pixel-city canvas width for an OS of w×h (L594). */
-export const clampWidth = (w, h) => Math.max(160, Math.min(420, Math.round((CITY_H * (w || 900)) / (h || 675))))
+/** Pixel-city canvas width for an OS of w×h (L594); an unknown size counts as OS_W × OS_H. */
+export const clampWidth = (w, h) => Math.max(160, Math.min(420, Math.round((CITY_H * (w || OS_W)) / (h || OS_H))))

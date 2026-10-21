@@ -141,6 +141,7 @@ vi.mock('three/examples/jsm/renderers/CSS3DRenderer.js', () => T.css3d)
 import { createScene, CANVAS_FONTS, GLOW_K } from './createScene.js'
 import { MUG, HIT } from './props.js'
 import { FLOPPIES } from './floppy.js'
+import { OS_W, OS_H } from '../core/constants.js'
 import { glowColor, widePose } from './sceneMath.js'
 
 const { state } = T
@@ -462,7 +463,7 @@ describe('scene/createScene lifecycle', () => {
   })
 
   // Round 3: dispose() puts the widened OS size back, so the holder is left at its host size.
-  it('dispose() resets the widened OS size: holder width and height are "" (or 900px / 675px) after a late widen', () => {
+  it('dispose() resets the widened OS size: holder width and height are "" (or OS_W px / OS_H px) after a late widen', () => {
     const env = setup()
     Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
     Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
@@ -470,12 +471,71 @@ describe('scene/createScene lifecycle', () => {
 
     env.app.ctrl.z = 0.99
     api.frame(0, 0.016)
-    expect(env.holder.style.width, 'widened width before dispose').not.toBe('900px')
+    expect(env.holder.style.width, 'widened width before dispose').not.toBe(OS_W + 'px')
 
     api.dispose()
 
-    expect(['', '900px']).toContain(env.holder.style.width)
-    expect(['', '675px']).toContain(env.holder.style.height)
+    expect(['', OS_W + 'px']).toContain(env.holder.style.width)
+    expect(['', OS_H + 'px']).toContain(env.holder.style.height)
+  })
+
+  // Round 4 R4-1 (plan §3 and §5 R4-1 item 7): the 20:13 screen is built from SCREEN in laptop.js.
+  // SCREEN is loaded per test (not at the top), so a missing laptop.js fails only these R4-1 tests.
+  it('the CSS3D screen is scaled by SCREEN.unit (0.00275 scene units per OS px), not 2.6 / OS_W', async () => {
+    const { SCREEN } = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build()
+    api.frame(0, 0.016)
+    const scaled = callsOn('CSS3DObject', 'setScalar')
+    expect(scaled.length).toBeGreaterThan(0)
+    expect(scaled.at(-1).args).toEqual([SCREEN.unit])
+    expect(SCREEN.unit).toBeCloseTo(2.86 / OS_W, 12)
+    // The scale is constant: frames that render (a sized stage, at the desk and in the dive) never
+    // write it again, and every write there was is SCREEN.unit.
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+    const before = callsOn('CSS3DObject', 'setScalar').length
+    const renders = callsOn('CSS3DRenderer', 'render').length
+    for (const [i, z] of [0, 0, 0.5, 0.9, 0.95].entries()) {
+      env.app.ctrl.z = z
+      api.frame(i * 16, 0.016)
+    }
+    expect(callsOn('CSS3DRenderer', 'render').length, 'the frames rendered the CSS3D pass').toBeGreaterThan(renders)
+    expect(callsOn('CSS3DObject', 'setScalar')).toHaveLength(before)
+    for (const c of callsOn('CSS3DObject', 'setScalar')) expect(c.args).toEqual([SCREEN.unit])
+    api.dispose()
+  })
+
+  it('the lid mirror and bezel use a PlaneGeometry of SCREEN.w × SCREEN.h (2.86 × 1.859)', async () => {
+    const { SCREEN } = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build()
+    const planes = createdOf('PlaneGeometry').filter((g) => g.__args[0] === SCREEN.w && g.__args[1] === SCREEN.h)
+    expect(planes.length).toBeGreaterThan(0)
+    expect(SCREEN.w).toBeCloseTo(2.86, 9)
+    expect(SCREEN.h).toBeCloseTo(1.859, 9)
+    api.dispose()
+  })
+
+  it('the camera anchor is an Object3D at (0, SCREEN.cy, 0.003) on the hinge', async () => {
+    const { SCREEN } = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build()
+    const anchorSets = callsOn('Object3D', 'set')
+    expect(
+      anchorSets.some((c) => c.args[0] === 0 && Math.abs(c.args[1] - SCREEN.cy) < 1e-9 && Math.abs(c.args[2] - 0.003) < 1e-9),
+    ).toBe(true)
+    expect(SCREEN.cy).toBeCloseTo(1.0955, 9)
+    api.dispose()
+  })
+
+  it('api.info() returns the renderer.info.render calls and triangles of the last frame', () => {
+    const env = setup()
+    const api = env.build()
+    const renderer = createdOf('WebGLRenderer')[0]
+    renderer.info = { render: { calls: 37, triangles: 1234 } }
+    expect(api.info()).toEqual({ calls: 37, triangles: 1234 })
+    api.dispose()
   })
 
   it('a failure while building disposes the partial work, removes the canvas, and rethrows (B7)', () => {

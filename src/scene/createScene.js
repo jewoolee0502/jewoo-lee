@@ -42,6 +42,7 @@ import { drawSky, drawNote, drawSticker, drawLogo, drawFloppyLabel, drawMirror, 
 import { FLOPPIES, createFloppySequencer } from './floppy.js'
 import { createHotspotActions, hotspotOf } from './hotspots.js'
 import { POLAROID, MUG, SLOT, HIT, faceAngle } from './props.js'
+import { LID, SCREEN } from './laptop.js'
 
 /** The faces the canvas textures draw with; the font gate redraws them once these have loaded. */
 export const CANVAS_FONTS = [
@@ -139,7 +140,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       holder.style.visibility = ''
       holder.style.opacity = ''
       holder.style.removeProperty('--vig')
-      // The widened size goes back to the host's 900×675, unless the OS is flat (sized by its fit).
+      // The widened size goes back to the host's OS_W × OS_H, unless the OS is flat (sized by its fit).
       if (!app.os?.store?.get?.().flat) app.os?.setSize?.(OS_W, OS_H)
       holder.style.willChange = ''
       holder.style.transform = ''
@@ -196,6 +197,9 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       if (css.domElement.firstElementChild) offs.push(pinScroll(css.domElement.firstElementChild))
       cssScene = new THREE.Scene()
       cssObj = new CSS3DObject(holder)
+      // OS px to scene units: the OS_W-wide DOM spans SCREEN.w. Set once: the frame's decompose
+      // writes only the position and rotation.
+      cssObj.scale.setScalar(SCREEN.unit)
       cssScene.add(cssObj)
     } catch {
       css?.domElement?.remove()
@@ -390,13 +394,13 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     noteM.rotation.set(-Math.PI / 2, 0, 0.2)
     const sticker = canvasTex(256, 64, drawSticker)
     flat(sticker, 0.5, 0.125, -1.0, 0.166, 0.75, base).rotation.x = -Math.PI / 2
-    // lid on a hinge at the back edge
-    const LH = 2.25
+    // Lid on a hinge at the back edge. R4-1: the lid is LID.w × LID.h (still 0.1 thick on the old
+    // body until R4-2), with the black bezel inset 0.02 and the 20:13 screen (SCREEN) on it.
     const hinge = new THREE.Group()
     hinge.position.set(0, 0.235, -1.05)
     base.add(hinge)
-    mk(B(3.0, LH, 0.1), M(CASE, { roughness: 0.55 }), 0, LH / 2, -0.05, hinge)
-    mk(new THREE.PlaneGeometry(2.74, 2.08), M(0x0b0f14, { roughness: 0.3 }), 0, 1.12, 0.002, hinge)
+    mk(B(LID.w, LID.h, 0.1), M(CASE, { roughness: 0.55 }), 0, LID.h / 2, -0.05, hinge)
+    mk(new THREE.PlaneGeometry(LID.w - 0.04, LID.h - 0.04), M(0x0b0f14, { roughness: 0.3 }), 0, LID.h / 2, 0.001, hinge)
     let osState = os.state
     // `mirrorSrc` is the wallpaper canvas the mirror last drew (null: the blue fallback), so
     // the frame loop can redraw once the engine mounts or gets a size.
@@ -408,24 +412,25 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       const c = app.wallpaperEngine?.canvas
       return c && c.width > 0 && c.height > 0 ? c : null
     }
-    const mirror = canvasTex(512, 384, (x, w, h) => {
+    const mirror = canvasTex(...SCREEN.mirror, (x, w, h) => {
       mirrorSrc = osState === 'on' ? wallCanvas() : null
       drawMirror(x, w, h, osState, mirrorSrc ?? undefined)
     })
-    flat(mirror, 2.6, 1.95, 0, 1.12, 0.004, hinge, true)
+    flat(mirror, SCREEN.w, SCREEN.h, 0, SCREEN.cy, 0.002, hinge, true)
+    // The camera dives to the anchor, and the CSS3D screen sits on it.
     const anchor = new THREE.Object3D()
-    anchor.position.set(0, 1.12, 0.006)
+    anchor.position.set(0, SCREEN.cy, 0.003)
     hinge.add(anchor)
     const logo = canvasTex(256, 128, drawLogo)
     const logoM = new THREE.Mesh(
       new THREE.PlaneGeometry(1.0, 0.5),
       new THREE.MeshStandardMaterial({ map: logo.t, transparent: true, roughness: 0.4, emissive: 0x0b2a44 }),
     )
-    logoM.position.set(0, LH / 2, -0.102)
+    logoM.position.set(0, LID.h / 2, -0.102)
     logoM.rotation.set(0, Math.PI, Math.PI)
     hinge.add(logoM)
     const screenL = new THREE.PointLight(0x7cc4ff, 0, 6, 2)
-    screenL.position.set(0, 1.1, 1.0)
+    screenL.position.set(0, SCREEN.cy, 1.0)
     hinge.add(screenL)
     let lidWasClosed = true
     hinge.rotation.x = Math.PI / 2
@@ -935,7 +940,6 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       renderer.render(scene, camera)
       if (css) {
         anchor.matrixWorld.decompose(cssObj.position, cssObj.quaternion, tmpS)
-        cssObj.scale.setScalar(2.6 / OS_W)
         css.render(cssScene, camera)
       }
     }
@@ -959,6 +963,11 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
         snowBoost = s
       },
       lamp: () => setLamp(!lampOn),
+      /** The last frame's draw calls and triangles (renderer.info.render), for the `?stats` probe. */
+      info() {
+        const r = renderer?.info?.render
+        return r ? { calls: r.calls, triangles: r.triangles } : null
+      },
       dispose,
     }
     offs.push(wireScene(api, app))

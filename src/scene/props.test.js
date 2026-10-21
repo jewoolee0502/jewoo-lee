@@ -1,6 +1,6 @@
 // Round 2 Phase 1 TEST LIST 13: scene/props.test.js. props.js is pure data (no three). The polaroid
 // must clear the laptop lid, stay clear of the dog tags and the window, and hang in front of the wall.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { POLAROID, MUG, mugRadiusAt, handleEnds, handleBulgeX, faceAngle, SLOT, HIT } from './props.js'
@@ -26,10 +26,15 @@ describe('scene/props POLAROID', () => {
     })
   })
 
-  it('its bottom edge clears the lid top (>= 2.45) and stays on the wall (<= 3.0)', () => {
+  // R4-1: the open MacBook lid's top is lidOpenTop() ≈ 2.173 (was 2.45 for the old lid). The polaroid
+  // does not move, so its bottom (3.05 − 0.38 · 1.2 = 2.594) clears the lid by 0.3.
+  it('its bottom edge clears the open lid top by 0.3 (lidOpenTop() + 0.3) and stays on the wall (<= 3.0)', async () => {
+    // Loaded here, not at the top, so a missing laptop.js fails only this test (R4-1).
+    const { lidOpenTop } = await vi.importActual('./laptop.js')
     const bottom = POLAROID.pos[1] - (POLAROID.card[1] / 2) * POLAROID.scale
-    expect(bottom).toBeGreaterThanOrEqual(2.45)
+    expect(bottom).toBeGreaterThanOrEqual(lidOpenTop() + 0.3)
     expect(bottom).toBeLessThanOrEqual(3.0)
+    expect(bottom).toBeCloseTo(2.594, 3)
   })
 
   it('its x range lies within [0.9, 2.4]: clear of the dog tags (-1.6) and the window (x <= -2.25)', () => {

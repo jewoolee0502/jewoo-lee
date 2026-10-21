@@ -3,10 +3,9 @@
 import { clamp, ss, easeQuad } from '../core/math.js'
 import { OS_W, OS_H, CAM_NARROW_ASPECT } from '../core/constants.js'
 import { PEEK } from './props.js'
+import { SCREEN } from './laptop.js'
 
 const DEG = Math.PI / 180
-const SCREEN_W = 2.6
-const SCREEN_H = 1.95
 
 /** Lid opening over the first 45 % of the timeline (L1241). */
 export const lidT = (z) => ss(0, 0.45, z)
@@ -31,7 +30,7 @@ export function lidBoot(t, wasClosed, osState) {
 /** R12: the holder widens over the last 3 % of the dive. */
 export const WIDEN_FROM = 0.97
 /** R12: the desktop widens to fill the stage late in the dive. At z = 1 it is exactly the flat
- *  layout (w/k, h/k with k = min(w/900, h/675)), so the swap to the flat OS is invisible (R4). */
+ *  layout (w/k, h/k with k = min(w/OS_W, h/OS_H)), so the swap to the flat OS is invisible (R4). */
 export function widenSize(z, w, h) {
   const g = ss(WIDEN_FROM, 1, z)
   const k = Math.min(w / OS_W, h / OS_H)
@@ -47,10 +46,10 @@ export const holderAlpha = (le) => ss(0.42, 0.6, le)
 
 export const camFov = (aspect) => (aspect < CAM_NARROW_ASPECT ? 46 : 35)
 
-/** Distance at which the 2.6×1.95 screen fills the view (L1247). */
+/** Distance at which the SCREEN.w × SCREEN.h screen (the OS_W × OS_H OS on the lid) fills the view (L1247). */
 export function camDistance(fov, aspect) {
   const tv = Math.tan((fov * DEG) / 2)
-  return Math.max(SCREEN_H / 2 / tv, SCREEN_W / 2 / (tv * aspect))
+  return Math.max(SCREEN.h / 2 / tv, SCREEN.w / 2 / (tv * aspect))
 }
 
 const NARROW_WP = [0.5, 4.4, 13.8]

@@ -7,6 +7,7 @@ import { act, render } from '@testing-library/react'
 import { createApp } from '../app/createApp.js'
 import { AppProvider } from '../app/AppContext.jsx'
 import WallpaperCanvas from './WallpaperCanvas.jsx'
+import { OS_W, OS_H } from '../core/constants.js'
 
 function mount({ strict = false, osState = 'on' } = {}) {
   const app = createApp()
@@ -124,14 +125,14 @@ describe('WallpaperCanvas', () => {
 
   // followSize (WallpaperCanvas.jsx): an OS resize applies at once only while the camera moves in
   // the dive. Inside (the flat view) and on the desk it waits out the normal resize debounce
-  // (200 ms, engine.js REBUILD_DEBOUNCE_MS). Widths: 900 px -> clamp 240, 1200 px -> clamp 320.
+  // (200 ms, engine.js REBUILD_DEBOUNCE_MS). Widths: OS_W (1040) px -> clamp 277, 1200 px -> clamp 320.
   describe('followSize is on only during the dive', () => {
     function sized(phase) {
       const { app, canvas } = mount()
-      const size = vi.spyOn(app.host, 'size').mockReturnValue({ w: 900, h: 675 })
+      const size = vi.spyOn(app.host, 'size').mockReturnValue({ w: OS_W, h: OS_H })
       app.ctrl.store.set({ phase, interactive: phase === 'inside' })
       app.wallpaperEngine.tick(1000)
-      expect(canvas.width).toBe(240)
+      expect(canvas.width).toBe(277)
       size.mockReturnValue({ w: 1200, h: 675 })
       return { app, canvas }
     }
@@ -145,9 +146,9 @@ describe('WallpaperCanvas', () => {
     it('inside the laptop (phase inside) a new width waits out the 200 ms debounce', () => {
       const { app, canvas } = sized('inside')
       app.wallpaperEngine.tick(1016)
-      expect(canvas.width).toBe(240)
+      expect(canvas.width).toBe(277)
       app.wallpaperEngine.tick(1100)
-      expect(canvas.width).toBe(240)
+      expect(canvas.width).toBe(277)
       app.wallpaperEngine.tick(1300)
       expect(canvas.width).toBe(320)
     })
@@ -155,9 +156,9 @@ describe('WallpaperCanvas', () => {
     it('on the desk a new width waits out the 200 ms debounce', () => {
       const { app, canvas } = sized('desk')
       app.wallpaperEngine.tick(1016)
-      expect(canvas.width).toBe(240)
+      expect(canvas.width).toBe(277)
       app.wallpaperEngine.tick(1100)
-      expect(canvas.width).toBe(240)
+      expect(canvas.width).toBe(277)
       app.wallpaperEngine.tick(1300)
       expect(canvas.width).toBe(320)
     })
@@ -167,13 +168,13 @@ describe('WallpaperCanvas', () => {
       app.ctrl.store.set({ phase: 'inside', interactive: true })
       app.wallpaperEngine.tick(1016)
       expect(canvas.width).toBe(320)
-      app.host.size.mockReturnValue({ w: 900, h: 675 })
+      app.host.size.mockReturnValue({ w: OS_W, h: OS_H })
       app.wallpaperEngine.tick(1100)
       expect(canvas.width).toBe(320)
       app.wallpaperEngine.tick(1200)
       expect(canvas.width).toBe(320)
       app.wallpaperEngine.tick(1300)
-      expect(canvas.width).toBe(240)
+      expect(canvas.width).toBe(277)
     })
   })
 })

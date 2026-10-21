@@ -60,21 +60,23 @@ describe('scene/sceneMath', () => {
   })
 
   // Round 2 Phase 3 (R12): the holder widens over [.97, 1] with no .994 factor, so widenSize(1) is the flat layout.
-  it('3. widenSize: no widening below .97; widenSize(1, 1600, 900) = {1200, 675} (k = min(w/900, h/675), no .994)', () => {
+  it('3. widenSize: no widening below .97; widenSize(1, 1600, 900) = {1201.8, 676} (k = min(w/1040, h/676) = 900/676, no .994)', () => {
     expect(widenSize(0.96, 1600, 900)).toEqual({ w: OS_W, h: OS_H })
     expect(widenSize(0.5, 1600, 900)).toEqual({ w: OS_W, h: OS_H })
     const k = Math.min(1600 / OS_W, 900 / OS_H)
-    expect(k).toBeCloseTo(1.3333, 4)
+    expect(k).toBeCloseTo(900 / OS_H, 9)
+    expect(k).toBeCloseTo(1.33136, 5)
     const full = widenSize(1, 1600, 900)
     expect(full.w).toBeCloseTo(1600 / k, 6)
     expect(full.h).toBeCloseTo(900 / k, 6)
-    expect(full.w).toBeCloseTo(1200, 6)
-    expect(full.h).toBeCloseTo(675, 6)
+    expect(full.w).toBeCloseTo(1201.8, 1)
+    expect(full.h).toBeCloseTo(676, 6)
   })
 
   it('3. widenSize at z=.985 is halfway through the widen (g = ss(.97, 1, .985) = .5)', () => {
+    const full = widenSize(1, 1600, 900)
     const mid = widenSize(0.985, 1600, 900)
-    expect(mid.w).toBeCloseTo(OS_W + (1200 - OS_W) * 0.5, 4)
+    expect(mid.w).toBeCloseTo(OS_W + (full.w - OS_W) * 0.5, 4)
     expect(mid.h).toBeCloseTo(OS_H, 4)
   })
 
@@ -90,10 +92,13 @@ describe('scene/sceneMath', () => {
     expect(camFov(1.05)).toBe(35)
   })
 
-  it('4. camDistance(35, 16/9) equals max(1.95/2/tv, 2.6/2/(tv*aspect))', () => {
+  it('4. camDistance(35, 16/9) equals max(SCREEN.h/2/tv, SCREEN.w/2/(tv*aspect)), which is 2.948 for the 2.86 × 1.859 screen', async () => {
+    // Loaded here, not at the top, so a missing laptop.js fails only this test (R4-1).
+    const { SCREEN } = await vi.importActual('./laptop.js')
     const aspect = 16 / 9
     const tv = Math.tan((35 * DEG) / 2)
-    expect(camDistance(35, aspect)).toBeCloseTo(Math.max(1.95 / 2 / tv, 2.6 / 2 / (tv * aspect)), 12)
+    expect(camDistance(35, aspect)).toBeCloseTo(Math.max(SCREEN.h / 2 / tv, SCREEN.w / 2 / (tv * aspect)), 12)
+    expect(camDistance(35, aspect)).toBeCloseTo(2.948, 3)
   })
 
   it('4. widePose: narrow pose below aspect 1.05, desktop pose otherwise (both with k = 1 when the view is wide enough)', () => {
@@ -278,7 +283,7 @@ describe('scene/sceneMath', () => {
     expect(f.far).toBeCloseTo(44.2, 9)
   })
 
-  it('R12 widenSize(1, w, h) equals the flat layout (w/k, h/k) with k = min(w/900, h/675)', () => {
+  it('R12 widenSize(1, w, h) equals the flat layout (w/k, h/k) with k = min(w/OS_W, h/OS_H)', () => {
     for (const [w, h] of [[1440, 900], [2560, 1080], [1024, 1366]]) {
       const k = Math.min(w / OS_W, h / OS_H)
       const s = widenSize(1, w, h)
@@ -287,17 +292,17 @@ describe('scene/sceneMath', () => {
     }
   })
 
-  it('R12 widenSize numbers: (.96,1440,900)={900,675}; (1,1440,900)={1080,675}; (1,2560,1080)≈{1600,675}; (1,1024,1366)≈{900,1200.6}', () => {
+  it('R12 widenSize numbers at 1040 × 676: (.96,1440,900)={1040,676}; (1,1440,900)≈{1081.6,676}; (1,2560,1080)≈{1602.4,676}; (1,1024,1366)≈{1040,1387.34}', () => {
     expect(widenSize(0.96, 1440, 900)).toEqual({ w: OS_W, h: OS_H })
     const a = widenSize(1, 1440, 900)
-    expect(a.w).toBeCloseTo(1080, 6)
-    expect(a.h).toBeCloseTo(675, 6)
+    expect(a.w).toBeCloseTo(1081.6, 6)
+    expect(a.h).toBeCloseTo(676, 6)
     const b = widenSize(1, 2560, 1080)
-    expect(b.w).toBeCloseTo(1600, 6)
-    expect(b.h).toBeCloseTo(675, 6)
+    expect(b.w).toBeCloseTo(1602.4, 1)
+    expect(b.h).toBeCloseTo(676, 6)
     const c = widenSize(1, 1024, 1366)
-    expect(c.w).toBeCloseTo(900, 6)
-    expect(c.h).toBeCloseTo(1200.6, 1)
+    expect(c.w).toBeCloseTo(1040, 6)
+    expect(c.h).toBeCloseTo(1387.34, 2)
   })
 
   it('vignetteAlpha: 1 on the desk, 0 from the start of the widen (.97), so the flat swap shows no pop', () => {

@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { TRACK_VH, PLATEAU_PX } from '../core/constants.js'
+import { TRACK_VH, PLATEAU_PX, OS_W, OS_H } from '../core/constants.js'
 
 const css = readFileSync(resolve(process.cwd(), 'src/styles/stage.css'), 'utf8')
 const tokens = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8')
@@ -82,6 +82,17 @@ describe('styles/stage.css', () => {
         expect(withoutComments(readFileSync(resolve(styleDir, f), 'utf8')), f).not.toMatch(/scroll-behavior\s*:/)
       }
     })
+  })
+})
+
+// Round 4 R4-1 (plan §3): the CSS3D holder is sized to the OS, so the drawn mirror and the DOM agree.
+describe('styles/stage.css OS holder size (R4-1)', () => {
+  it('#os-holder is OS_W × OS_H (1040px × 676px)', () => {
+    const holder = body(css, '#os-holder')
+    expect(holder).toMatch(new RegExp(`width:\\s*${OS_W}px`))
+    expect(holder).toMatch(new RegExp(`height:\\s*${OS_H}px`))
+    expect(holder).toMatch(/width:\s*1040px/)
+    expect(holder).toMatch(/height:\s*676px/)
   })
 })
 

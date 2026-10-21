@@ -1,6 +1,7 @@
 // Shared layout and input constants.
-export const OS_W = 900
-export const OS_H = 675
+/** The OS logical size: the 20:13 MacBook Air panel (2560 × 1664), plan-r4 M24. */
+export const OS_W = 1040
+export const OS_H = 676
 export const NARROW_PX = 760
 /** A stage shorter than this (phone landscape) also gets the compact OS. */
 export const SHORT_PX = 480

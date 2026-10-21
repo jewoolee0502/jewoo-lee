@@ -1,7 +1,9 @@
 /* JAY-OS shell styles, verbatim from design/revamp-lab.html L86–167. */
 /* ---------- JAY-OS (lives on the 3D monitor) ---------- */
-.os{position:relative;width:900px;height:675px;overflow:hidden;background:#04070A;color:#122030;font:16px/1.55 var(--f-body);user-select:none;-webkit-user-select:none;pointer-events:auto}
+.os{position:relative;width:1040px;height:676px;overflow:hidden;background:#04070A;color:#122030;font:16px/1.55 var(--f-body);user-select:none;-webkit-user-select:none;pointer-events:auto}
 .os.flat{width:100%;height:100%}
+/* plan-r4 §3: the lid screen's top corners round (SCREEN.cornerPx, as drawMirror masks them) and square off with the vignette (--vig on the holder), so the widen and the flat swap show none. */
+.os:not(.flat){border-radius:calc(var(--vig,1)*10px) calc(var(--vig,1)*10px) 0 0}
 .os .layer{position:absolute;inset:0;display:none}
 .os[data-state="standby"] .l-standby,.os[data-state="boot"] .l-boot,.os[data-state="on"] .l-desk,.os[data-state="off"] .l-off{display:block}
 .os::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:9000;background:radial-gradient(ellipse at center,transparent 70%,rgba(0,0,0,.3) 100%);opacity:var(--vig,1)}

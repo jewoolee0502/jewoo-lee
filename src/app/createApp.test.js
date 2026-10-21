@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createApp } from './createApp.js'
 import { setReducedMotion } from '../test/setup.js'
+import { OS_W, OS_H } from '../core/constants.js'
 
 describe('createApp', () => {
   it('returns motion, toasts, snd, ach and wallpaper', () => {
@@ -32,7 +33,8 @@ describe('createApp', () => {
 
     expect(app.host.osEl.id).toBe('os')
     expect(app.os.store.get().state).toBe('standby')
-    expect(app.os.size()).toEqual({ w: 900, h: 675 })
+    expect(app.os.size()).toEqual({ w: 1040, h: 676 })
+    expect(app.os.size()).toEqual({ w: OS_W, h: OS_H })
     app.dispose()
   })
 

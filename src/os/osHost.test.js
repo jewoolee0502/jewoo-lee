@@ -1,6 +1,7 @@
 // Round 2 Phase 2 TEST LIST item 7 (osHost): live toggles keep scroll offsets, no trap, fade class, fitFlat returns k.
 import { describe, it, expect, vi } from 'vitest'
 import { createOsHost } from './osHost.js'
+import { OS_W, OS_H } from '../core/constants.js'
 
 function makeFlatHost(width, height) {
   const el = document.createElement('div')
@@ -15,8 +16,8 @@ describe('createOsHost', () => {
     const host = createOsHost()
 
     expect(host.holder.id).toBe('os-holder')
-    expect(host.holder.style.width).toBe('900px')
-    expect(host.holder.style.height).toBe('675px')
+    expect(host.holder.style.width).toBe('1040px')
+    expect(host.holder.style.height).toBe('676px')
     expect(host.osEl.id).toBe('os')
     expect(host.osEl.classList.contains('os')).toBe(true)
     expect(host.osEl.dataset.state).toBe('standby')
@@ -46,28 +47,28 @@ describe('createOsHost', () => {
     expect(flatHost.classList.contains('on')).toBe(true)
   })
 
-  it('fitFlat in a 1200x675 host scales by 1 and sizes to the host', () => {
+  it('fitFlat in a 1040x676 host (the OS size) scales by 1 and sizes to the host', () => {
     const host = createOsHost()
-    host.bindFlatHost(makeFlatHost(1200, 675))
+    host.bindFlatHost(makeFlatHost(1040, 676))
     host.setFlat(true, false)
 
     host.fitFlat()
 
     expect(host.osEl.style.transform).toBe('scale(1)')
-    expect(host.osEl.style.width).toBe('1200px')
-    expect(host.osEl.style.height).toBe('675px')
+    expect(host.osEl.style.width).toBe('1040px')
+    expect(host.osEl.style.height).toBe('676px')
   })
 
-  it('fitFlat in a 450x675 host scales by 0.5 and grows the logical size', () => {
+  it('fitFlat in a 520x676 host scales by 0.5 and grows the logical size to 1040 x 1352', () => {
     const host = createOsHost()
-    host.bindFlatHost(makeFlatHost(450, 675))
+    host.bindFlatHost(makeFlatHost(520, 676))
     host.setFlat(true, false)
 
     host.fitFlat()
 
     expect(host.osEl.style.transform).toBe('scale(0.5)')
-    expect(host.osEl.style.width).toBe('900px')
-    expect(host.osEl.style.height).toBe('1350px')
+    expect(host.osEl.style.width).toBe('1040px')
+    expect(host.osEl.style.height).toBe('1352px')
   })
 
   it('setFlat(true, true) in compact mode clears transform, width and height', () => {
@@ -84,7 +85,7 @@ describe('createOsHost', () => {
     expect(host.osEl.style.height).toBe('')
   })
 
-  it('setFlat(false) moves the OS element back into the holder and restores 900px', () => {
+  it('setFlat(false) moves the OS element back into the holder and restores 1040px', () => {
     const host = createOsHost()
     const flatHost = makeFlatHost(450, 675)
     host.bindFlatHost(flatHost)
@@ -97,16 +98,16 @@ describe('createOsHost', () => {
     expect(host.osEl.classList.contains('flat')).toBe(false)
     expect(flatHost.classList.contains('on')).toBe(false)
     expect(host.osEl.style.transform).toBe('')
-    expect(host.osEl.style.width).toBe('900px')
+    expect(host.osEl.style.width).toBe('1040px')
   })
 
   it('setSize writes both widths and reports no shrink when growing', () => {
     const host = createOsHost()
 
-    const result = host.setSize(1000, 700)
+    const result = host.setSize(1100, 700)
 
-    expect(host.holder.style.width).toBe('1000px')
-    expect(host.osEl.style.width).toBe('1000px')
+    expect(host.holder.style.width).toBe('1100px')
+    expect(host.osEl.style.width).toBe('1100px')
     expect(result).toEqual({ shrunk: false })
   })
 
@@ -165,15 +166,18 @@ describe('createOsHost', () => {
     expect(flatHost.classList.contains('fade')).toBe(false)
   })
 
-  it('fitFlat returns the scale k = min(W/900, H/675) for a non-compact flat host and sizes the OS to 1080px wide at 1440x900', () => {
+  it('fitFlat returns the scale k = min(W/OS_W, H/OS_H) for a non-compact flat host and sizes the OS to about 1081.6px wide at 1440x900', () => {
     const host = createOsHost()
     host.bindFlatHost(makeFlatHost(1440, 900))
     host.setFlat(true, false)
 
     const k = host.fitFlat()
 
-    expect(k).toBeCloseTo(4 / 3, 6)
-    expect(host.osEl.style.width).toBe('1080px')
+    expect(k).toBeCloseTo(Math.min(1440 / OS_W, 900 / OS_H), 6)
+    expect(k).toBeCloseTo(1.33136, 5)
+    expect(parseFloat(host.osEl.style.width)).toBeCloseTo(1440 / k, 6)
+    expect(parseFloat(host.osEl.style.width)).toBeCloseTo(1081.6, 1)
+    expect(parseFloat(host.osEl.style.height)).toBeCloseTo(OS_H, 6)
   })
 
   it('fitFlat returns 1 for the compact layout', () => {
