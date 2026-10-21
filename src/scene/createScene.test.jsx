@@ -6,137 +6,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { StrictMode, useRef } from 'react'
 import { render, waitFor } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createApp } from '../app/createApp.js'
 import { AppProvider } from '../app/AppContext.jsx'
 import SceneMount from '../stage/SceneMount.jsx'
 
-const T = vi.hoisted(() => {
-  // `hits`: what the raycaster reports for a pointer pick (round 2 phase 4 tests set it per case).
-  const state = { calls: [], created: [], failOn: null, seq: 0, hits: [] }
-
-  const SKIP = (p) => typeof p === 'symbol' || p === 'then' || p === 'toJSON' || p === 'nodeType'
-
-  // An unknown member (e.g. `mesh.position`, `renderer.shadowMap`) is itself callable and
-  // property-accessible, so nested access like `mesh.position.set(…)` or
-  // `moon.shadow.mapSize.set(…)` works. Calling any member records `method` = its last name.
-  function member(kind, id, root, name) {
-    const own = {}
-    const fn = function () {}
-    return new Proxy(fn, {
-      get(_t, p) {
-        if (p in own) return own[p]
-        if (SKIP(p)) return undefined
-        if (typeof p === 'string' && /^is[A-Z]/.test(p)) return false
-        own[p] = member(kind, id, root, p)
-        return own[p]
-      },
-      set(_t, p, v) {
-        own[p] = v
-        return true
-      },
-      apply(_t, _this, args) {
-        state.calls.push({ kind, id, method: name, args })
-        return root
-      },
-    })
-  }
-
-  function makeProxy(kind, own = {}) {
-    const id = ++state.seq
-    const target = { ...own, __kind: kind, __id: id, children: [] }
-    const proxy = new Proxy(target, {
-      get(t, p) {
-        if (p in t) return t[p]
-        if (SKIP(p)) return undefined
-        if (typeof p === 'string' && /^is[A-Z]/.test(p)) return false
-        t[p] = member(kind, id, proxy, p)
-        return t[p]
-      },
-      set(t, p, v) {
-        t[p] = v
-        return true
-      },
-    })
-    target.add = (c) => {
-      target.children.push(c)
-      return proxy
-    }
-    target.remove = (c) => {
-      target.children = target.children.filter((x) => x !== c)
-      state.calls.push({ kind, id, method: 'remove', args: [c] })
-      return proxy
-    }
-    target.traverse = (fn) => {
-      fn(proxy)
-      for (const c of target.children) c.traverse(fn)
-    }
-    return proxy
-  }
-
-  function ctor(kind, own) {
-    return class {
-      constructor(...args) {
-        if (state.failOn === kind) throw new Error(`boom: ${kind}`)
-        const extra = own ? own(args) : {}
-        const proxy = makeProxy(kind, extra)
-        proxy.__args = args
-        if (kind === 'Mesh' || kind === 'Points') {
-          proxy.geometry = args[0]
-          proxy.material = args[1]
-          proxy[kind === 'Mesh' ? 'isMesh' : 'isPoints'] = true
-        }
-        state.created.push(proxy)
-        return proxy
-      }
-    }
-  }
-
-  const three = {
-    WebGLRenderer: ctor('WebGLRenderer', () => ({ domElement: document.createElement('canvas') })),
-    Scene: ctor('Scene'),
-    Color: ctor('Color'),
-    Fog: ctor('Fog'),
-    PerspectiveCamera: ctor('PerspectiveCamera'),
-    Group: ctor('Group'),
-    Object3D: ctor('Object3D'),
-    // A real Object3D starts at scale 1; the mock's scale is a plain {x,y,z} so an unset axis reads 1.
-    Mesh: ctor('Mesh', () => ({ scale: { x: 1, y: 1, z: 1 } })),
-    Points: ctor('Points'),
-    MeshStandardMaterial: ctor('MeshStandardMaterial'),
-    MeshBasicMaterial: ctor('MeshBasicMaterial'),
-    PointsMaterial: ctor('PointsMaterial'),
-    BoxGeometry: ctor('BoxGeometry'),
-    PlaneGeometry: ctor('PlaneGeometry'),
-    CylinderGeometry: ctor('CylinderGeometry'),
-    SphereGeometry: ctor('SphereGeometry'),
-    TorusGeometry: ctor('TorusGeometry'),
-    ConeGeometry: ctor('ConeGeometry'),
-    BufferGeometry: ctor('BufferGeometry'),
-    BufferAttribute: ctor('BufferAttribute'),
-    CanvasTexture: ctor('CanvasTexture'),
-    HemisphereLight: ctor('HemisphereLight'),
-    DirectionalLight: ctor('DirectionalLight'),
-    PointLight: ctor('PointLight'),
-    Vector2: ctor('Vector2'),
-    Vector3: ctor('Vector3'),
-    Quaternion: ctor('Quaternion'),
-    Euler: ctor('Euler'),
-    Raycaster: ctor('Raycaster', () => ({ intersectObjects: () => state.hits })),
-    TextureLoader: ctor('TextureLoader'),
-    sRGBEncoding: 3001,
-    PCFShadowMap: 2,
-    NearestFilter: 1003,
-    DoubleSide: 2,
-  }
-  const css3d = {
-    CSS3DRenderer: ctor('CSS3DRenderer', () => ({ domElement: document.createElement('div') })),
-    CSS3DObject: ctor('CSS3DObject'),
-  }
-  return { state, three, css3d }
+// The three fake is shared with laptopBuild.test.js (src/test/threeMock.js). It is loaded through
+// vi.hoisted so the vi.mock factories below can read it.
+const T = await vi.hoisted(async () => {
+  const { createThreeFake } = await import('../test/threeMock.js')
+  return createThreeFake()
 })
 
 vi.mock('three', () => T.three)
 vi.mock('three/examples/jsm/renderers/CSS3DRenderer.js', () => T.css3d)
+vi.mock('three/examples/jsm/geometries/RoundedBoxGeometry.js', () => ({ RoundedBoxGeometry: T.jsm.RoundedBoxGeometry }))
+vi.mock('three/examples/jsm/utils/BufferGeometryUtils.js', () => ({ BufferGeometryUtils: T.jsm.BufferGeometryUtils }))
 
 import { createScene, CANVAS_FONTS, GLOW_K } from './createScene.js'
 import { MUG, HIT } from './props.js'
@@ -145,6 +31,7 @@ import { OS_W, OS_H } from '../core/constants.js'
 import { glowColor, widePose } from './sceneMath.js'
 
 const { state } = T
+// R4-2: the body, keycap, icon and merged geometries, and the PMREM render target, are resources too.
 const RESOURCE_KINDS = new Set([
   'BoxGeometry',
   'PlaneGeometry',
@@ -152,11 +39,16 @@ const RESOURCE_KINDS = new Set([
   'SphereGeometry',
   'TorusGeometry',
   'ConeGeometry',
+  'ExtrudeGeometry',
+  'ShapeGeometry',
+  'CircleGeometry',
+  'RoundedBoxGeometry',
   'BufferGeometry',
   'MeshStandardMaterial',
   'MeshBasicMaterial',
   'PointsMaterial',
   'CanvasTexture',
+  'WebGLRenderTarget',
 ])
 const POINTER_EVENTS = ['pointermove', 'pointerdown', 'pointerup', 'pointerleave']
 
@@ -1198,5 +1090,382 @@ describe('scene/createScene pick: a real mesh beats a hit proxy', () => {
 
     expect(picked).toBe(labelOf(mug))
     api.dispose()
+  })
+})
+
+// Round 4 Phase R4-2 TEST LIST (plan-r4 §5 R4-2 item 8): the MacBook body, the keycap mesh, the PMREM env
+// (laptop only, with the no-env fallback), the key presses, the backlight, the laptop glow and the textures.
+// The laptop library is read with vi.importActual inside each test, so a missing export fails only that test.
+describe('scene/createScene laptop body, keyboard, env and backlight (round 4 R4-2)', () => {
+  beforeEach(() => {
+    state.calls = []
+    state.created = []
+    state.failOn = null
+    state.seq = 0
+    state.hits = []
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const WRITE = new Set(['copy', 'set', 'setRGB', 'setHex', 'setStyle'])
+  const CAPS = 77
+  const hotOf = (label) => state.created.find((o) => o.__kind === 'Group' && o.userData?.hot?.label === label)
+  const canvasOf = (env) => env.mount.querySelector('canvas.gl')
+  const pointer = (el, type, x = 10) => el.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: 10 }))
+  const hoverOn = (env, label) => {
+    state.hits = [{ object: hotOf(label) }]
+    pointer(canvasOf(env), 'pointermove')
+  }
+  const sized = (env) => {
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+  }
+  const emissiveWrites = (mat) => state.calls.filter((c) => c.kind === 'MeshStandardMaterial' && c.id === mat.__id && WRITE.has(c.method))
+  const optsOf = (m) => m.__args?.[0] ?? {}
+  const envOf = (m) => optsOf(m).envMap ?? Reflect.getOwnPropertyDescriptor(m, 'envMap')?.value
+  /** The [r, g, b] a recorded write set: setRGB(r,g,b), setHex(n), or copy(Color). Null if unreadable. */
+  function rgbOf(args) {
+    if (args.length === 3 && args.every((v) => typeof v === 'number')) return args
+    if (args.length === 1 && typeof args[0] === 'number') return [(args[0] >> 16) & 255, (args[0] >> 8) & 255, args[0] & 255].map((v) => v / 255)
+    if (args.length === 1 && Array.isArray(args[0]?.__args) && args[0].__kind === 'Color') return rgbOf(args[0].__args)
+    return null
+  }
+  const lastRgb = (mat) => {
+    const w = emissiveWrites(mat).at(-1)
+    return w ? rgbOf(w.args) ?? [NaN, NaN, NaN] : [0, 0, 0]
+  }
+  const close = (a, b, eps = 1e-6) => Array.isArray(a) && a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < eps)
+  /** The keycap buffer: the Float32Array behind the one 77-cap position attribute. */
+  const capsAttr = () => state.created.find((o) => o.__kind === 'BufferAttribute' && o.__args[0] instanceof Float32Array && o.__args[0].length === CAPS * 24 * 3)
+  const capsMesh = () => state.created.find((o) => o.__kind === 'Mesh' && o.geometry?.attributes?.position === capsAttr())
+  /** The top-most y of one cap's vertex range in the keycap buffer. */
+  const topOf = (pos, [s, e]) => {
+    let top = -Infinity
+    for (let v = s; v < e; v++) top = Math.max(top, pos[3 * v + 1])
+    return top
+  }
+  const rangeOf = (layout, id) => {
+    const caps = layout.filter((k) => !k.touchId)
+    const i = caps.findIndex((k) => k.id === id)
+    expect(i, `cap ${id}`).toBeGreaterThanOrEqual(0)
+    return [24 * i, 24 * i + 24]
+  }
+  /** Every vertex outside `range` keeps its y. */
+  const outsideUnchanged = (pos, before, [s, e]) => {
+    for (let v = 0; v < pos.length / 3; v++) if (v < s || v >= e) if (pos[3 * v + 1] !== before[3 * v + 1]) return false
+    return true
+  }
+
+  it('the body is extruded: two ExtrudeGeometry bodies (base and lid), and the old boxes (3.0 × 0.16 × 2.1, LID.w × LID.h × 0.1) are gone', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build()
+    expect(createdOf('ExtrudeGeometry').length).toBeGreaterThanOrEqual(2)
+    const boxes = createdOf('BoxGeometry').map((g) => g.__args)
+    expect(boxes).not.toContainEqual([3, 0.16, 2.1])
+    expect(boxes).not.toContainEqual([LP.LID.w, LP.LID.h, 0.1])
+    api.dispose()
+  })
+
+  it('the keyboard is one keycap mesh of 77 caps (1,848 vertices), and it is the only child of the Keyboard group', () => {
+    const env = setup()
+    const api = env.build()
+    expect(capsAttr(), 'the keycap position attribute').toBeDefined()
+    const kb = hotOf('Keyboard')
+    const meshes = kb.children.filter((c) => c.__kind === 'Mesh')
+    expect(meshes).toHaveLength(1)
+    expect(meshes[0].geometry.attributes.position).toBe(capsAttr())
+    api.dispose()
+  })
+
+  it('the env is one PMREM built from a scene with sigma 0.04, and its generator is disposed during the build', () => {
+    const env = setup()
+    const api = env.build()
+    const from = callsOn('PMREMGenerator', 'fromScene')
+    expect(from).toHaveLength(1)
+    expect(from[0].args[1]).toBe(0.04)
+    expect(callsOn('PMREMGenerator', 'dispose')).toHaveLength(1)
+    api.dispose()
+  })
+
+  it('dispose() releases the PMREM render target, like every other GPU resource', () => {
+    const env = setup()
+    const api = env.build()
+    const rt = createdOf('WebGLRenderTarget')[0]
+    expect(rt, 'the env render target').toBeDefined()
+    api.dispose()
+    expect(callsOn(undefined, 'dispose').some((c) => c.id === rt.__id)).toBe(true)
+  })
+
+  it('a failure in PMREMGenerator still builds the scene: the aluminium takes the no-env parameters and no material has an envMap', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup({ failOn: 'PMREMGenerator' })
+    let api = null
+    expect(() => {
+      api = env.build()
+    }).not.toThrow()
+    const noEnv = LP.MATERIALS.alu.noEnv
+    const mats = createdOf('MeshStandardMaterial')
+    expect(mats.some((m) => optsOf(m).metalness === noEnv.metalness && optsOf(m).roughness === noEnv.roughness)).toBe(true)
+    expect(mats.some((m) => envOf(m) !== undefined)).toBe(false)
+    expect(() => api.frame(0, 0.016)).not.toThrow()
+    api.dispose()
+  })
+
+  it('the env map is set on the laptop aluminium only: never on scene.environment, and not on the desk wood', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build()
+    const rt = createdOf('WebGLRenderTarget')[0]
+    expect(Reflect.getOwnPropertyDescriptor(createdOf('Scene')[0], 'environment')).toBeUndefined()
+    const alu = createdOf('MeshStandardMaterial').filter((m) => optsOf(m).metalness === LP.MATERIALS.alu.metalness)
+    expect(alu.length).toBeGreaterThan(0)
+    for (const m of alu) expect(envOf(m)).toBe(rt.texture)
+    const desk = createdOf('MeshStandardMaterial').filter((m) => optsOf(m).color === 0x6e4a30)
+    expect(desk.length).toBeGreaterThan(0)
+    for (const m of desk) expect(envOf(m)).toBeUndefined()
+    api.dispose()
+  })
+
+  it('pressKey("a") lowers the A cap by KEYBOARD.travel in the next frame and sets needsUpdate; the other caps stay put', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.ctrl.z = 0
+    const pos = capsAttr().__args[0]
+    const attr = capsAttr()
+    const range = rangeOf(LP.keyboardLayout(), 'A')
+    const restA = topOf(pos, range)
+    const before = Float32Array.from(pos)
+    api.pressKey('a')
+    attr.needsUpdate = false
+    api.frame(16, 0.016)
+    expect(restA - topOf(pos, range)).toBeCloseTo(LP.KEYBOARD.travel, 6)
+    expect(attr.needsUpdate).toBe(true)
+    expect(outsideUnchanged(pos, before, range)).toBe(true)
+    api.dispose()
+  })
+
+  it('pressKey("ArrowUp") and pressKey("Escape") lower their own caps (the inverted T and the fn row)', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.ctrl.z = 0
+    const pos = capsAttr().__args[0]
+    const layout = LP.keyboardLayout()
+    const up = rangeOf(layout, 'ARROWUP')
+    const esc = rangeOf(layout, 'ESCAPE')
+    const restUp = topOf(pos, up)
+    const restEsc = topOf(pos, esc)
+    api.pressKey('ArrowUp')
+    api.pressKey('Escape')
+    api.frame(16, 0.016)
+    expect(restUp - topOf(pos, up)).toBeCloseTo(LP.KEYBOARD.travel, 6)
+    expect(restEsc - topOf(pos, esc)).toBeCloseTo(LP.KEYBOARD.travel, 6)
+    api.dispose()
+  })
+
+  it('pressKey("Dead") is a no-op: no vertex moves and nothing is flagged for upload', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.ctrl.z = 0
+    const pos = capsAttr().__args[0]
+    const attr = capsAttr()
+    const before = Float32Array.from(pos)
+    api.pressKey('Dead')
+    attr.needsUpdate = false
+    api.frame(16, 0.016)
+    expect(pos).toEqual(before)
+    expect(attr.needsUpdate).toBe(false)
+    api.dispose()
+  })
+
+  it('a pressed key springs back to rest within a few frames, and a resting keyboard writes nothing on later frames', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.ctrl.z = 0
+    const pos = capsAttr().__args[0]
+    const attr = capsAttr()
+    const range = rangeOf(LP.keyboardLayout(), 'A')
+    const rest = topOf(pos, range)
+    api.pressKey('a')
+    api.frame(16, 0.016)
+    for (let i = 0; i < 12; i++) api.frame(32 + 16 * i, 0.016)
+    expect(topOf(pos, range)).toBeCloseTo(rest, 6)
+    attr.needsUpdate = false
+    api.frame(400, 0.016)
+    expect(attr.needsUpdate).toBe(false)
+    api.dispose()
+  })
+
+  it('hovering the Keyboard makes no glow write on the keycap material (its own emissive is the backlight)', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const keyMat = capsMesh().material
+    const before = emissiveWrites(keyMat).length
+    hoverOn(env, 'Keyboard')
+    expect(emissiveWrites(keyMat).length).toBe(before)
+    api.dispose()
+  })
+
+  it('the keyboard backlight is off with the lid shut, and warm white (0xfff4e0 at full level) with the lid open and the OS on', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const keyMat = capsMesh().material
+    env.app.os.store.set({ state: 'on' })
+    env.app.ctrl.z = 0
+    api.frame(0, 0.016)
+    const dark = lastRgb(keyMat)
+    expect(dark[0]).toBeLessThan(0.01)
+    env.app.ctrl.z = 0.6
+    for (let i = 1; i <= 5; i++) api.frame(16 * i, 0.016)
+    const lit = lastRgb(keyMat)
+    expect(lit[0]).toBeCloseTo(1, 2)
+    expect(lit[1]).toBeCloseTo(0xf4 / 255, 2)
+    expect(lit[2]).toBeCloseTo(0xe0 / 255, 2)
+    api.dispose()
+  })
+
+  it('the laptop hotspot glows at LAPTOP.glow (0.12) and not at GLOW_K, so the silver does not go chalky', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const hued = state.created.filter((o) => o.__kind === 'MeshStandardMaterial' && typeof o.userData.hue === 'number')
+    hoverOn(env, 'Laptop · open me')
+    const atLaptop = hued.filter((m) => emissiveWrites(m).some((w) => close(rgbOf(w.args), glowColor(m.userData.hue, LP.LAPTOP.glow))))
+    expect(atLaptop.length, 'laptop parts written at LAPTOP.glow').toBeGreaterThan(0)
+    const atGlowK = atLaptop.filter((m) => emissiveWrites(m).some((w) => close(rgbOf(w.args), glowColor(m.userData.hue, GLOW_K))))
+    expect(atGlowK).toHaveLength(0)
+    api.dispose()
+  })
+
+  it('the lid has no 256 × 128 JAY logo canvas; the keyboard atlas is 1024 × 424, its glow 512 × 212, and the Touch ID ring 64 × 64', () => {
+    const env = setup()
+    const api = env.build()
+    const sizes = createdOf('CanvasTexture').map((t) => [t.__args[0].width, t.__args[0].height])
+    expect(sizes).not.toContainEqual([256, 128])
+    expect(sizes).toContainEqual([1024, 424])
+    expect(sizes).toContainEqual([512, 212])
+    expect(sizes).toContainEqual([64, 64])
+    api.dispose()
+  })
+
+  it('the Power button is Touch ID: its group holds one hit box of HIT.touchId size', () => {
+    const env = setup()
+    const api = env.build()
+    const pb = hotOf('Power button')
+    expect(pb).toBeDefined()
+    const hits = pb.children.filter((c) => c.__kind === 'Mesh' && c.material?.__args?.[0]?.visible === false)
+    expect(hits).toHaveLength(1)
+    expect(hits[0].geometry.__args).toEqual(HIT.touchId.size)
+    api.dispose()
+  })
+})
+
+// Round 4 R4-2 review follow-ups: the lamp drives the laptop's env intensity, the static room parts
+// are merged (window frame, desk legs), and the three namespace is never passed as a value (so the
+// lazy chunk keeps tree-shaking three).
+describe('scene/createScene R4-2 follow-ups: lamp env intensity, merged room parts, tree-shaking', () => {
+  beforeEach(() => {
+    state.calls = []
+    state.created = []
+    state.failOn = null
+    state.seq = 0
+    state.hits = []
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const optsOf = (m) => m.__args?.[0] ?? {}
+  const envMats = () => createdOf('MeshStandardMaterial').filter((m) => optsOf(m).envMap !== undefined)
+  const intensityOf = (m) => Reflect.getOwnPropertyDescriptor(m, 'envMapIntensity')?.value
+  const sized = (env) => {
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+  }
+
+  it('every env material starts at its own env0 (the constructor intensity), and the desk wood never gets one', () => {
+    const env = setup()
+    const api = env.build()
+    const mats = envMats()
+    expect(mats.length).toBeGreaterThan(0)
+    for (const m of mats) expect(m.userData.env0).toBe(optsOf(m).envMapIntensity)
+    api.lamp()
+    const desk = createdOf('MeshStandardMaterial').filter((m) => optsOf(m).color === 0x6e4a30)
+    for (const m of desk) expect(intensityOf(m)).toBeUndefined()
+    api.dispose()
+  })
+
+  it('with reduced motion the lamp sets the env intensity at once: off is env0 × ENV.min, on is env0 again', async () => {
+    const { ENV } = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build({ reduce: true })
+    const mats = envMats()
+    api.lamp()
+    for (const m of mats) expect(intensityOf(m)).toBeCloseTo(m.userData.env0 * ENV.min, 9)
+    api.lamp()
+    for (const m of mats) expect(intensityOf(m)).toBeCloseTo(m.userData.env0, 9)
+    api.dispose()
+  })
+
+  it('without reduced motion the env intensity eases down over frames and settles at env0 × ENV.min', async () => {
+    const { ENV } = await vi.importActual('./laptop.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const mats = envMats()
+    api.lamp()
+    api.frame(16, 0.05)
+    for (const m of mats) {
+      expect(intensityOf(m)).toBeLessThan(m.userData.env0)
+      expect(intensityOf(m)).toBeGreaterThan(m.userData.env0 * ENV.min)
+    }
+    for (let i = 0; i < 60; i++) api.frame(32 + 16 * i, 0.1)
+    for (const m of mats) expect(intensityOf(m)).toBeCloseTo(m.userData.env0 * ENV.min, 9)
+    api.dispose()
+  })
+
+  it('the window frame (6 bars and the sill) is one merged mesh, and the Window hotspot is still the sky plane', () => {
+    const env = setup()
+    const api = env.build()
+    const frame = createdOf('Mesh').filter((m) => optsOf(m.material).color === 0xe9edf2)
+    expect(frame).toHaveLength(1)
+    expect(frame[0].geometry.__args[0]).toHaveLength(7)
+    const win = state.created.find((o) => o.userData?.hot?.label === 'Window')
+    expect(win.__kind).toBe('Mesh')
+    expect(win.geometry.__kind).toBe('PlaneGeometry')
+    api.dispose()
+  })
+
+  it('the four desk legs are one merged mesh', () => {
+    const env = setup()
+    const api = env.build()
+    const legs = createdOf('Mesh').filter((m) => optsOf(m.material).color === 0x3a2818)
+    expect(legs).toHaveLength(1)
+    expect(legs[0].geometry.__args[0]).toHaveLength(4)
+    api.dispose()
+  })
+
+  it('the three namespace is only read through members (THREE.X), never passed as a value', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/scene/createScene.js'), 'utf8').replace(/\/\/.*$/gm, '')
+    // Neither a member read (THREE.X) nor an object key (the injected `THREE: { … }` for laptopBuild).
+    const bare = src.match(/\bTHREE\b(?![.:])/g) ?? []
+    // The one bare use is the import itself: `import * as THREE from 'three'`.
+    expect(bare).toHaveLength(1)
+    expect(src).toMatch(/import \* as THREE from 'three'/)
   })
 })

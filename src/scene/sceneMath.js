@@ -160,10 +160,25 @@ export function cameraPose({ e, aspect, sp, aPos, aN, d, reduce }) {
   }
 }
 
-/** One frame of key depression (L1257). */
-export function stepKey(p, dt, base = 0.19) {
+/** One frame of key depression (L1257): a press sets p to 1, and the key sits `travel` under `base`
+ *  until p falls under 0.5, then rises back. R4-2 passes base 0 and KEYBOARD.travel (an offset). */
+export function stepKey(p, dt, base = 0.19, travel = 0.035) {
   const np = Math.max(0, p - dt * 7)
-  return { p: np, y: base - 0.035 * Math.min(1, np * 2) }
+  return { p: np, y: base - travel * Math.min(1, np * 2) }
+}
+
+const BACKLIGHT = { on: 1, boot: 0.6 }
+
+/**
+ * The keyboard backlight level (plan-r4 D3), 0..1: on 1, boot 0.6, otherwise dark, all scaled by
+ * the lid opening `le`. A hovered keyboard keeps at least 0.45·le, and a lid peeking at the desk
+ * leaks 0.3 from under it.
+ */
+export function backlightTarget({ osState, le, hovered, peeking }) {
+  let v = (BACKLIGHT[osState] ?? 0) * le
+  if (hovered) v = Math.max(v, 0.45 * le)
+  if (peeking) v = Math.max(v, 0.3)
+  return clamp(v, 0, 1)
 }
 
 export const SNOW_TOP = 3.65

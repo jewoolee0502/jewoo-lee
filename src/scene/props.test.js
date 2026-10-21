@@ -114,8 +114,20 @@ describe('scene/props hover glow and hit proxies (plan §7 6C)', () => {
   const lo = ({ pos, size }) => pos.map((p, i) => p - size[i] / 2)
   const hi = ({ pos, size }) => pos.map((p, i) => p + size[i] / 2)
 
-  it('HIT has a tags box and a floppy box', () => {
-    expect(Object.keys(HIT).sort()).toEqual(['floppy', 'tags'])
+  // R4-2 (M11): the power button is Touch ID, so HIT gains a touchId box for its key cell.
+  it('HIT has a tags box, a floppy box and a Touch ID box', () => {
+    expect(Object.keys(HIT).sort()).toEqual(['floppy', 'tags', 'touchId'])
+  })
+
+  it('the Touch ID box is HIT.touchId: size [0.24, 0.05, 0.22] at [0, 0.01, 0] in its group', () => {
+    expect(HIT.touchId).toEqual({ size: [0.24, 0.05, 0.22], pos: [0, 0.01, 0] })
+  })
+
+  it('the Touch ID box covers the Touch ID cell in x and z (its footprint is the cell plus a margin)', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const cell = LP.keyboardLayout().find((k) => k.touchId)
+    expect(HIT.touchId.size[0]).toBeGreaterThanOrEqual(cell.w)
+    expect(HIT.touchId.size[2]).toBeGreaterThanOrEqual(cell.d)
   })
 
   it('the mug glow is softer than the old 0.35 and below 0.2 (U15)', () => {

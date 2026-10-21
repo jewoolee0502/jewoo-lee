@@ -524,3 +524,62 @@ describe('scene/sceneMath hover glow and lid peek latch (round 2 phase 4 decisio
     expect(peekLatch(false, false, false)).toBe(false)
   })
 })
+
+// Round 4 Phase R4-2 TEST LIST (plan-r4 §1.2 M10, §2 D3): the key travel parameter of stepKey and the
+// keyboard backlight target. Both are read through the namespace so a missing export fails only here.
+describe('scene/sceneMath R4-2 key travel and keyboard backlight', () => {
+  it('stepKey(1, 0.1, 0, 0.005): the caps dip by the given travel times the ramp, 0.005 × 0.6, and p falls to 0.3', () => {
+    const s = SM.stepKey(1, 0.1, 0, 0.005)
+    expect(s.p).toBeCloseTo(0.3, 12)
+    expect(s.y).toBeCloseTo(-0.005 * 0.6, 12)
+  })
+
+  it('stepKey with a zero base and a full-travel press at rest is exactly 0 at p 0', () => {
+    const s = SM.stepKey(0.05, 0.1, 0, 0.005)
+    expect(s.p).toBe(0)
+    expect(s.y).toBe(0)
+  })
+
+  it('the default travel is unchanged: stepKey(1, 0.1) still gives y = 0.19 − 0.035 × 0.6', () => {
+    expect(SM.stepKey(1, 0.1).y).toBeCloseTo(0.19 - 0.035 * 0.6, 12)
+  })
+
+  it('backlightTarget: on is 1, boot 0.6, standby and off 0, with the lid open (le 1)', () => {
+    const at = (osState) => SM.backlightTarget({ osState, le: 1, hovered: false, peeking: false })
+    expect(at('on')).toBeCloseTo(1, 12)
+    expect(at('boot')).toBeCloseTo(0.6, 12)
+    expect(at('standby')).toBe(0)
+    expect(at('off')).toBe(0)
+  })
+
+  it('backlightTarget scales with the lid: on at le 0.5 is 0.5, boot at le 0.5 is 0.3, and a closed lid gives 0', () => {
+    expect(SM.backlightTarget({ osState: 'on', le: 0.5, hovered: false, peeking: false })).toBeCloseTo(0.5, 12)
+    expect(SM.backlightTarget({ osState: 'boot', le: 0.5, hovered: false, peeking: false })).toBeCloseTo(0.3, 12)
+    expect(SM.backlightTarget({ osState: 'on', le: 0, hovered: false, peeking: false })).toBe(0)
+  })
+
+  it('a hovered keyboard keeps at least 0.45 × le, even with the OS off (le 1 gives 0.45, le 0.5 gives 0.225)', () => {
+    expect(SM.backlightTarget({ osState: 'off', le: 1, hovered: true, peeking: false })).toBeCloseTo(0.45, 12)
+    expect(SM.backlightTarget({ osState: 'off', le: 0.5, hovered: true, peeking: false })).toBeCloseTo(0.225, 12)
+    expect(SM.backlightTarget({ osState: 'off', le: 0, hovered: true, peeking: false })).toBe(0)
+  })
+
+  it('the hover floor never lowers a brighter OS level: on, hovered, le 1 is 1', () => {
+    expect(SM.backlightTarget({ osState: 'on', le: 1, hovered: true, peeking: false })).toBeCloseTo(1, 12)
+  })
+
+  it('a lid peeking at the desk leaks 0.3 of light, even with the lid nearly shut (le 0)', () => {
+    expect(SM.backlightTarget({ osState: 'on', le: 0, hovered: false, peeking: true })).toBeCloseTo(0.3, 12)
+  })
+
+  it('backlightTarget stays within [0, 1] over a grid of states', () => {
+    for (const osState of ['on', 'boot', 'standby', 'off'])
+      for (const le of [0, 0.25, 0.5, 1])
+        for (const hovered of [false, true])
+          for (const peeking of [false, true]) {
+            const v = SM.backlightTarget({ osState, le, hovered, peeking })
+            expect(v).toBeGreaterThanOrEqual(0)
+            expect(v).toBeLessThanOrEqual(1)
+          }
+  })
+})

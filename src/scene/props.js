@@ -72,9 +72,12 @@ export const PEEK = 7 * DEG
  * Invisible hit boxes (plan-r2 §7 U16) that make the thin dog tags and floppies easy to hover and
  * click. Each is local to its hotspot group: `pos` is the box centre, `size` its [w, h, d]. The tags
  * box covers both plates, the chain and the ring, and stays in front of the wall; the floppy box is
- * a little larger than the 0.5 × 0.03 × 0.52 floppy, but thinner than the stack.
+ * a little larger than the 0.5 × 0.03 × 0.52 floppy, but thinner than the stack. The Touch ID box
+ * (R4-2, M11: the power button) covers its 1 u key cell with a margin, local to the Power button
+ * group, which sits on the cell at the cap top.
  */
 export const HIT = {
   tags: { size: [0.42, 1.0, 0.1], pos: [0.02, -0.44, 0] },
   floppy: { size: [0.58, 0.07, 0.6], pos: [0, 0.015, 0] },
+  touchId: { size: [0.24, 0.05, 0.22], pos: [0, 0.01, 0] },
 }

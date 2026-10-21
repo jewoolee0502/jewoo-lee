@@ -1,8 +1,10 @@
 // Canvas texture painters for the 3D scene, each (ctx, w, h, …) and free of three.js.
 // Ported from initScene (L1082–1088, L1143–1146, L1155, L1163–1164, L1223–1230); the mirror's
-// standby and desktop drawings were reworked to match the DOM screen it crossfades with.
+// standby and desktop drawings were reworked to match the DOM screen it crossfades with. Round 4
+// (R4-2) adds the MacBook keyboard's atlas and glow and the Touch ID ring; the lid's JAY logo is
+// gone (the lid carries a J geometry instead).
 import { OS_W, OS_H } from '../core/constants.js'
-import { SCREEN } from './laptop.js'
+import { SCREEN, keyboardUv } from './laptop.js'
 
 /** Night sky over Mont-Royal with its cross, the city and a strip of snow (L1082–1088). */
 export function drawSky(x, w, h) {
@@ -69,15 +71,6 @@ export function drawSticker(x, w, h) {
   x.fillStyle = '#9fb2c8'
   x.font = '16px Silkscreen, monospace'
   x.fillText('2.0', 172, 42)
-}
-
-/** The JAY logo on the back of the lid (L1155). */
-export function drawLogo(x, w, h) {
-  x.clearRect(0, 0, w, h)
-  x.fillStyle = '#4AA6EE'
-  x.font = '72px Silkscreen, monospace'
-  x.textAlign = 'center'
-  x.fillText('JAY', w / 2, 90)
 }
 
 /**
@@ -211,4 +204,88 @@ export function drawMirror(x, w, h, osState, wall) {
     BIOS.forEach((l, i) => x.fillText(l, Math.round(34 * k), Math.round((52 + 30 * i) * k)))
   }
   maskCorners(x, w, h, Math.round(SCREEN.cornerPx * k))
+}
+
+// ---------- the MacBook keyboard (plan-r4 M9, M11) ----------
+
+const KEY_FONT = (px) => `600 ${px}px system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif`
+const CAP_SIDE = '#0c0d0f'
+const CAP_TOP = '#1b1c1f'
+
+/** A cap's top face in canvas px: the planar keyboard UVs (keyboardUv) of its inset footprint. */
+function capRect(k, w, h) {
+  const inset = 0.04 * Math.min(k.w, k.d)
+  const [u0, v0] = keyboardUv(k.x - k.w / 2 + inset, k.z - k.d / 2 + inset)
+  const [u1, v1] = keyboardUv(k.x + k.w / 2 - inset, k.z + k.d / 2 - inset)
+  return { x: u0 * w, y: (1 - v0) * h, w: (u1 - u0) * w, h: (v0 - v1) * h }
+}
+
+/** Where a cap's legend goes: letters, digits, glyphs and F-keys centred; words in the lower
+ *  corner toward the keyboard edge, as on a Mac. Sizes scale with the canvas width (1024 base). */
+function legendOf(k, r, s) {
+  const word = k.label.length > 1 && !/^F\d+$/.test(k.label)
+  if (!word) {
+    const px = Math.round((/^F\d+$/.test(k.label) ? 13 : /[◀▶▲▼]/.test(k.label) ? 12 : 22) * s)
+    return { font: KEY_FONT(px), align: 'center', x: r.x + r.w / 2, y: r.y + r.h / 2 + px * 0.36 }
+  }
+  const px = Math.round((k.label.length > 7 ? 10 : 11) * s)
+  const pad = 5 * s
+  const right = k.x > 0
+  return { font: KEY_FONT(px), align: right ? 'right' : 'left', x: right ? r.x + r.w - pad : r.x + pad, y: r.y + r.h - pad }
+}
+
+function legends(x, w, h, layout) {
+  const s = w / 1024
+  for (const k of layout) {
+    if (k.touchId || !k.label) continue
+    const l = legendOf(k, capRect(k, w, h), s)
+    x.font = l.font
+    x.textAlign = l.align
+    x.fillText(k.label, l.x, l.y)
+  }
+  x.textAlign = 'left'
+}
+
+/**
+ * The keycap atlas (the caps' `map`), planar over the keyboard rectangle: the cap sides' near
+ * black, one rounded dark cap face per cap (the Touch ID cell is its own texture) and grey legends.
+ */
+export function drawKeyAtlas(x, w, h, layout) {
+  x.fillStyle = CAP_SIDE
+  x.fillRect(0, 0, w, h)
+  x.fillStyle = CAP_TOP
+  for (const k of layout) {
+    if (k.touchId) continue
+    const r = capRect(k, w, h)
+    const rr = Math.min(r.w, r.h) * 0.14
+    x.beginPath()
+    x.moveTo(r.x + rr, r.y)
+    x.arcTo(r.x + r.w, r.y, r.x + r.w, r.y + r.h, rr)
+    x.arcTo(r.x + r.w, r.y + r.h, r.x, r.y + r.h, rr)
+    x.arcTo(r.x, r.y + r.h, r.x, r.y, rr)
+    x.arcTo(r.x, r.y, r.x + r.w, r.y, rr)
+    x.closePath()
+    x.fill()
+  }
+  x.fillStyle = '#9da2aa'
+  legends(x, w, h, layout)
+}
+
+/** The backlight's emissive map: white legends on black (drawn at half size, so they glow soft). */
+export function drawKeyGlow(x, w, h, layout) {
+  x.fillStyle = '#000'
+  x.fillRect(0, 0, w, h)
+  x.fillStyle = '#fff'
+  legends(x, w, h, layout)
+}
+
+/** The Touch ID key: a glossy black face inside a thin brushed-steel ring. */
+export function drawTouchId(x, w, h) {
+  x.fillStyle = '#0d0e10'
+  x.fillRect(0, 0, w, h)
+  x.strokeStyle = '#8d939b'
+  x.lineWidth = Math.max(1, w / 20)
+  x.beginPath()
+  x.arc(w / 2, h / 2, w * 0.4, 0, Math.PI * 2)
+  x.stroke()
 }

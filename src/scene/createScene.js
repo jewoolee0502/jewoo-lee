@@ -2,9 +2,13 @@
 // that imports three (ESLint enforces it), and loadScene imports it lazily, so three ships in
 // its own chunk. The shared stage ticker calls `frame(t, dt)` after `ctrl.update(dt)` (D6);
 // the scene has no rAF or IntersectionObserver of its own. `dispose()` releases everything,
-// and a throw while building disposes the partial work before rethrowing (B6, B7).
+// and a throw while building disposes the partial work before rethrowing (B6, B7). Round 4: the
+// MacBook Air is built by laptopBuild.js, which gets the three classes it uses (and the jsm
+// helpers) injected from here. THREE is only ever read as THREE.X, never passed as a value, so the
+// lazy chunk keeps three tree-shaken.
 import * as THREE from 'three'
 import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
+import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { pinScroll } from '../stage/pinScroll.js'
 import { OS_W, OS_H } from '../core/constants.js'
 import {
@@ -18,7 +22,6 @@ import {
   cameraPose,
   stepKey,
   stepSnow,
-  ledPower,
   ledDrive,
   screenLightTarget,
   tagAngle,
@@ -35,14 +38,16 @@ import {
   peekTarget,
   peekLatch,
   glowColor,
+  backlightTarget,
   STEAM_Y0,
   STEAM_Y1,
 } from './sceneMath.js'
-import { drawSky, drawNote, drawSticker, drawLogo, drawFloppyLabel, drawMirror, drawMugLabel, drawPuff } from './textures.js'
+import { drawSky, drawFloppyLabel, drawMirror, drawMugLabel, drawPuff } from './textures.js'
 import { FLOPPIES, createFloppySequencer } from './floppy.js'
 import { createHotspotActions, hotspotOf } from './hotspots.js'
-import { POLAROID, MUG, SLOT, HIT, faceAngle } from './props.js'
-import { LID, SCREEN } from './laptop.js'
+import { POLAROID, MUG, HIT, PEEK, faceAngle } from './props.js'
+import { SCREEN, KEYBOARD, MATERIALS, ENV, LAPTOP, keyIdOf, offsetKeyVerts } from './laptop.js'
+import { buildLaptop, buildEnv, mergeParts } from './laptopBuild.js'
 
 /** The faces the canvas textures draw with; the font gate redraws them once these have loaded. */
 export const CANVAS_FONTS = [
@@ -124,6 +129,8 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
   let scene = null
   let ro = null
   let photoTex = null
+  // The laptop's PMREM env (laptopBuild.buildEnv): its render target is released with the scene.
+  let env = null
   const textures = []
   const listeners = []
   const offs = []
@@ -156,6 +163,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     })
     for (const t of textures.splice(0)) t.dispose()
     photoTex?.dispose()
+    env?.target.dispose()
     if (renderer) {
       renderer.dispose()
       renderer.forceContextLoss()
@@ -184,6 +192,34 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     canvas = renderer.domElement
     canvas.className = 'gl'
     mount.prepend(canvas)
+    // The injected three for laptopBuild.js: only the classes and constants it uses (the whole
+    // namespace as a value would pull every class into the chunk). Then the laptop-only env map
+    // (M6): set on the laptop's materials, never on scene.environment, so the tuned room is
+    // untouched. Null if PMREM fails.
+    const T = {
+      THREE: {
+        BackSide: THREE.BackSide,
+        BoxGeometry: THREE.BoxGeometry,
+        BufferAttribute: THREE.BufferAttribute,
+        BufferGeometry: THREE.BufferGeometry,
+        CircleGeometry: THREE.CircleGeometry,
+        CylinderGeometry: THREE.CylinderGeometry,
+        ExtrudeGeometry: THREE.ExtrudeGeometry,
+        Group: THREE.Group,
+        Mesh: THREE.Mesh,
+        MeshBasicMaterial: THREE.MeshBasicMaterial,
+        MeshStandardMaterial: THREE.MeshStandardMaterial,
+        Object3D: THREE.Object3D,
+        Path: THREE.Path,
+        PlaneGeometry: THREE.PlaneGeometry,
+        PMREMGenerator: THREE.PMREMGenerator,
+        Scene: THREE.Scene,
+        Shape: THREE.Shape,
+        ShapeGeometry: THREE.ShapeGeometry,
+      },
+      BufferGeometryUtils,
+    }
+    env = buildEnv(T, renderer)
     scene = new THREE.Scene()
     scene.background = new THREE.Color(0x141c2e)
     scene.fog = new THREE.Fog(0x141c2e, 16, 34)
@@ -278,11 +314,12 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     mk(new THREE.PlaneGeometry(40, 40), M(0x161e30, { roughness: 1 }), 0, -2.5, 0, scene).rotation.x = -Math.PI / 2
     const sky = canvasTex(512, 420, drawSky)
     const skyM = flat(sky, 2.4, 2.0, -3.5, 2.7, -2.99, scene, true)
-    const frameM = M(0xe9edf2)
-    ;[[0, 1.05, 2.6, 0.12], [0, -1.05, 2.6, 0.12], [-1.25, 0, 0.12, 2.2], [1.25, 0, 0.12, 2.2], [0, 0, 0.06, 2.0], [0, 0, 2.4, 0.06]].forEach(
-      ([fx, fy, fw, fh]) => mk(B(fw, fh, 0.08), frameM, -3.5 + fx, 2.7 + fy, -2.95, scene),
+    // The frame's six bars and the sill are one merged mesh (one draw call). The Window hotspot is
+    // the sky plane, so the frame takes no part in picking.
+    const frameBars = [[0, 1.05, 2.6, 0.12], [0, -1.05, 2.6, 0.12], [-1.25, 0, 0.12, 2.2], [1.25, 0, 0.12, 2.2], [0, 0, 0.06, 2.0], [0, 0, 2.4, 0.06]].map(
+      ([fx, fy, fw, fh]) => B(fw, fh, 0.08).translate(fx, fy, 0),
     )
-    mk(B(2.9, 0.1, 0.3), frameM, -3.5, 1.6, -2.86, scene)
+    mk(mergeParts(BufferGeometryUtils, [...frameBars, B(2.9, 0.1, 0.3).translate(0, -1.1, 0.09)]), M(0xe9edf2), -3.5, 2.7, -2.95, scene)
     const SN = 280
     const snowPos = new Float32Array(SN * 3)
     const snowV = new Float32Array(SN)
@@ -345,62 +382,27 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
 
     // ---------- desk (L1124–1125) ----------
     mk(B(7, 0.22, 3.2), M(0x6e4a30, { roughness: 0.6 }), 0, -0.11, 0)
-    ;[[-3.3, -1.45], [3.3, -1.45], [-3.3, 1.45], [3.3, 1.45]].forEach(([x, z]) => mk(B(0.16, 2.3, 0.16), M(0x3a2818), x, -1.37, z))
+    // The four legs, merged into one mesh.
+    const legs = [[-3.3, -1.45], [3.3, -1.45], [-3.3, 1.45], [3.3, 1.45]].map(([x, z]) => B(0.16, 2.3, 0.16).translate(x, 0, z))
+    mk(mergeParts(BufferGeometryUtils, legs), M(0x3a2818), 0, -1.37, 0)
 
-    // ---------- the laptop (L1128–1159) ----------
-    const CASE = 0xcdd3da
-    const ACC = 0x4aa6ee
+    // ---------- the laptop: a MacBook Air (plan-r4 R4-2, laptopBuild.js) ----------
     const base = new THREE.Group()
     base.position.set(0, 0, 0.35)
     rig.add(base)
-    mk(B(3.0, 0.16, 2.1), M(CASE, { roughness: 0.55 }), 0, 0.08, 0, base)
-    mk(B(2.76, 0.012, 0.98), M(0x9aa3ad), 0, 0.162, -0.48, base)
-    // All keys sit in one group so the keyboard is a single hotspot (L1202).
-    const kbHot = new THREE.Group()
-    base.add(kbHot)
-    const keyM = M(0xf3f5f8, { roughness: 0.5 })
-    const keys = new Map()
-    const keyList = []
-    const addKey = (name, w, x, z, mat) => {
-      const k = mk(B(w, 0.05, 0.16), mat || keyM, x, 0.19, z, kbHot)
-      k.userData.base = 0.19
-      k.userData.p = 0
-      keys.set(name, k)
-      keyList.push(k)
-      return k
-    }
-    ;['1234567890', 'QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].forEach((row, r) => {
-      ;[...row].forEach((ch, i) => addKey(ch, 0.19, -1.12 + r * 0.07 + i * 0.225, -0.86 + r * 0.19))
-    })
-    addKey(' ', 1.1, 0, -0.1)
-    addKey('ENTER', 0.4, 1.15, -0.48, M(ACC, { roughness: 0.5 }))
-    addKey('BACKSPACE', 0.4, 1.15, -0.86)
-    mk(new THREE.CylinderGeometry(0.035, 0.035, 0.05, 12), M(0xe8452e, { roughness: 0.9 }), 0.17, 0.2, -0.39, base)
-    mk(B(0.84, 0.008, 0.52), M(0xb6bec7, { roughness: 0.4 }), 0, 0.164, 0.5, base)
-    ;[-0.21, 0.21].forEach((bx) => mk(B(0.4, 0.014, 0.12), M(0x9aa3ad), bx, 0.166, 0.86, base))
-    const pbtn = new THREE.Group()
-    pbtn.position.set(1.28, 0.17, -0.97)
-    base.add(pbtn)
-    mk(new THREE.CylinderGeometry(0.065, 0.065, 0.03, 20), M(0xe8572a, { roughness: 0.4 }), 0, 0, 0, pbtn)
-    const powerLED = mk(B(0.08, 0.025, 0.01), M(0x2a2a2a, { emissive: 0x000000 }), -1.1, 0.08, 1.052, base)
-    // The floppy drive on the front face (R14): a bezel, the dark mouth the floppy slides into,
-    // an eject button and the drive LED.
-    mk(B(...SLOT.frame), M(0x9aa3ad), SLOT.x, SLOT.y, SLOT.z + 0.001, base)
-    mk(B(SLOT.w, SLOT.h, 0.008), M(0x05070a, { roughness: 1 }), SLOT.x, SLOT.y, SLOT.z + 0.006, base)
-    mk(B(0.06, 0.02, 0.01), M(0x6f7883), SLOT.eject[0], SLOT.eject[1], SLOT.z + 0.006, base)
-    const driveLED = mk(B(0.06, 0.018, 0.008), M(0x2a2a2a, { emissive: 0x000000 }), SLOT.led[0], SLOT.led[1], SLOT.z + 0.006, base)
-    const note = canvasTex(256, 256, drawNote)
-    const noteM = flat(note, 0.42, 0.42, 1.0, 0.17, 0.55, base)
-    noteM.rotation.set(-Math.PI / 2, 0, 0.2)
-    const sticker = canvasTex(256, 64, drawSticker)
-    flat(sticker, 0.5, 0.125, -1.0, 0.166, 0.75, base).rotation.x = -Math.PI / 2
-    // Lid on a hinge at the back edge. R4-1: the lid is LID.w × LID.h (still 0.1 thick on the old
-    // body until R4-2), with the black bezel inset 0.02 and the 20:13 screen (SCREEN) on it.
-    const hinge = new THREE.Group()
-    hinge.position.set(0, 0.235, -1.05)
-    base.add(hinge)
-    mk(B(LID.w, LID.h, 0.1), M(CASE, { roughness: 0.55 }), 0, LID.h / 2, -0.05, hinge)
-    mk(new THREE.PlaneGeometry(LID.w - 0.04, LID.h - 0.04), M(0x0b0f14, { roughness: 0.3 }), 0, LID.h / 2, 0.001, hinge)
+    const laptop = buildLaptop(T, { mk, hued, canvasTex, hitBox, env, base })
+    const { hinge, anchor, kbHot, pbtn, note: noteM } = laptop
+    const driveLED = laptop.leds.drive
+    // The keycaps: one position buffer, one press level per cap (stepKey), and the caps still moving.
+    const keyAttr = laptop.keys.attr
+    const keyPos = laptop.keys.position
+    const keyRanges = laptop.keys.ranges
+    const keyIndex = new Map(laptop.keys.ids.map((id, i) => [id, i]))
+    const keyP = new Float32Array(keyRanges.length)
+    const keysMoving = new Set()
+    const keyM = laptop.keys.mat
+    const [BL_R, BL_G, BL_B] = MATERIALS.keys.backlight
+    let backlight = 0
     let osState = os.state
     // `mirrorSrc` is the wallpaper canvas the mirror last drew (null: the blue fallback), so
     // the frame loop can redraw once the engine mounts or gets a size.
@@ -417,18 +419,6 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       drawMirror(x, w, h, osState, mirrorSrc ?? undefined)
     })
     flat(mirror, SCREEN.w, SCREEN.h, 0, SCREEN.cy, 0.002, hinge, true)
-    // The camera dives to the anchor, and the CSS3D screen sits on it.
-    const anchor = new THREE.Object3D()
-    anchor.position.set(0, SCREEN.cy, 0.003)
-    hinge.add(anchor)
-    const logo = canvasTex(256, 128, drawLogo)
-    const logoM = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.0, 0.5),
-      new THREE.MeshStandardMaterial({ map: logo.t, transparent: true, roughness: 0.4, emissive: 0x0b2a44 }),
-    )
-    logoM.position.set(0, LID.h / 2, -0.102)
-    logoM.rotation.set(0, Math.PI, Math.PI)
-    hinge.add(logoM)
     const screenL = new THREE.PointLight(0x7cc4ff, 0, 6, 2)
     screenL.position.set(0, SCREEN.cy, 1.0)
     hinge.add(screenL)
@@ -587,6 +577,9 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       lampL.intensity = 1.5 * lv
       hemi.intensity = 0.18 + (0.55 - 0.18) * lv
       bulb.material.color.copy(BULB_OFF).lerp(BULB_ON, lv)
+      // The laptop's reflections dim with the lamp, down to ENV.min (M6).
+      const k = ENV.min + (1 - ENV.min) * lv
+      for (const m of laptop.envMats) m.envMapIntensity = m.userData.env0 * k
     }
     function setLamp(v) {
       lampOn = v
@@ -628,7 +621,7 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       obj.userData.hot = { label, fn: actions.get(label), obj, glow }
       hot.push(obj)
     }
-    addHot(hinge, 'Laptop · open me')
+    addHot(hinge, 'Laptop · open me', LAPTOP.glow)
     addHot(pbtn, 'Power button')
     floppies.forEach((f) => addHot(f.m, 'Floppy · ' + f.label))
     addHot(tags, 'Dog tags')
@@ -676,7 +669,8 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       o.traverse((m) => {
         if (!m.isMesh) return
         for (const mt of [].concat(m.material)) {
-          if (!mt.emissive) continue
+          // Frame-owned emissives (the keycap backlight, the LEDs) are not the glow's (M22).
+          if (!mt.emissive || mt.userData.ownEmissive === true) continue
           if (!mt.userData.e0) mt.userData.e0 = mt.emissive.clone()
           if (on) mt.emissive.setRGB(...glowColor(hueOf(mt), k))
           else mt.emissive.copy(mt.userData.e0)
@@ -757,7 +751,8 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       osState = s
       mirror.redraw()
     }
-    const redrawText = () => [mirror, note, sticker, logo, mugLabel, ...floppies.map((f) => f.lab)].forEach((t) => t.redraw())
+    // The keyboard atlas uses system fonts, so it is not gated.
+    const redrawText = () => [mirror, ...laptop.texts, mugLabel, ...floppies.map((f) => f.lab)].forEach((t) => t.redraw())
     // One redraw once every face has loaded (a face that fails to load is skipped) and the font
     // set is ready, so a late face does not leave a label in its fallback.
     const fonts = globalThis.document?.fonts
@@ -905,12 +900,27 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       tagT += dt
       tagSwing *= Math.pow(0.6, dt)
       tags.rotation.z = tagAngle(tagT, tagSwing, reduced)
-      for (const k of keyList) {
-        if (k.userData.p > 0) {
-          const s = stepKey(k.userData.p, dt, k.userData.base)
-          k.userData.p = s.p
-          k.position.y = s.y
+      // Pressed caps dip by KEYBOARD.travel and spring back (D8): only their vertices move, and the
+      // buffer is re-uploaded once, only on frames where a cap moved.
+      if (keysMoving.size) {
+        for (const i of keysMoving) {
+          const s = stepKey(keyP[i], dt, 0, KEYBOARD.travel)
+          keyP[i] = s.p
+          offsetKeyVerts(keyPos, KEYBOARD.top, keyRanges[i], s.y)
+          if (s.p === 0) keysMoving.delete(i)
         }
+        keyAttr.needsUpdate = true
+      }
+      // The keyboard backlight (D3): the OS state through the lid, a hover floor, and a leak from
+      // under a peeking lid (in step with the peek). Written only when it changes.
+      const leak = PEEK > 0 ? peek / PEEK : 0
+      const bl = Math.max(
+        backlightTarget({ osState, le, hovered: hover === kbHot, peeking: false }),
+        leak * backlightTarget({ osState, le: 0, hovered: false, peeking: true }),
+      )
+      if (bl !== backlight) {
+        backlight = bl
+        keyM.emissive.setRGB(BL_R * bl, BL_G * bl, BL_B * bl)
       }
       const sb = snowBoost > 0 ? 3.5 : 1
       snowBoost = Math.max(0, snowBoost - dt)
@@ -922,7 +932,6 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
         if (y > y0) snowPos[i * 3] = -4.65 + Math.random() * 2.3
       }
       snowAttr.needsUpdate = true
-      powerLED.material.emissive.setHex(ledPower(osState, t))
       driveBusy = Math.max(0, driveBusy - dt)
       driveLED.material.emissive.setHex(ledDrive(driveBusy, osState, t))
       if (flatInside) mirrorStale = true
@@ -949,8 +958,10 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       frame,
       onOS,
       pressKey(k) {
-        const m = keys.get(String(k).toUpperCase())
-        if (m) m.userData.p = 1
+        const i = keyIndex.get(keyIdOf(k))
+        if (i === undefined) return
+        keyP[i] = 1
+        keysMoving.add(i)
       },
       openLid: () => ctrl.enter(),
       drive(s) {

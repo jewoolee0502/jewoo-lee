@@ -3,6 +3,8 @@
 import { describe, it, expect } from 'vitest'
 import * as textures from './textures.js'
 import { drawMirror, drawMugLabel } from './textures.js'
+// R4-2 layouts come from laptop.js through the namespace, so a missing export fails only its test.
+import * as LP from './laptop.js'
 
 const ctx2d = () => document.createElement('canvas').getContext('2d')
 const calls = (ctx, name) => ctx.calls.filter((c) => c[0] === name)
@@ -156,5 +158,69 @@ describe('scene/textures drawMugLabel', () => {
     expect(measured.at(-2).width).toBeGreaterThan(0.3 * 1024)
     const font = ctx.sets.filter((s) => s[0] === 'font').at(-1)[1]
     expect(font).toMatch(/^500 102px /)
+  })
+})
+
+// Round 4 Phase R4-2 TEST LIST (plan-r4 §1.2 M9, M11): the keyboard atlas (map), the key glow
+// (emissiveMap) and the Touch ID ring. drawLogo is gone with the lid's JAY logo.
+const PAINT = ['fill', 'fillRect', 'stroke', 'strokeRect', 'drawImage', 'clearRect', 'fillText']
+// The caps the atlas draws: every layout entry except the Touch ID cell (its own texture).
+const capsWithLabels = () => LP.keyboardLayout().filter((k) => !k.touchId && k.label)
+
+describe('scene/textures R4-2 keyboard atlas, key glow and Touch ID', () => {
+  it('drawLogo is gone from textures (the JAY logo on the lid is now the J geometry)', () => {
+    expect(textures).not.toHaveProperty('drawLogo')
+  })
+
+  it('drawKeyAtlas fills one cap face per cap (77) and writes one legend per labelled cap, in layout order', () => {
+    const ctx = ctx2d()
+    textures.drawKeyAtlas(ctx, 1024, 424, LP.keyboardLayout())
+    expect(calls(ctx, 'fill')).toHaveLength(77)
+    const texts = calls(ctx, 'fillText').map((c) => c[1])
+    expect(texts).toEqual(capsWithLabels().map((k) => k.label))
+    expect(texts).toHaveLength(76)
+  })
+
+  it('drawKeyAtlas legends are upper-case letters, and the modifiers use the M9 words and glyphs', () => {
+    const labelOf = (id) => LP.keyboardLayout().find((k) => k.id === id).label
+    expect(labelOf('A')).toBe('A')
+    expect(labelOf('ENTER')).toBe('return')
+    expect(labelOf('BACKSPACE')).toBe('delete')
+    expect(labelOf('ESCAPE')).toBe('esc')
+    expect(labelOf('TAB')).toBe('tab')
+    expect(labelOf('CAPSLOCK')).toBe('caps lock')
+    expect(labelOf('SHIFT')).toBe('shift')
+    expect(labelOf('CONTROL')).toBe('control')
+    expect(labelOf('ALT')).toBe('option')
+    expect(labelOf('META')).toBe('command ⌘')
+    expect(labelOf('F12')).toBe('F12')
+    expect(labelOf(' ')).toBe('')
+  })
+
+  it('drawKeyAtlas draws its caps with the dark cap colour 0x1b1c1f', () => {
+    const ctx = ctx2d()
+    textures.drawKeyAtlas(ctx, 1024, 424, LP.keyboardLayout())
+    expect(ctx.sets).toContainEqual(['fillStyle', '#1b1c1f'])
+  })
+
+  it('drawKeyGlow fills black first, then paints only white legends (fillText), one per labelled cap', () => {
+    const ctx = ctx2d()
+    textures.drawKeyGlow(ctx, 512, 212, LP.keyboardLayout())
+    expect(ctx.sets.some((s) => s[0] === 'fillStyle' && /^(#000|#000000|black)$/i.test(s[1]))).toBe(true)
+    const paints = ctx.calls.filter((c) => PAINT.includes(c[0]))
+    expect(paints[0]).toEqual(['fillRect', 0, 0, 512, 212])
+    expect(paints.slice(1).every((c) => c[0] === 'fillText')).toBe(true)
+    expect(paints.slice(1)).toHaveLength(capsWithLabels().length)
+    expect(ctx.sets.some((s) => s[0] === 'fillStyle' && /^(#fff|#ffffff|white)$/i.test(s[1]))).toBe(true)
+  })
+
+  it('drawTouchId draws a ring: an arc centred in the 64 × 64 canvas, then a stroke', () => {
+    const ctx = ctx2d()
+    textures.drawTouchId(ctx, 64, 64)
+    const arcs = calls(ctx, 'arc')
+    expect(arcs.length).toBeGreaterThanOrEqual(1)
+    expect(arcs[0][1]).toBe(32)
+    expect(arcs[0][2]).toBe(32)
+    expect(calls(ctx, 'stroke').length).toBeGreaterThanOrEqual(1)
   })
 })
