@@ -259,3 +259,68 @@ describe('scene/laptopBuild buildEnv (R4-2, M6)', () => {
     expect(LB.buildEnv(w.T, new w.three.WebGLRenderer())).toBeNull()
   })
 })
+
+// Round 4 Phase R4-3 TEST LIST (plan-r4 M18, M19, D4, D5): the LED placements, the sheen and the deck
+// glow as built (hidden at rest), and the side ports. Positions are read from the recorded
+// position.set calls of mk (base-local), so the fake needs no geometry maths.
+describe('scene/laptopBuild R4-3 LEDs, sheen and deck glow', () => {
+  const posOf = (state, m) => state.calls.filter((c) => c.kind === 'Mesh' && c.id === m.__id && c.method === 'set').at(-1)?.args
+  const isHidden = (m) => m.visible === false
+
+  it('the drive LED is on the front face at x 1.2 (base-local z at BASE.d/2), so a desk viewer sees it blink', () => {
+    const w = world()
+    const out = LB.buildLaptop(w.T, w.ctx)
+    const [x, , z] = posOf(w.state, out.leds.drive)
+    expect(x).toBeCloseTo(1.2, 2)
+    expect(z).toBeCloseTo(LP.BASE.d / 2, 2)
+  })
+
+  it('the MagSafe LED is a separate mesh on the left side, at the outer end of the plug (x past the left face)', () => {
+    const w = world()
+    const out = LB.buildLaptop(w.T, w.ctx)
+    expect(out.leds.magsafe).toBeDefined()
+    expect(out.leds.magsafe).not.toBe(out.leds.drive)
+    const [x, y, z] = posOf(w.state, out.leds.magsafe)
+    expect(x).toBeLessThan(-LP.BASE.w / 2)
+    expect(x).toBeGreaterThan(-LP.BASE.w / 2 - 0.15)
+    expect(y).toBeGreaterThan(0.04)
+    expect(y).toBeLessThan(LP.BASE.deckY)
+    expect(Math.abs(z - LP.PORTS.left.magsafe.z)).toBeLessThanOrEqual(LP.PORTS.left.magsafe.len / 2)
+  })
+
+  it('the MagSafe LED is toneMapped off (it stays lit in a dark room, D6)', () => {
+    const w = world()
+    const out = LB.buildLaptop(w.T, w.ctx)
+    expect(optsOf(out.leds.magsafe.material).toneMapped).toBe(false)
+  })
+
+  it('the sheen is a hidden additive plane on the lid: its texture is the 256 × 64 band and it is not visible at rest', () => {
+    const w = world()
+    const out = LB.buildLaptop(w.T, w.ctx)
+    expect(out.sheen.__kind).toBe('Mesh')
+    expect(isHidden(out.sheen)).toBe(true)
+    expect(out.sheen.material.map.__args[0].width).toBe(256)
+    expect(out.sheen.material.map.__args[0].height).toBe(64)
+    let inHinge = false
+    out.hinge.traverse((o) => {
+      if (o === out.sheen) inHinge = true
+    })
+    expect(inHinge).toBe(true)
+  })
+
+  it('the deck glow is a hidden additive plane of 2.8 × 1.0 scene units (D4), not visible at rest', () => {
+    const w = world()
+    const out = LB.buildLaptop(w.T, w.ctx)
+    expect(out.deckGlow.__kind).toBe('Mesh')
+    expect(isHidden(out.deckGlow)).toBe(true)
+    expect(out.deckGlow.geometry.__args.slice(0, 2)).toEqual([2.8, 1])
+  })
+
+  it('the sheen and the deck glow are not in the resting draw count: they build hidden, so a rest frame shows neither', () => {
+    const w = world()
+    const out = LB.buildLaptop(w.T, w.ctx)
+    const visible = meshesUnder(out.base).filter((m) => !isProxy(m) && !isHidden(m))
+    expect(visible).not.toContain(out.sheen)
+    expect(visible).not.toContain(out.deckGlow)
+  })
+})

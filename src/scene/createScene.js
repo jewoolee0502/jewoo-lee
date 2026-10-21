@@ -4,7 +4,8 @@
 // the scene has no rAF or IntersectionObserver of its own. `dispose()` releases everything,
 // and a throw while building disposes the partial work before rethrowing (B6, B7). Round 4: the
 // MacBook Air is built by laptopBuild.js, which gets the three classes it uses (and the jsm
-// helpers) injected from here. THREE is only ever read as THREE.X, never passed as a value, so the
+// helpers) injected from here; the frame drives its lid overshoot, LEDs, power fade, sheen and
+// deck glow (plan-r4 §2). THREE is only ever read as THREE.X, never passed as a value, so the
 // lazy chunk keeps three tree-shaken.
 import * as THREE from 'three'
 import { CSS3DRenderer, CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
@@ -13,7 +14,6 @@ import { pinScroll } from '../stage/pinScroll.js'
 import { OS_W, OS_H } from '../core/constants.js'
 import {
   lidT as lidOf,
-  hingeAngle,
   camE,
   lidBoot,
   widenSize,
@@ -23,7 +23,12 @@ import {
   stepKey,
   stepSnow,
   ledDrive,
+  ledMagSafe,
   screenLightTarget,
+  lidOpenAngle,
+  deckGlowAlpha,
+  sheenOffset,
+  SHEEN,
   tagAngle,
   createTweenList,
   dragYaw,
@@ -58,8 +63,9 @@ export const CANVAS_FONTS = [
   '42px Silkscreen',
   '500 64px "EB Garamond"',
 ]
-// Per-second ease rates (approach) for the hover lift, the steam, the lamp and the lid peek.
-const RATE = { lift: 12, steam: 4, lamp: 6, peek: 10, wiggle: 10 }
+// Per-second ease rates (approach) for the hover lift, the steam, the lamp, the lid peek, and the
+// screen and backlight power fade (plan-r4 D2).
+const RATE = { lift: 12, steam: 4, lamp: 6, peek: 10, wiggle: 10, power: 3 }
 const STEAM_N = 18
 const WIGGLE_AMP = 0.06
 // The hover glow is the material's own colour at this strength, so a prop keeps its hue. A hotspot
@@ -198,11 +204,14 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     // untouched. Null if PMREM fails.
     const T = {
       THREE: {
+        AdditiveBlending: THREE.AdditiveBlending,
         BackSide: THREE.BackSide,
         BoxGeometry: THREE.BoxGeometry,
         BufferAttribute: THREE.BufferAttribute,
         BufferGeometry: THREE.BufferGeometry,
+        CatmullRomCurve3: THREE.CatmullRomCurve3,
         CircleGeometry: THREE.CircleGeometry,
+        ClampToEdgeWrapping: THREE.ClampToEdgeWrapping,
         CylinderGeometry: THREE.CylinderGeometry,
         ExtrudeGeometry: THREE.ExtrudeGeometry,
         Group: THREE.Group,
@@ -216,6 +225,8 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
         Scene: THREE.Scene,
         Shape: THREE.Shape,
         ShapeGeometry: THREE.ShapeGeometry,
+        TubeGeometry: THREE.TubeGeometry,
+        Vector3: THREE.Vector3,
       },
       BufferGeometryUtils,
     }
@@ -392,7 +403,18 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
     rig.add(base)
     const laptop = buildLaptop(T, { mk, hued, canvasTex, hitBox, env, base })
     const { hinge, anchor, kbHot, pbtn, note: noteM } = laptop
-    const driveLED = laptop.leds.drive
+    const { drive: driveLED, magsafe: magsafeLED } = laptop.leds
+    const { sheen, deckGlow } = laptop
+    // The sheen sweep's clock in s (−1: idle), and the scene's shown time for the first-show sweep.
+    let sheenT = -1
+    let shownT = 0
+    let sheenShown = false
+    // The power fade (D2): the screen light's and the backlight's OS-state factor, eased; the frame
+    // multiplies them by the lid opening. The LED colours are written only when they change.
+    let screenP = 0
+    let backlightP = 0
+    let magsafeHex = -1
+    let driveHex = 0
     // The keycaps: one position buffer, one press level per cap (stepKey), and the caps still moving.
     const keyAttr = laptop.keys.attr
     const keyPos = laptop.keys.position
@@ -718,6 +740,8 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
         glow(hover, false)
         hover = o
         glow(hover, true)
+        // The lid catches the light as the hover lands on it at the desk (D5).
+        if (hover === hinge && ctrl.z < 0.02 && sheenT < 0 && !isReduced()) sheenT = 0
       }
       canvas.style.cursor = hover ? 'pointer' : ctrl.z < 0.5 ? 'grab' : 'default'
       if (!tipEl) return
@@ -849,7 +873,8 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       peekLatched = peekLatch(peekLatched, hover === hinge, overLaptop)
       const pt = peekTarget({ hovered: peekLatched, z, reduce: reduced })
       peek = reduced ? pt : approach(peek, pt, dt, RATE.peek)
-      hinge.rotation.x = hingeAngle(le) - peek
+      // D1: the lid swings a little past open and settles (plain hingeAngle with reduced motion).
+      hinge.rotation.x = lidOpenAngle(le, reduced) - peek
       const lb = lidBoot(le, lidWasClosed, os.state)
       lidWasClosed = lb.wasClosed
       if (lb.boot) os.boot()
@@ -911,11 +936,18 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
         }
         keyAttr.needsUpdate = true
       }
-      // The keyboard backlight (D3): the OS state through the lid, a hover floor, and a leak from
+      // The power fade (D2): the screen light's and the backlight's OS-state factors ease toward
+      // their targets (at once with reduced motion), and the lid opening scales them as it moves.
+      const power = (cur, target) => (reduced || Math.abs(cur - target) < 1e-3 ? target : approach(cur, target, dt, RATE.power))
+      screenP = power(screenP, screenLightTarget(osState, 1))
+      backlightP = power(backlightP, backlightTarget({ osState, le: 1, hovered: false, peeking: false }))
+      // The keyboard backlight (D3): the eased power through the lid, a hover floor, and a leak from
       // under a peeking lid (in step with the peek). Written only when it changes.
       const leak = PEEK > 0 ? peek / PEEK : 0
       const bl = Math.max(
-        backlightTarget({ osState, le, hovered: hover === kbHot, peeking: false }),
+        backlightP * le,
+        // With the state 'off', backlightTarget is the hover floor alone.
+        backlightTarget({ osState: 'off', le, hovered: hover === kbHot, peeking: false }),
         leak * backlightTarget({ osState, le: 0, hovered: false, peeking: true }),
       )
       if (bl !== backlight) {
@@ -933,13 +965,39 @@ export function createScene({ mount, stage, holder, park, tipEl, app, reduce }) 
       }
       snowAttr.needsUpdate = true
       driveBusy = Math.max(0, driveBusy - dt)
-      driveLED.material.emissive.setHex(ledDrive(driveBusy, osState, t))
+      const dh = ledDrive(driveBusy, osState, t)
+      if (dh !== driveHex) driveLED.material.emissive.setHex((driveHex = dh))
+      // D6: the MagSafe LED shows the OS state (breathing amber in standby).
+      const mh = ledMagSafe(osState, t, reduced)
+      if (mh !== magsafeHex) magsafeLED.material.color.setHex((magsafeHex = mh))
       if (flatInside) mirrorStale = true
       else if (mirrorStale || (osState === 'on' && wallCanvas() !== mirrorSrc)) {
         mirrorStale = false
         mirror.redraw()
       }
-      screenL.intensity += (screenLightTarget(osState, le) - screenL.intensity) * 0.08
+      // The screen's light on the room and its glow on the deck (D4), shown only while lit.
+      const level = screenP * le
+      screenL.intensity = level
+      const ga = deckGlowAlpha(level)
+      const glowOn = ga > 0.01
+      if (deckGlow.visible !== glowOn) deckGlow.visible = glowOn
+      if (glowOn) deckGlow.material.opacity = ga
+      // D5: the sheen sweeps the lid back once 1.2 s after the scene first shows (at the desk) and
+      // on a lid hover; it is drawn only during a sweep, and never with reduced motion.
+      if (!flatInside && !sheenShown) {
+        shownT += dt
+        if (shownT >= SHEEN.delay) {
+          sheenShown = true
+          if (z < 0.02 && sheenT < 0 && !reduced) sheenT = 0
+        }
+      }
+      if (sheenT >= 0) {
+        sheenT += dt
+        if (reduced || sheenT > SHEEN.dur) sheenT = -1
+        else sheen.material.map.offset.x = sheenOffset(sheenT)
+      }
+      const sheenOn = sheenT >= 0
+      if (sheen.visible !== sheenOn) sheen.visible = sheenOn
       if (discoT > 0) {
         discoT -= dt
         lampL.color.setHSL((t / 700) % 1, 0.85, 0.6)

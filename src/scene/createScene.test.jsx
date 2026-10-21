@@ -29,6 +29,7 @@ import { MUG, HIT } from './props.js'
 import { FLOPPIES } from './floppy.js'
 import { OS_W, OS_H } from '../core/constants.js'
 import { glowColor, widePose } from './sceneMath.js'
+import { ADDITIVE_BLENDING } from '../test/threeMock.js'
 
 const { state } = T
 // R4-2: the body, keycap, icon and merged geometries, and the PMREM render target, are resources too.
@@ -1328,7 +1329,8 @@ describe('scene/createScene laptop body, keyboard, env and backlight (round 4 R4
     const dark = lastRgb(keyMat)
     expect(dark[0]).toBeLessThan(0.01)
     env.app.ctrl.z = 0.6
-    for (let i = 1; i <= 5; i++) api.frame(16 * i, 0.016)
+    // R4-3 (D2): the backlight's power fades in at RATE.power 3/s, so it settles over ~3 s, not 5 frames.
+    for (let i = 1; i <= 60; i++) api.frame(50 * i, 0.05)
     const lit = lastRgb(keyMat)
     expect(lit[0]).toBeCloseTo(1, 2)
     expect(lit[1]).toBeCloseTo(0xf4 / 255, 2)
@@ -1467,5 +1469,333 @@ describe('scene/createScene R4-2 follow-ups: lamp env intensity, merged room par
     // The one bare use is the import itself: `import * as THREE from 'three'`.
     expect(bare).toHaveLength(1)
     expect(src).toMatch(/import \* as THREE from 'three'/)
+  })
+})
+
+// Round 4 Phase R4-3 TEST LIST (plan-r4 §2 D1–D6, M18–M21, §5): the side slot's laptop, the MagSafe
+// and drive LEDs, the braided cable, the contact shadow, the lid overshoot, the sheen sweep and the
+// deck glow. Meshes are found by what they are (geometry size, texture size, blending, material
+// writes), not by a name the implementation may not have.
+describe('scene/createScene R4-3 LEDs, cable, contact shadow, lid overshoot, sheen and deck glow', () => {
+  beforeEach(() => {
+    state.calls = []
+    state.created = []
+    state.failOn = null
+    state.seq = 0
+    state.hits = []
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const hotOf = (label) => state.created.find((o) => o.__kind === 'Group' && o.userData?.hot?.label === label)
+  const canvasOf = (env) => env.mount.querySelector('canvas.gl')
+  const pointer = (el, type, x = 10) => el.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: 10 }))
+  const hoverOn = (env, label) => {
+    state.hits = [{ object: hotOf(label) }]
+    pointer(canvasOf(env), 'pointermove')
+  }
+  const sized = (env) => {
+    Object.defineProperty(env.stage, 'clientWidth', { configurable: true, value: 1440 })
+    Object.defineProperty(env.stage, 'clientHeight', { configurable: true, value: 900 })
+  }
+  const optsOf = (m) => m?.__args?.[0] ?? {}
+  /** A material or geometry option, from its constructor arguments or a property set after it. */
+  const propOf = (m, k) => optsOf(m)[k] ?? Reflect.getOwnPropertyDescriptor(m, k)?.value
+  /** The last position (or rotation/scale) set on an object: the arguments of its recorded `set` call. */
+  const setOf = (o) => state.calls.filter((c) => c.kind === o.__kind && c.id === o.__id && c.method === 'set').at(-1)?.args
+  const parentOf = (o) => state.created.find((p) => p.children?.includes(o))
+  const subtree = (o) => [o, ...(o.children ?? []).flatMap(subtree)]
+  const planeOf = (w, h) => state.created.find((o) => o.__kind === 'Mesh' && o.geometry?.__kind === 'PlaneGeometry' && o.geometry.__args?.[0] === w && o.geometry.__args?.[1] === h)
+  /** The lid sheen: an additive plane whose map is the 256 × 64 band. */
+  const sheenMesh = () =>
+    state.created.find(
+      (o) =>
+        o.__kind === 'Mesh' &&
+        o.material?.map?.__kind === 'CanvasTexture' &&
+        o.material.map.__args[0]?.width === 256 &&
+        o.material.map.__args[0]?.height === 64 &&
+        propOf(o.material, 'blending') === ADDITIVE_BLENDING,
+    )
+  const deckGlowMesh = () => planeOf(2.8, 1)
+  const contactMesh = () => planeOf(3.4, 2.5)
+  const cableMesh = () => state.created.find((o) => o.__kind === 'Mesh' && o.geometry?.__kind === 'TubeGeometry')
+  /** Every value written to a MeshBasicMaterial colour (the MagSafe LED's only writer). */
+  const basicWrites = () => state.calls.filter((c) => c.kind === 'MeshBasicMaterial' && c.method === 'setHex')
+  const lastBasicWrite = () => basicWrites().at(-1)?.args[0]
+  const sweepSteps = (api, from, n, dt) => {
+    for (let i = 1; i <= n; i++) api.frame(from + 50 * i, dt)
+  }
+
+  it('the MagSafe LED shows the OS state: green when on, dim amber when off (the charging look)', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.os.store.set({ state: 'on' })
+    env.app.ctrl.z = 0
+    api.frame(0, 0.016)
+    expect(lastBasicWrite()).toBe(0x3ddc84)
+    env.app.os.store.set({ state: 'off' })
+    api.frame(16, 0.016)
+    expect(lastBasicWrite()).toBe(0x3a2406)
+    api.dispose()
+  })
+
+  it('the MagSafe LED breathes in standby: each frame writes ledMagSafe(standby, t) with its time', async () => {
+    const { ledMagSafe } = await vi.importActual('./sceneMath.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.os.store.set({ state: 'standby' })
+    env.app.ctrl.z = 0
+    api.frame(1000, 0.016)
+    expect(lastBasicWrite()).toBe(ledMagSafe('standby', 1000, false))
+    api.frame(2000, 0.016)
+    expect(lastBasicWrite()).toBe(ledMagSafe('standby', 2000, false))
+    api.dispose()
+  })
+
+  it('with reduced motion the MagSafe LED stays a steady amber 0xff9f1c in standby', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build({ reduce: true })
+    env.app.os.store.set({ state: 'standby' })
+    env.app.ctrl.z = 0
+    for (const t of [1000, 2000, 3000]) {
+      api.frame(t, 0.016)
+      expect(lastBasicWrite()).toBe(0xff9f1c)
+    }
+    api.dispose()
+  })
+
+  it('the drive LED blinks while a floppy is busy (api.drive): both its on and off colours are written, and it sits on the front face at x 1.2', async () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    api.drive(1)
+    api.frame(0, 0.016)
+    api.frame(80, 0.016)
+    const writes = state.calls.filter((c) => c.kind === 'MeshStandardMaterial' && c.method === 'setHex' && (c.args[0] === 0x220800 || c.args[0] === 0xff5533))
+    const values = new Set(writes.map((c) => c.args[0]))
+    expect(values).toEqual(new Set([0x220800, 0xff5533]))
+    const id = writes[0].id
+    const led = state.created.find((o) => o.__kind === 'Mesh' && o.material?.__id === id)
+    expect(led, 'the drive LED mesh').toBeDefined()
+    const [x, , z] = setOf(led)
+    const LP = await vi.importActual('./laptop.js')
+    expect(x).toBeCloseTo(1.2, 2)
+    expect(z).toBeCloseTo(LP.BASE.d / 2, 2)
+    api.dispose()
+  })
+
+  it('the lid sheen sweeps when the hover becomes the lid at z 0: visible within the 0.9 s sweep, then hidden again at 1.0 s', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const sheen = sheenMesh()
+    expect(sheen, 'the sheen band plane').toBeDefined()
+    env.app.ctrl.z = 0
+    expect(sheen.visible).not.toBe(true)
+    hoverOn(env, 'Laptop · open me')
+    api.frame(0, 0.016)
+    expect(sheen.visible).toBe(true)
+    sweepSteps(api, 0, 9, 0.05)
+    expect(sheen.visible, 'still sweeping at 0.45 s').toBe(true)
+    sweepSteps(api, 450, 11, 0.05)
+    expect(sheen.visible, 'hidden again after the 0.9 s sweep (at about 1.0 s)').not.toBe(true)
+    api.dispose()
+  })
+
+  it('with reduced motion the sheen never shows: not on a hover at z 0, not during 2 s of frames', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build({ reduce: true })
+    const sheen = sheenMesh()
+    env.app.ctrl.z = 0
+    hoverOn(env, 'Laptop · open me')
+    for (let i = 0; i < 40; i++) {
+      api.frame(50 * i, 0.05)
+      expect(sheen.visible).not.toBe(true)
+    }
+    api.dispose()
+  })
+
+  it('the deck glow is hidden with the lid shut (le 0) and visible with the OS on and the lid open; off it stays hidden', () => {
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const glow = deckGlowMesh()
+    expect(glow, 'the deck glow plane 2.8 × 1.0').toBeDefined()
+    env.app.os.store.set({ state: 'on' })
+    env.app.ctrl.z = 0
+    api.frame(0, 0.016)
+    expect(glow.visible).not.toBe(true)
+    env.app.ctrl.z = 0.6
+    sweepSteps(api, 0, 5, 0.016)
+    expect(glow.visible).toBe(true)
+    env.app.os.store.set({ state: 'off' })
+    sweepSteps(api, 300, 120, 0.1)
+    expect(glow.visible).not.toBe(true)
+    api.dispose()
+  })
+
+  it('the contact shadow is a plane in the rig (not the base), 3.4 × 2.5 at y 0.0015 centred on the base, and it casts no shadow', () => {
+    const env = setup()
+    const api = env.build()
+    const shadow = contactMesh()
+    expect(shadow, 'the contact shadow plane 3.4 × 2.5').toBeDefined()
+    // The hinge hangs off the base group, and the base sits in the rig with the desk and props.
+    const base = parentOf(hotOf('Laptop · open me'))
+    const rig = parentOf(base)
+    expect(parentOf(shadow)).toBe(rig)
+    expect(parentOf(shadow)).not.toBe(base)
+    const [x, y, z] = setOf(shadow)
+    expect(x).toBeCloseTo(0, 6)
+    expect(y).toBeCloseTo(0.0015, 6)
+    expect(z).toBeCloseTo(0.35, 6)
+    expect(shadow.castShadow).toBeFalsy()
+    expect(propOf(shadow.material, 'transparent')).toBe(true)
+    expect(propOf(shadow.material, 'depthWrite')).toBe(false)
+    expect(propOf(shadow.material, 'opacity')).toBeCloseTo(0.5, 6)
+    api.dispose()
+  })
+
+  it('a TubeGeometry is built for the braided cable, along a CatmullRomCurve3 through the seven CABLE points', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build()
+    expect(createdOf('TubeGeometry').length).toBeGreaterThanOrEqual(1)
+    const cable = cableMesh()
+    expect(cable, 'a mesh on the cable tube').toBeDefined()
+    const curve = cable.geometry.__args[0]
+    expect(curve.__kind).toBe('CatmullRomCurve3')
+    expect(curve.__args[0]).toHaveLength(LP.CABLE.points.length)
+    expect(LP.CABLE.points).toHaveLength(7)
+    api.dispose()
+  })
+
+  it('the hinge follows lidOpenAngle(lidT(z)) through the dive, so the lid overshoots and settles at −10°', async () => {
+    const SM = await vi.importActual('./sceneMath.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const hinge = hotOf('Laptop · open me')
+    for (const z of [0.1, 0.3, 0.6]) {
+      env.app.ctrl.z = z
+      api.frame(16, 0.016)
+      expect(hinge.rotation.x, `hinge at z ${z}`).toBeCloseTo(SM.lidOpenAngle(SM.lidT(z), false), 9)
+    }
+    env.app.ctrl.z = 0.3
+    api.frame(32, 0.016)
+    expect(Math.abs(SM.lidOpenAngle(SM.lidT(0.3), false) - SM.hingeAngle(SM.lidT(0.3)))).toBeGreaterThan(0.01)
+    api.dispose()
+  })
+
+  it('with reduced motion the hinge is exactly hingeAngle(lidT(z)) through the dive: no overshoot', async () => {
+    const SM = await vi.importActual('./sceneMath.js')
+    const env = setup()
+    sized(env)
+    const api = env.build({ reduce: true })
+    const hinge = hotOf('Laptop · open me')
+    env.app.ctrl.z = 0.3
+    api.frame(16, 0.016)
+    expect(hinge.rotation.x).toBeCloseTo(SM.hingeAngle(SM.lidT(0.3)), 9)
+    api.dispose()
+  })
+
+  // R4-3 review (D2): the power fade eases the screen light and the backlight; reduced motion is instant.
+  const screenLight = () => state.created.find((o) => o.__kind === 'PointLight' && o.__args?.[0] === 0x7cc4ff)
+  const keyMat = () => state.created.find((o) => o.__kind === 'Mesh' && o.geometry?.attributes?.position?.__args?.[0]?.length === 77 * 72)?.material
+  const lastKeyRgb = (mat) => state.calls.filter((c) => c.kind === 'MeshStandardMaterial' && c.id === mat.__id && c.method === 'setRGB').at(-1)?.args ?? [0, 0, 0]
+
+  it('D2: one 16 ms frame after the OS is on with the lid open, the screen light and the backlight are part-way up (strictly between 0 and their targets)', async () => {
+    const SM = await vi.importActual('./sceneMath.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    env.app.os.store.set({ state: 'on' })
+    env.app.ctrl.z = 0.6
+    api.frame(16, 0.016)
+    const target = SM.screenLightTarget('on', 1)
+    expect(screenLight().intensity).toBeGreaterThan(0)
+    expect(screenLight().intensity).toBeLessThan(target)
+    const [r] = lastKeyRgb(keyMat())
+    expect(r).toBeGreaterThan(0)
+    expect(r).toBeLessThan(1)
+    api.dispose()
+  })
+
+  it('D2: with reduced motion the screen light and the backlight are at their targets on the first frame', async () => {
+    const SM = await vi.importActual('./sceneMath.js')
+    const env = setup()
+    sized(env)
+    const api = env.build({ reduce: true })
+    env.app.os.store.set({ state: 'on' })
+    env.app.ctrl.z = 0.6
+    api.frame(16, 0.016)
+    expect(screenLight().intensity).toBeCloseTo(SM.screenLightTarget('on', 1), 12)
+    expect(lastKeyRgb(keyMat())[0]).toBeCloseTo(1, 12)
+    api.dispose()
+  })
+
+  // R4-3 review (D5): the first-show sweep, and a hover during a sweep does not restart it.
+  it('the first-show sheen sweep starts at SHEEN.delay of shown frames at the desk, runs its 0.9 s, and never comes back on its own', async () => {
+    const SM = await vi.importActual('./sceneMath.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const sheen = sheenMesh()
+    env.app.ctrl.z = 0
+    let t = 0
+    const run = (secs) => {
+      for (let i = 0; i < Math.round(secs / 0.05); i++) api.frame((t += 50), 0.05)
+    }
+    run(SM.SHEEN.delay - 0.1)
+    expect(sheen.visible, 'not before SHEEN.delay').not.toBe(true)
+    run(0.2)
+    expect(sheen.visible, 'sweeping just after SHEEN.delay').toBe(true)
+    run(SM.SHEEN.dur)
+    expect(sheen.visible, 'done after the sweep').not.toBe(true)
+    run(3)
+    expect(sheen.visible, 'no second sweep without a hover').not.toBe(true)
+    api.dispose()
+  })
+
+  it('a lid hover during a sweep does not restart it: the band keeps moving on and the sweep ends 0.9 s after it began', async () => {
+    const SM = await vi.importActual('./sceneMath.js')
+    const env = setup()
+    sized(env)
+    const api = env.build()
+    const sheen = sheenMesh()
+    env.app.ctrl.z = 0
+    hoverOn(env, 'Laptop · open me')
+    sweepSteps(api, 0, 10, 0.05) // 0.5 s into the sweep
+    const mid = sheen.material.map.offset.x
+    expect(mid).toBeCloseTo(SM.sheenOffset(0.5), 9)
+    // Off the laptop, then back onto the lid: a new hover on the lid mid-sweep.
+    state.hits = []
+    pointer(canvasOf(env), 'pointermove')
+    hoverOn(env, 'Laptop · open me')
+    api.frame(550, 0.05)
+    expect(sheen.material.map.offset.x, 'not reset to the start').toBeGreaterThan(mid)
+    sweepSteps(api, 550, 8, 0.05) // 0.95 s since the sweep began
+    expect(sheen.visible, 'the sweep ended on its first schedule').not.toBe(true)
+    api.dispose()
+  })
+
+  it('the laptop mesh budget holds with the cable and the contact shadow counted: the visible meshes at rest are at most LAPTOP.drawBudget', async () => {
+    const LP = await vi.importActual('./laptop.js')
+    const env = setup()
+    const api = env.build()
+    const base = parentOf(hotOf('Laptop · open me'))
+    const visible = (o) => o.__kind === 'Mesh' && optsOf(o.material).visible !== false && o.visible !== false
+    const inBase = subtree(base).filter(visible)
+    const extra = [cableMesh(), contactMesh()].filter((m) => m && visible(m))
+    const count = new Set([...inBase, ...extra]).size
+    expect(count).toBeGreaterThan(0)
+    expect(count).toBeLessThanOrEqual(LP.LAPTOP.drawBudget)
+    api.dispose()
   })
 })

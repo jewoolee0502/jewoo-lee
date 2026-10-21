@@ -469,3 +469,176 @@ describe('scene/laptop LAPTOP constants (R4-2, M22 and M23)', () => {
     expect(LP.LAPTOP.drawBudget).toBe(20)
   })
 })
+
+// Round 4 Phase R4-3 TEST LIST (plan-r4 M18, M19, M20, §4). Assumed contracts, base-local unless
+// marked rig (see the R4-3 report): SLOT {x (the right face plane), y, z (mouth centre), len (along
+// z), h (along y)}; PORTS {left: {magsafe: {z, len, h}, usbc: [{z, len, h}, …]}, right: {jack: {z, r}}};
+// CABLE {r, points: [[x, y, z] …] in rig coordinates, the first at the MagSafe plug end}.
+describe('scene/laptop side floppy slot (R4-3, M20)', () => {
+  const FLAT = BASE.d / 2 - BASE.r
+  const span = (c, len) => [c - len / 2, c + len / 2]
+
+  it('the slot sits on the right face: its plane is BASE.w/2 (x 1.5) and its mouth is in the slab (y 0.0535)', () => {
+    expect(LP.SLOT.x).toBeCloseTo(BASE.w / 2, 9)
+    expect(LP.SLOT.y).toBeCloseTo(0.0535, 9)
+  })
+
+  it('the mouth has at least 0.02 of aluminium above and below (0.029 each, within the slab from its feet to its deck)', () => {
+    const bottom = LP.SLOT.y - LP.SLOT.h / 2
+    const top = LP.SLOT.y + LP.SLOT.h / 2
+    expect(bottom - BASE.lift).toBeGreaterThanOrEqual(0.029 - 1e-9)
+    expect(BASE.deckY - top).toBeGreaterThanOrEqual(0.029 - 1e-9)
+  })
+
+  it('the mouth is 0.56 long along z (at least a 0.52 floppy plus room) and 0.036 high, and taller than a 0.03 floppy', () => {
+    expect(LP.SLOT.len).toBeGreaterThanOrEqual(0.56 - 1e-9)
+    expect(LP.SLOT.h).toBeCloseTo(0.036, 9)
+    expect(LP.SLOT.h).toBeGreaterThan(0.03)
+  })
+
+  it('the mouth z range lies on the flat part of the right face, clear of the plan corners (r 0.12)', () => {
+    const [z0, z1] = span(LP.SLOT.z, LP.SLOT.len)
+    expect(z0).toBeGreaterThanOrEqual(-FLAT)
+    expect(z1).toBeLessThanOrEqual(FLAT)
+  })
+
+  it('the mouth is clear of the headphone jack on the same face, with room to spare', () => {
+    const [z0, z1] = span(LP.SLOT.z, LP.SLOT.len)
+    const jack = LP.PORTS.right.jack
+    expect(z1 < jack.z - jack.r || z0 > jack.z + jack.r).toBe(true)
+  })
+
+  it('a seated floppy (rig z −0.1 ± 0.26) lies behind the floppy pile (nearest z 0.43), clear by at least 0.2', () => {
+    const rigZ = BASE.pos[2] + LP.SLOT.z
+    expect(rigZ + 0.26).toBeLessThan(0.43 - 0.2)
+  })
+})
+
+describe('scene/laptop ports (R4-3, M18)', () => {
+  it('the MagSafe plug and the two USB-C mouths are on the left face, and the headphone jack is on the right', () => {
+    expect(Object.keys(LP.PORTS.left).sort()).toEqual(['magsafe', 'usbc'])
+    expect(LP.PORTS.left.usbc).toHaveLength(2)
+    expect(Object.keys(LP.PORTS.right)).toEqual(['jack'])
+  })
+
+  it('the MagSafe plug is at z −0.78 and 0.16 long; the USB-C mouths are at z −0.50 and −0.32, 0.09 long and 0.028 high', () => {
+    const { magsafe, usbc } = LP.PORTS.left
+    expect(magsafe.z).toBeCloseTo(-0.78, 9)
+    expect(magsafe.len).toBeCloseTo(0.16, 9)
+    expect(usbc.map((u) => u.z)).toEqual([-0.5, -0.32].map((v) => expect.closeTo(v, 9)))
+    for (const u of usbc) {
+      expect(u.len).toBeCloseTo(0.09, 9)
+      expect(u.h).toBeCloseTo(0.028, 9)
+    }
+  })
+
+  it('the jack is at z −0.90 with radius 0.018, behind the floppy slot', () => {
+    expect(LP.PORTS.right.jack.z).toBeCloseTo(-0.9, 9)
+    expect(LP.PORTS.right.jack.r).toBeCloseTo(0.018, 9)
+    expect(LP.PORTS.right.jack.z).toBeLessThan(LP.SLOT.z)
+  })
+
+  it('no two left-face ports overlap in z, and every port is on the flat part of the face', () => {
+    const FLAT = BASE.d / 2 - BASE.r
+    const zs = [
+      [LP.PORTS.left.magsafe.z, LP.PORTS.left.magsafe.len],
+      ...LP.PORTS.left.usbc.map((u) => [u.z, u.len]),
+    ].map(([c, len]) => [c - len / 2, c + len / 2])
+    for (let i = 0; i < zs.length; i++) {
+      expect(zs[i][0]).toBeGreaterThanOrEqual(-FLAT)
+      expect(zs[i][1]).toBeLessThanOrEqual(FLAT)
+      for (let j = i + 1; j < zs.length; j++) expect(zs[i][1] <= zs[j][0] || zs[j][1] <= zs[i][0]).toBe(true)
+    }
+  })
+})
+
+describe('scene/laptop braided cable (R4-3, M18)', () => {
+  const FOOT = { x0: -BASE.w / 2, x1: BASE.w / 2, z0: BASE.pos[2] - BASE.d / 2, z1: BASE.pos[2] + BASE.d / 2 }
+  const inFoot = ([x, , z]) => x > FOOT.x0 && x < FOOT.x1 && z > FOOT.z0 && z < FOOT.z1
+  const PLANT = { x: -2.4, z: -1.2, r: 0.18 }
+  const MUG_AT = { x: -2.3, z: 0.85 }
+
+  it('has the seven control points from the plan, with a radius of 0.014', () => {
+    expect(LP.CABLE.r).toBeCloseTo(0.014, 9)
+    expect(LP.CABLE.points).toHaveLength(7)
+    expect(LP.CABLE.points[0]).toEqual([-1.63, 0.054, -0.43].map((v) => expect.closeTo(v, 2)))
+    expect(LP.CABLE.points[6][1]).toBeLessThan(-0.5)
+  })
+
+  it('the first point is at the MagSafe plug end: rig z of the plug, just outside the left face', () => {
+    const [x, , z] = LP.CABLE.points[0]
+    expect(z).toBeCloseTo(BASE.pos[2] + LP.PORTS.left.magsafe.z, 2)
+    expect(x).toBeLessThan(-BASE.w / 2)
+    expect(x).toBeGreaterThan(-BASE.w / 2 - 0.2)
+  })
+
+  it('every point lies outside the base footprint', () => {
+    for (const p of LP.CABLE.points) expect(inFoot(p), JSON.stringify(p)).toBe(false)
+  })
+
+  it('on the desk (|x| ≤ 3.5, z ≥ −1.6, y ≥ 0) until the drop: the first five points', () => {
+    for (const [x, y, z] of LP.CABLE.points.slice(0, 5)) {
+      expect(Math.abs(x)).toBeLessThanOrEqual(3.5)
+      expect(z).toBeGreaterThanOrEqual(-1.6)
+      expect(y).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('stays at least 0.2 from the plant pot (its edge, centre distance minus r 0.18) and clear of the mug', () => {
+    for (const [x, , z] of LP.CABLE.points) {
+      expect(Math.hypot(x - PLANT.x, z - PLANT.z) - PLANT.r).toBeGreaterThanOrEqual(0.2)
+      expect(Math.hypot(x - MUG_AT.x, z - MUG_AT.z)).toBeGreaterThan(0.5)
+    }
+  })
+
+  it('the last point is below y −0.5 (it has dropped off the back edge of the desk)', () => {
+    expect(LP.CABLE.points.at(-1)[1]).toBeLessThan(-0.5)
+  })
+})
+
+// R4-3 review: the tube runs on three's centripetal Catmull-Rom through CABLE.points, which bends
+// between the points, so the tube itself (not just its control points) is checked. catmullRomPoint
+// is the pure port of CatmullRomCurve3.getPoint (defaults: open, centripetal).
+describe('scene/laptop cable tube clearance (R4-3 review, M18)', () => {
+  const N = 2000
+  const samples = () => Array.from({ length: N + 1 }, (_, i) => LP.catmullRomPoint(LP.CABLE.points, i / N))
+  const EDGE = { z: -1.6, y: 0 } // the desk's back top edge
+
+  it('catmullRomPoint passes through every control point at its knot, and runs from the first to the last', () => {
+    const pts = LP.CABLE.points
+    pts.forEach((p, i) => {
+      const q = LP.catmullRomPoint(pts, i / (pts.length - 1))
+      q.forEach((v, k) => expect(v).toBeCloseTo(p[k], 12))
+    })
+  })
+
+  it('catmullRomPoint is the centripetal spline: on a straight, evenly spaced line it stays on the line', () => {
+    const line = [[0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0]]
+    for (let i = 0; i <= 30; i++) {
+      const [x, y, z] = LP.catmullRomPoint(line, i / 30)
+      expect(x).toBeCloseTo((3 * i) / 30, 9)
+      expect(y).toBeCloseTo(0, 12)
+      expect(z).toBeCloseTo(0, 12)
+    }
+  })
+
+  it('over the desk (z ≥ −1.6) the tube centre is at least CABLE.r above the desk top, so the tube never dips into it', () => {
+    for (const [x, y, z] of samples()) {
+      if (z >= EDGE.z) expect(y, `at ${[x, y, z].map((v) => v.toFixed(3))}`).toBeGreaterThanOrEqual(LP.CABLE.r)
+    }
+  })
+
+  it('past the back edge the tube clears the edge and the desk’s back face by CABLE.r: it only falls behind the desk', () => {
+    for (const [x, y, z] of samples()) {
+      if (z < EDGE.z) expect(Math.hypot(z - EDGE.z, y - EDGE.y), `at ${[x, y, z].map((v) => v.toFixed(3))}`).toBeGreaterThanOrEqual(LP.CABLE.r)
+      if (y < 0) expect(z, `below the desk top at ${[x, y, z].map((v) => v.toFixed(3))}`).toBeLessThanOrEqual(EDGE.z - LP.CABLE.r)
+    }
+  })
+
+  it('the whole tube stays at least 0.2 from the plant pot and 0.5 from the mug', () => {
+    for (const [x, , z] of samples()) {
+      expect(Math.hypot(x + 2.4, z + 1.2) - 0.18).toBeGreaterThanOrEqual(0.2)
+      expect(Math.hypot(x + 2.3, z - 0.85)).toBeGreaterThan(0.5)
+    }
+  })
+})

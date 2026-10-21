@@ -3,7 +3,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { POLAROID, MUG, mugRadiusAt, handleEnds, handleBulgeX, faceAngle, SLOT, HIT } from './props.js'
+import * as PR from './props.js'
+import { POLAROID, MUG, mugRadiusAt, handleEnds, handleBulgeX, faceAngle, HIT } from './props.js'
 import { glowColor } from './sceneMath.js'
 
 // handleEnds may return [x, y] pairs or {x, y} points; both are accepted here.
@@ -92,19 +93,10 @@ describe('scene/props McGill mug and drive slot', () => {
     expect(faceAngle({ x: 0, z: 0 }, { x: 1, z: 0 })).toBeCloseTo(Math.PI / 2, 10)
   })
 
-  it('the floppy slot is wide enough for a 0.5 floppy (w >= 0.54)', () => {
-    expect(SLOT.w).toBeGreaterThanOrEqual(0.5 + 0.04)
-  })
-
-  it('the slot mouth sits inside the base height (0 to 0.16)', () => {
-    expect(SLOT.y - SLOT.h / 2).toBeGreaterThanOrEqual(0)
-    expect(SLOT.y + SLOT.h / 2).toBeLessThanOrEqual(0.16)
-  })
-
-  it('the slot lies within the base width [-1.5, 1.5] and clear of the power LED at x -1.1', () => {
-    expect(SLOT.x - SLOT.w / 2).toBeGreaterThanOrEqual(-1.5)
-    expect(SLOT.x + SLOT.w / 2).toBeLessThanOrEqual(1.5)
-    expect(SLOT.x - SLOT.w / 2).toBeGreaterThan(-1.1 + 0.04)
+  // R4-3 (M20): the floppy slot moved to the right face, so its numbers are in laptop.js
+  // (laptop.test.js, "side floppy slot"). props.js no longer exports it.
+  it('props.js no longer exports SLOT (the drive slot is laptop.js SLOT on the right face)', () => {
+    expect(PR).not.toHaveProperty('SLOT')
   })
 })
 

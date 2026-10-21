@@ -224,3 +224,65 @@ describe('scene/textures R4-2 keyboard atlas, key glow and Touch ID', () => {
     expect(calls(ctx, 'stroke').length).toBeGreaterThanOrEqual(1)
   })
 })
+
+// Round 4 Phase R4-3 TEST LIST (plan-r4 M21, D4, D5): the contact shadow, the lid sheen band and the
+// screen's glow on the deck. Signatures (ctx, w, h) as the other painters; the recording context
+// shows their calls and property sets.
+describe('scene/textures R4-3 contact shadow, sheen and deck glow', () => {
+  const TRANSPARENT = /,\s*0(\.0+)?\)$|^transparent$/
+
+  it('drawContactShadow blurs (shadowBlur > 0) and paints a rounded rect, so the base edge fades out softly', () => {
+    const ctx = ctx2d()
+    textures.drawContactShadow(ctx, 256, 192)
+    const blur = ctx.sets.filter((s) => s[0] === 'shadowBlur').map((s) => s[1])
+    expect(blur.length).toBeGreaterThan(0)
+    expect(Math.max(...blur)).toBeGreaterThan(0)
+    const roundRect = calls(ctx, 'arcTo').length + calls(ctx, 'roundRect').length + calls(ctx, 'quadraticCurveTo').length
+    expect(roundRect).toBeGreaterThanOrEqual(4)
+  })
+
+  it('drawContactShadow paints a dark shadow colour and fills it, so it reads as a shadow when it is blended', () => {
+    const ctx = ctx2d()
+    textures.drawContactShadow(ctx, 256, 192)
+    expect(calls(ctx, 'fill').length + calls(ctx, 'fillRect').length).toBeGreaterThanOrEqual(1)
+    const dark = ctx.sets.filter((s) => s[0] === 'fillStyle' || s[0] === 'shadowColor').map((s) => String(s[1]))
+    expect(dark.some((c) => /^#0{3}|^#0{6}|rgba\(0,\s*0,\s*0/.test(c))).toBe(true)
+  })
+
+  it('drawSheen paints one linear band whose edges are transparent (its gradient stops at both ends have alpha 0)', () => {
+    const ctx = ctx2d()
+    textures.drawSheen(ctx, 256, 64)
+    expect(calls(ctx, 'createLinearGradient')).toHaveLength(1)
+    const stops = calls(ctx, 'addColorStop')
+    expect(stops.length).toBeGreaterThanOrEqual(3)
+    const first = stops[0]
+    const last = stops.at(-1)
+    expect(first[1]).toBe(0)
+    expect(last[1]).toBe(1)
+    expect(TRANSPARENT.test(String(first[2]))).toBe(true)
+    expect(TRANSPARENT.test(String(last[2]))).toBe(true)
+  })
+
+  it('drawSheen has a bright centre: some stop in the middle has a non-zero alpha', () => {
+    const ctx = ctx2d()
+    textures.drawSheen(ctx, 256, 64)
+    const mid = calls(ctx, 'addColorStop').filter((c) => c[1] > 0 && c[1] < 1)
+    expect(mid.length).toBeGreaterThan(0)
+    expect(mid.some((c) => !TRANSPARENT.test(String(c[2])))).toBe(true)
+  })
+
+  it('drawDeckGlow paints a radial or linear gradient of the screen light, not a flat fill', () => {
+    const ctx = ctx2d()
+    textures.drawDeckGlow(ctx, 512, 180)
+    const grad = calls(ctx, 'createRadialGradient').length + calls(ctx, 'createLinearGradient').length
+    expect(grad).toBeGreaterThanOrEqual(1)
+    expect(calls(ctx, 'addColorStop').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('drawDeckGlow fades to transparent at its edge, so the glow has no hard rim on the deck', () => {
+    const ctx = ctx2d()
+    textures.drawDeckGlow(ctx, 512, 180)
+    const stops = calls(ctx, 'addColorStop')
+    expect(TRANSPARENT.test(String(stops.at(-1)[2]))).toBe(true)
+  })
+})

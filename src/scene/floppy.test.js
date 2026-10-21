@@ -3,7 +3,10 @@
 // rAF tween loop does. Poses are rig coordinates: the front face of the base is at z 1.4 and a
 // floppy is 0.5 wide and 0.52 deep (half sizes 0.25 and 0.26).
 import { describe, it, expect, vi } from 'vitest'
+import * as FL from './floppy.js'
 import { createFloppySequencer, FLOPPIES, FLOPPY_PACE, SLIDE_X } from './floppy.js'
+// R4-3: the lane is rig-space and derived from the Air's right-face slot (laptop.js).
+import * as LP from './laptop.js'
 
 function fakeTweens() {
   const queue = []
@@ -26,21 +29,33 @@ function fakeTweens() {
 // The real floppy table (PROJECTS 0, GAMES 1) with a fake mesh each, so the homes are the shipped ones.
 const pilot = (n) => ({ ...FLOPPIES[n], m: { name: `m${n}` } })
 
-const SLOT_X = 0.95
-const APPROACH = { x: 0.95, y: 0.085, z: 1.75 }
-const SEATED = { x: 0.95, y: 0.085, z: 1.19 }
+// R4-3 (plan-r4 §4): the slot is on the right face at rig z -0.1, y 0.0535. The floppy seats 0.14
+// past the right face (rig x 1.5), so its centre is at 1.39; APPROACH is 0.03 clear of the face.
+const SLOT_Z = -0.1
+const SLOT_Y = 0.0535
+const APPROACH = { x: 1.78, y: SLOT_Y, z: SLOT_Z }
+const SEATED = { x: 1.39, y: SLOT_Y, z: SLOT_Z }
+const HALF_W = 0.25
+const HALF_D = 0.26
 
 /** The poses a floppy was sent to, in call order. */
 const posesOf = (calls, obj) => calls.filter((c) => c.obj === obj).map((c) => c.to.p)
 
-// Base footprint from the scene: x in [-1.5, 1.5], z up to the front face at 1.4.
-const floppyHitsBase = (p) => p.x - 0.25 < 1.5 && p.x + 0.25 > -1.5 && p.z - 0.26 < 1.4
-const isSlotPose = (p) => p.x === SLOT_X && p.y === 0.085
+// Base footprint (R4-3, BASE): rig x in [-1.5, 1.5], z in [-0.7, 1.4] (BASE.pos z 0.35, d 2.1).
+const floppyHitsBase = (p) => p.x - HALF_W < 1.5 && p.x + HALF_W > -1.5 && p.z - HALF_D < 1.4 && p.z + HALF_D > -0.7
+const isSlotPose = (p) => p.x === APPROACH.x || p.x === SEATED.x
+// The disc of the lamp base (rig): centre (3.0, -1.3), r 0.32.
+const LAMP = { x: 3.0, z: -1.3, r: 0.32 }
+const rectTouchesDisc = (p) => {
+  const nx = Math.max(p.x - HALF_W, Math.min(LAMP.x, p.x + HALF_W))
+  const nz = Math.max(p.z - HALF_D, Math.min(LAMP.z, p.z + HALF_D))
+  return Math.hypot(nx - LAMP.x, nz - LAMP.z) < LAMP.r
+}
 
 /**
  * Samples 20 points on every straight segment of a path (start pose first). A segment that runs
  * between two slot poses (APPROACH and SEATED, either way) is the one allowed run through the base;
- * its samples must stay at x 0.95 and y SLOT.y. Every other sample must keep the footprint clear.
+ * its samples must stay at y SLOT.y and z SLOT_Z. Every other sample must keep the footprint clear.
  */
 function clearanceErrors(path) {
   const errors = []
@@ -52,10 +67,11 @@ function clearanceErrors(path) {
       const t = s / 19
       const p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t }
       if (slotRun) {
-        if (Math.abs(p.x - SLOT_X) > 1e-9 || Math.abs(p.y - 0.085) > 1e-9) errors.push(`slot run ${i} leaves the slot`)
+        if (Math.abs(p.y - SLOT_Y) > 1e-9 || Math.abs(p.z - SLOT_Z) > 1e-9) errors.push(`slot run ${i} leaves the slot`)
       } else if (floppyHitsBase(p)) {
         errors.push(`segment ${i} sample ${s} overlaps the base at ${JSON.stringify(p)}`)
       }
+      if (rectTouchesDisc(p)) errors.push(`segment ${i} sample ${s} touches the lamp base at ${JSON.stringify(p)}`)
     }
   }
   return errors
@@ -69,12 +85,13 @@ describe('scene/floppy', () => {
     const f0 = pilot(0)
 
     seq.insert(f0)
+    // R4-3 legs (plan-r4 §4): slide, lift, lane along to the slot's z, drop to the slot, approach, seat.
     const want = [
       [{ x: SLIDE_X, y: 0.016, z: 0.75 }, 0.2],
       [{ x: SLIDE_X, y: 0.13, z: 0.75 }, 0.15],
-      [{ x: SLIDE_X, y: 0.13, z: 1.75 }, 0.25],
-      [{ x: 0.95, y: 0.13, z: 1.75 }, 0.3],
-      [APPROACH, 0.1],
+      [{ x: SLIDE_X, y: 0.13, z: SLOT_Z }, 0.25],
+      [{ x: SLIDE_X, y: SLOT_Y, z: SLOT_Z }, 0.1],
+      [APPROACH, 0.3],
       [SEATED, 0.35],
     ]
     want.forEach(([p, dur], i) => {
@@ -102,13 +119,35 @@ describe('scene/floppy', () => {
     expect(lane.x).toBe(slide.x)
   })
 
-  it('the seated pose leaves 0.05 of the floppy sticking out of the front face at z 1.4', () => {
+  it('the seated pose leaves 0.14 of the floppy sticking out past the right face at rig x 1.5', () => {
     const { tween, calls, flush } = fakeTweens()
     const seq = createFloppySequencer({ tween, onInserted: vi.fn() })
     seq.insert(pilot(0))
     flush()
     const seated = calls[calls.length - 1].to.p
-    expect(seated.z + 0.26 - 1.4).toBeCloseTo(0.05, 2)
+    expect(seated.x + HALF_W - 1.5).toBeCloseTo(0.14, 9)
+    expect(seated).toEqual(SEATED)
+  })
+
+  it('the seated floppy is inside the mouth: its z range lies within the slot length, and its y range within the slot height', () => {
+    const slotZ = LP.BASE.pos[2] + LP.SLOT.z
+    const half = LP.SLOT.len / 2
+    expect(SEATED.z - HALF_D).toBeGreaterThanOrEqual(slotZ - half)
+    expect(SEATED.z + HALF_D).toBeLessThanOrEqual(slotZ + half)
+    expect(SEATED.y - 0.015).toBeGreaterThanOrEqual(LP.SLOT.y - LP.SLOT.h / 2)
+    expect(SEATED.y + 0.015).toBeLessThanOrEqual(LP.SLOT.y + LP.SLOT.h / 2)
+  })
+
+  it('APPROACH is clear of the right face by at least 0.03, and the rig slot matches laptop.js (z −0.1, y 0.0535)', () => {
+    expect(APPROACH.x - HALF_W - 1.5).toBeGreaterThanOrEqual(0.03 - 1e-9)
+    expect(LP.BASE.pos[2] + LP.SLOT.z).toBeCloseTo(SLOT_Z, 9)
+    expect(LP.SLOT.y).toBeCloseTo(SLOT_Y, 9)
+    expect(SEATED.z).toBeCloseTo(LP.BASE.pos[2] + LP.SLOT.z, 9)
+    expect(SEATED.y).toBeCloseTo(LP.SLOT.y, 9)
+  })
+
+  it('the floppy module no longer exports LANE_Z (the lane runs along the slot z now)', () => {
+    expect(FL).not.toHaveProperty('LANE_Z')
   })
 
   it('inserting floppy 1 while floppy 0 is in the drive ejects 0 first: approach, up to the lane, along it to the slide x, over its home z, drop (turning back), slide in home', () => {
@@ -124,15 +163,15 @@ describe('scene/floppy', () => {
     const out = calls.filter((c) => c.obj === f0.m)
     expect(out.map((c) => c.to.p)).toEqual([
       APPROACH,
-      { x: 0.95, y: 0.13, z: 1.75 },
-      { x: SLIDE_X, y: 0.13, z: 1.75 },
+      { x: SLIDE_X, y: SLOT_Y, z: SLOT_Z },
+      { x: SLIDE_X, y: 0.13, z: SLOT_Z },
       { x: SLIDE_X, y: 0.13, z: 0.75 },
       { x: SLIDE_X, y: 0.016, z: 0.75 },
       { x: 2.15, y: 0.016, z: 0.75 },
     ])
-    const oldEjectDurs = [0.25, 0.1, 0.25, 0.2, 0.15, 0.2]
-    expect(out).toHaveLength(oldEjectDurs.length)
-    out.forEach((c, i) => expect(c.dur, `eject leg ${i}`).toBeCloseTo(oldEjectDurs[i] * FLOPPY_PACE, 10))
+    const ejectDurs = [0.25, 0.25, 0.1, 0.2, 0.15, 0.2]
+    expect(out).toHaveLength(ejectDurs.length)
+    out.forEach((c, i) => expect(c.dur, `eject leg ${i}`).toBeCloseTo(ejectDurs[i] * FLOPPY_PACE, 10))
     expect(out[4].to.r.y).toBe(0.3)
   })
 
@@ -197,7 +236,7 @@ describe('scene/floppy', () => {
     expect(onInserted).toHaveBeenLastCalledWith(f0)
   })
 
-  it('no floppy path clips the base: every segment keeps its footprint clear, except the slot run at x 0.95', () => {
+  it('no floppy path clips the base: every segment keeps its footprint clear, except the APPROACH to SEATED run at the slot', () => {
     const { tween, calls, flush } = fakeTweens()
     const seq = createFloppySequencer({ tween, onInserted: vi.fn() })
     const f0 = pilot(0)
@@ -217,7 +256,7 @@ describe('scene/floppy', () => {
     const ejectPathF1 = [f1Seated, ...posesOf(calls, f1.m)]
     expect(clearanceErrors(insertPathF0)).toEqual([])
     expect(clearanceErrors(ejectPathF1)).toEqual([])
-    expect(ejectPathF1.slice(1, 3)).toEqual([APPROACH, { x: 0.95, y: 0.13, z: 1.75 }])
+    expect(ejectPathF1.slice(1, 4)).toEqual([APPROACH, { x: SLIDE_X, y: SLOT_Y, z: SLOT_Z }, { x: SLIDE_X, y: 0.13, z: SLOT_Z }])
   })
 
   it('the floppy app mapping is PROJECTS → projects, GAMES → bugs, RESUME → resume (L1162)', () => {
@@ -453,5 +492,79 @@ describe('scene/floppy timing with FLOPPY_PACE', () => {
     const total = clickToInserted({ preload: false })
     expect(total).toBeLessThanOrEqual(0.9)
     expect(total).toBeCloseTo(1.35 * FLOPPY_PACE, 10)
+  })
+})
+
+// Round 4 R4-3 (plan-r4 §4): the side-slot lane. Every leg of an insert or eject is checked against
+// the base footprint (2D, the only allowed run through it is APPROACH ↔ SEATED), the lamp base disc
+// and the resting pile, and the lane's heights and timings are the re-planned ones.
+describe('scene/floppy R4-3 side-slot lane', () => {
+  /** Every pose of an insert of `a` after `b` is in the drive (eject then load), as paths. */
+  function swapPaths(a, b) {
+    const { tween, calls, flush } = fakeTweens()
+    const seq = createFloppySequencer({ tween, onInserted: vi.fn() })
+    const fa = pilot(a)
+    const fb = pilot(b)
+    seq.insert(fa)
+    flush()
+    calls.length = 0
+    seq.insert(fb)
+    flush()
+    return {
+      eject: [{ ...SEATED }, ...posesOf(calls, fa.m)],
+      load: [{ x: fb.home[0], y: fb.home[1], z: fb.home[2] }, ...posesOf(calls, fb.m)],
+    }
+  }
+
+  it.each([
+    [0, 1],
+    [1, 2],
+    [2, 0],
+  ])('swap %i → %i: no leg of the eject or the load passes over the lamp base disc', (a, b) => {
+    const { eject, load } = swapPaths(a, b)
+    for (const path of [eject, load]) {
+      for (let i = 0; i + 1 < path.length; i++) {
+        for (let s = 0; s < 20; s++) {
+          const t = s / 19
+          const p = { x: path[i].x + (path[i + 1].x - path[i].x) * t, y: path[i].y + (path[i + 1].y - path[i].y) * t, z: path[i].z + (path[i + 1].z - path[i].z) * t }
+          expect(rectTouchesDisc(p), `segment ${i} sample ${s} at ${JSON.stringify(p)}`).toBe(false)
+        }
+      }
+    }
+  })
+
+  it('the insert poses at the slot (APPROACH and SEATED) hold the slot height SLOT.y and the slot z', () => {
+    const { tween, calls, flush } = fakeTweens()
+    const seq = createFloppySequencer({ tween, onInserted: vi.fn() })
+    const f0 = pilot(0)
+    seq.insert(f0)
+    flush()
+    const inward = posesOf(calls, f0.m)
+    const slotLegs = inward.filter((p) => p.x === APPROACH.x || p.x === SEATED.x)
+    expect(slotLegs.length).toBeGreaterThan(0)
+    for (const p of slotLegs) {
+      expect(p.y).toBe(SLOT_Y)
+      expect(p.z).toBe(SLOT_Z)
+    }
+  })
+
+  it.each([0, 1, 2])('floppy %i only changes height at SLIDE_X, clear of the pile (x − 0.25 > 2.62), on its load and on its eject', (n) => {
+    // n ejects to make room for the next floppy, and n loads after the previous one ejects.
+    const { eject } = swapPaths(n, (n + 1) % 3)
+    const { load } = swapPaths((n + 2) % 3, n)
+    for (const path of [eject, load]) {
+      for (let i = 0; i + 1 < path.length; i++) {
+        const [a, b] = [path[i], path[i + 1]]
+        if (a.y === b.y) continue
+        expect(a.x, `leg ${i} starts its rise or drop at SLIDE_X`).toBe(SLIDE_X)
+        expect(b.x, `leg ${i} ends its rise or drop at SLIDE_X`).toBe(SLIDE_X)
+        expect(a.x - HALF_W).toBeGreaterThan(2.62)
+      }
+    }
+  })
+
+  it('the lane height and slide x are kept: LANE_Y 0.13 and SLIDE_X 2.9', () => {
+    expect(FL.LANE_Y).toBe(0.13)
+    expect(FL.SLIDE_X).toBe(2.9)
   })
 })

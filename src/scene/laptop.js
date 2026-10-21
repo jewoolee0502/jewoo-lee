@@ -3,7 +3,8 @@
 // (1 unit ≈ 101 mm) and base-local unless marked "rig". The screen is the 20:13 Air panel: OS_W ×
 // OS_H OS px at SCREEN.unit scene units per px; everything else about it is derived from that.
 // R4-2 adds the keyboard layout and its cap buffers, the trackpad, the J monogram, the materials
-// and the env map's room (laptopBuild.js turns them into meshes).
+// and the env map's room; R4-3 the side floppy slot, the ports and the MagSafe cable (laptopBuild.js
+// turns them into meshes; floppy.js builds its lane on SLOT).
 import { OS_W, OS_H } from '../core/constants.js'
 
 const DEG = Math.PI / 180
@@ -74,6 +75,94 @@ export const KEYBOARD = {
 
 /** The Force Touch trackpad on the palm rest: centre (x, z), size and corner radius. */
 export const TRACKPAD = { x: 0, z: 0.62, w: 1.2, d: 0.72, r: 0.06 }
+
+// ---------- R4-3: the side floppy slot, the ports and the MagSafe cable (M18–M20) ----------
+
+// The slab's mid-height (BASE.lift + BASE.h/2): the slot and every port are centred on it.
+const MID_Y = 0.0535
+
+/**
+ * The floppy drive slot on the right face (M20): `x` is the face plane, the mouth is centred at
+ * (y, z) and is `len` long along z and `h` high, with `lip` the shade frame's margin around it. It
+ * leaves 0.029 of aluminium above and below, and sits toward the back (rig z −0.1), behind the
+ * floppy pile.
+ */
+export const SLOT = { x: BASE.w / 2, y: MID_Y, z: -0.45, len: 0.56, h: 0.036, lip: 0.012 }
+
+/**
+ * The side ports (M18), base-local z on the faces' flat parts, all centred at the slot's height.
+ * Left: the MagSafe plug (`len` along z, `h` high, standing `out` proud of the face) and two USB-C
+ * mouths; right: the headphone jack behind the floppy slot.
+ */
+export const PORTS = {
+  y: MID_Y,
+  left: {
+    magsafe: { z: -0.78, len: 0.16, h: 0.034, out: 0.13 },
+    usbc: [
+      { z: -0.5, len: 0.09, h: 0.028 },
+      { z: -0.32, len: 0.09, h: 0.028 },
+    ],
+  },
+  right: { jack: { z: -0.9, r: 0.018 } },
+}
+
+/**
+ * The braided MagSafe cable (M18): a tube of radius `r` on the Catmull-Rom spline through these rig
+ * points (catmullRomPoint), from the plug end, left and back over the desk between the laptop and
+ * the plant, then over the desk's back edge (z −1.6) and straight down behind it. The desk run is
+ * at y 0.017, so the sampled tube's bottom stays just above the desk top (y 0) where the spline sags
+ * between points, and the hang point sits 0.025 behind the edge so the tube clears it.
+ */
+export const CABLE = {
+  r: 0.014,
+  points: [
+    [-1.63, 0.054, -0.43],
+    [-1.77, 0.03, -0.47],
+    [-1.94, 0.017, -0.7],
+    [-1.99, 0.017, -1.15],
+    [-1.96, 0.017, -1.52],
+    [-1.95, 0, -1.625],
+    [-1.95, -0.7, -1.64],
+  ],
+}
+
+/**
+ * A point `t` (0…1) along the open centripetal Catmull-Rom spline through `points` ([x, y, z]
+ * each): three's CatmullRomCurve3.getPoint with its defaults, ported so the tests can check where
+ * the cable's tube really runs (the scene builds the tube on three's own curve).
+ */
+export function catmullRomPoint(points, t) {
+  const l = points.length
+  let i = Math.floor((l - 1) * t)
+  let w = (l - 1) * t - i
+  if (w === 0 && i === l - 1) {
+    i = l - 2
+    w = 1
+  }
+  const ext = (a, b) => a.map((v, k) => 2 * v - b[k])
+  const p0 = i > 0 ? points[i - 1] : ext(points[0], points[1])
+  const p1 = points[i]
+  const p2 = points[i + 1]
+  const p3 = i + 2 < l ? points[i + 2] : ext(points[l - 1], points[l - 2])
+  const dt = (a, b) => Math.pow((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2, 0.25)
+  let d1 = dt(p1, p2)
+  if (d1 < 1e-4) d1 = 1
+  let d0 = dt(p0, p1)
+  if (d0 < 1e-4) d0 = d1
+  let d2 = dt(p2, p3)
+  if (d2 < 1e-4) d2 = d1
+  return [0, 1, 2].map((k) => {
+    const [x0, x1, x2, x3] = [p0[k], p1[k], p2[k], p3[k]]
+    const t1 = ((x1 - x0) / d0 - (x2 - x0) / (d0 + d1) + (x2 - x1) / d1) * d1
+    const t2 = ((x2 - x1) / d1 - (x3 - x1) / (d1 + d2) + (x3 - x2) / d2) * d1
+    const c2 = -3 * x1 + 3 * x2 - 2 * t1 - t2
+    const c3 = 2 * x1 - 2 * x2 + t1 + t2
+    return x1 + t1 * w + c2 * w * w + c3 * w * w * w
+  })
+}
+
+/** The drive LED on the front face (M19), base-local x and y, so a desk viewer sees it blink. */
+export const DRIVE_LED = { x: 1.2, y: MID_Y }
 
 /** The laptop hotspot's own hover glow (silver at GLOW_K reads chalky) and its mesh budget (M22, M23). */
 export const LAPTOP = { glow: 0.12, drawBudget: 20 }
@@ -270,6 +359,8 @@ export const MATERIALS = {
   j: { color: 0xeef0f3, metalness: 1, roughness: 0.06, envMapIntensity: 1.3, noEnv: { metalness: 0.5, roughness: 0.3 } },
   keys: { color: 0xb4b4b4, metalness: 0, roughness: 0.6, backlight: [1, 0xf4 / 255, 0xe0 / 255] },
   touchId: { color: 0x111214, metalness: 0, roughness: 0.3, hue: 0x9fb2c8 },
+  // R4-3: the braided MagSafe cable, a soft silver-white so it reads on the dark desk.
+  cable: { color: 0xc4c6ca, roughness: 0.85 },
 }
 
 /**

@@ -1,5 +1,6 @@
 // Pure maths from the scene frame loop (L1239–1262) and the pointer handlers (L1214–1219).
-// Every value is the prototype's, including its per-frame (not dt-based) smoothing factors.
+// Every value is the prototype's, including its per-frame (not dt-based) smoothing factors. Round 4
+// adds the laptop's curves (plan-r4 §2): the lid overshoot, the MagSafe LED, the sheen and the deck glow.
 import { clamp, ss, easeQuad } from '../core/math.js'
 import { OS_W, OS_H, CAM_NARROW_ASPECT } from '../core/constants.js'
 import { PEEK } from './props.js'
@@ -12,6 +13,16 @@ export const lidT = (z) => ss(0, 0.45, z)
 
 /** Hinge rotation: closed π/2, fully open −10° (L1241). */
 export const hingeAngle = (t) => Math.PI / 2 + (-10 * DEG - Math.PI / 2) * t
+
+/** Ease-out with an overshoot of strength `s` (0 at 0, 1 at 1, past 1 just before the end). */
+export const easeOutBack = (x, s = 1.70158) => 1 + (s + 1) * (x - 1) ** 3 + s * (x - 1) ** 2
+
+/**
+ * The hinge angle as the lid swings open and settles (plan-r4 D1): hingeAngle through
+ * easeOutBack(le, 0.7), which swings about 1.8° past −10° near le 0.73 and is exactly −10° at 1.
+ * Reduced motion keeps the plain hingeAngle(le).
+ */
+export const lidOpenAngle = (le, reduce) => hingeAngle(reduce ? le : easeOutBack(le, 0.7))
 
 /** Camera dolly progress (L1239). */
 export const camE = (z) => ss(0.2, 1, z)
@@ -190,11 +201,20 @@ export function stepSnow(y, v, dt, boost) {
   return ny < SNOW_BOTTOM ? SNOW_TOP : ny
 }
 
-/** Power LED colour (L1260–1261). */
-export function ledPower(state, t) {
-  if (state === 'on' || state === 'boot') return 0x2be070
-  if (state === 'standby') return (t / 600) % 2 < 1 ? 0xffaa22 : 0x221100
-  return 0x000000
+const MAGSAFE = { on: 0x3ddc84, standby: 0xff9f1c, off: 0x3a2406, min: 0.35, period: 4000 }
+
+/**
+ * The MagSafe plug's LED (plan-r4 D6) at `t` ms: green while the OS is on or booting; in standby
+ * an amber that breathes between 0.35 and full brightness every 4 s (steady with reduced motion);
+ * otherwise (off) a dim amber, as the laptop is still charging.
+ */
+export function ledMagSafe(state, t, reduce) {
+  if (state === 'on' || state === 'boot') return MAGSAFE.on
+  if (state !== 'standby') return MAGSAFE.off
+  if (reduce) return MAGSAFE.standby
+  const b = MAGSAFE.min + (1 - MAGSAFE.min) * (0.5 - 0.5 * Math.cos((2 * Math.PI * t) / MAGSAFE.period))
+  const ch = (shift) => Math.round(((MAGSAFE.standby >> shift) & 255) * b) << shift
+  return ch(16) | ch(8) | ch(0)
 }
 
 /** Drive LED colour (L1262). */
@@ -207,6 +227,18 @@ const SCREEN_LIGHT = { on: 1.1, boot: 0.6, standby: 0.25 }
 
 /** Target intensity of the light the screen casts (L1263). */
 export const screenLightTarget = (state, t) => (SCREEN_LIGHT[state] ?? 0) * t
+
+/** The opacity of the screen's glow on the deck (plan-r4 D4) at screen light `level` (it carries le). */
+export const deckGlowAlpha = (level) => 0.32 * level
+
+/**
+ * The lid sheen sweep (plan-r4 D5): the band's texture offset runs `from` → `to` over `dur` s
+ * (ease in-out) at `opacity`; the first-show sweep runs `delay` s after the scene first shows.
+ */
+export const SHEEN = { dur: 0.9, from: -1.2, to: 1.2, opacity: 0.28, delay: 1.2 }
+
+/** The sheen band's texture offset `t` s into a sweep. */
+export const sheenOffset = (t) => SHEEN.from + (SHEEN.to - SHEEN.from) * easeQuad(clamp(t / SHEEN.dur, 0, 1))
 
 /** Dog-tag swing angle (L1256). */
 export const tagAngle = (t, swing, reduce) => (reduce ? 0 : Math.sin(t * 3.1) * (swing + 0.03))

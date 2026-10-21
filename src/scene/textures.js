@@ -2,7 +2,8 @@
 // Ported from initScene (L1082–1088, L1143–1146, L1155, L1163–1164, L1223–1230); the mirror's
 // standby and desktop drawings were reworked to match the DOM screen it crossfades with. Round 4
 // (R4-2) adds the MacBook keyboard's atlas and glow and the Touch ID ring; the lid's JAY logo is
-// gone (the lid carries a J geometry instead).
+// gone (the lid carries a J geometry instead). R4-3 adds the laptop's contact shadow, the lid sheen
+// band and the screen's glow on the deck.
 import { OS_W, OS_H } from '../core/constants.js'
 import { SCREEN, keyboardUv } from './laptop.js'
 
@@ -288,4 +289,74 @@ export function drawTouchId(x, w, h) {
   x.beginPath()
   x.arc(w / 2, h / 2, w * 0.4, 0, Math.PI * 2)
   x.stroke()
+}
+
+/**
+ * The laptop's contact shadow (plan-r4 M21), for a 3.4 × 2.5 plane under the 3.0 × 2.1 base: a
+ * rounded rect a little larger than the base, blurred. The shape is drawn a canvas width off to the left and only
+ * its shadow, offset back onto the canvas, lands, so the edge is soft all round.
+ */
+export function drawContactShadow(x, w, h) {
+  x.clearRect(0, 0, w, h)
+  // 0.05 past the base's edge all round, so the darkest part of the blur peeks out from under it.
+  const rw = w * (3.1 / 3.4)
+  const rh = h * (2.2 / 2.5)
+  const r = w * (0.12 / 3.4)
+  const x0 = (w - rw) / 2 - w
+  const y0 = (h - rh) / 2
+  x.shadowColor = 'rgba(0,0,0,1)'
+  x.shadowBlur = Math.round(w / 28)
+  x.shadowOffsetX = w
+  x.fillStyle = '#000'
+  x.beginPath()
+  x.moveTo(x0 + r, y0)
+  x.arcTo(x0 + rw, y0, x0 + rw, y0 + rh, r)
+  x.arcTo(x0 + rw, y0 + rh, x0, y0 + rh, r)
+  x.arcTo(x0, y0 + rh, x0, y0, r)
+  x.arcTo(x0, y0, x0 + rw, y0, r)
+  x.closePath()
+  x.fill()
+  x.shadowBlur = 0
+  x.shadowOffsetX = 0
+}
+
+/**
+ * The lid sheen's band (plan-r4 D5): one soft white stripe across the middle, skewed into a
+ * diagonal, with fully transparent edges, so a clamped texture shows nothing until the sweep's
+ * offset brings the stripe onto the lid.
+ */
+export function drawSheen(x, w, h) {
+  x.clearRect(0, 0, w, h)
+  const g = x.createLinearGradient(0, 0, w, 0)
+  g.addColorStop(0, 'rgba(255,255,255,0)')
+  g.addColorStop(0.4, 'rgba(255,255,255,0)')
+  g.addColorStop(0.5, 'rgba(255,255,255,0.9)')
+  g.addColorStop(0.6, 'rgba(255,255,255,0)')
+  g.addColorStop(1, 'rgba(255,255,255,0)')
+  x.save()
+  // x' = x + 0.5·(h − y): the stripe leans right toward the top.
+  x.setTransform(1, 0, -0.5, 1, 0.5 * h, 0)
+  x.fillStyle = g
+  x.fillRect(-h, 0, w + 2 * h, h)
+  x.restore()
+}
+
+/**
+ * The screen's glow on the deck (plan-r4 D4): white, brightest at the back edge (the canvas top, by
+ * the screen) and fading to transparent in a half ellipse that reaches the plane's sides and front.
+ * The material tints it the screen light's colour.
+ */
+export function drawDeckGlow(x, w, h) {
+  x.clearRect(0, 0, w, h)
+  x.save()
+  x.scale(1, (2 * h) / w)
+  const g = x.createRadialGradient(w / 2, 0, 0, w / 2, 0, w / 2)
+  // Broad stops: the texture is sRGB, so mid greys come out darker in linear light.
+  g.addColorStop(0, 'rgba(255,255,255,1)')
+  g.addColorStop(0.5, 'rgba(255,255,255,0.8)')
+  g.addColorStop(0.8, 'rgba(255,255,255,0.35)')
+  g.addColorStop(1, 'rgba(255,255,255,0)')
+  x.fillStyle = g
+  x.fillRect(0, 0, w, w / 2)
+  x.restore()
 }

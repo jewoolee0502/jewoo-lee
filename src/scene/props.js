@@ -1,4 +1,5 @@
 // Placement data for the room's props, free of three.js so it can be unit-tested (round 2, R13).
+// The floppy drive slot moved to the laptop's right face in round 4 (laptop.js SLOT).
 
 /**
  * The polaroid hangs alone on the back wall at x 1.6, mirroring the dog tags at x −1.6, high enough
@@ -57,13 +58,6 @@ export const handleBulgeX = ({ R, center }) => center[0] + R
 
 /** The rotation about y that turns an object's local +z from `from` toward `to` ({x, z}). */
 export const faceAngle = (from, to) => Math.atan2(to.x - from.x, to.z - from.z)
-
-/**
- * The floppy drive slot on the front face of the base, in base-local coordinates (the base group
- * sits at rig z 0.35, so its front face z 1.05 is rig z 1.4). `w`×`h` is the dark mouth, `frame`
- * the bezel around it; `eject` and `led` are the (x, y) of the eject button and the drive LED.
- */
-export const SLOT = { x: 0.95, y: 0.085, z: 1.05, w: 0.56, h: 0.036, frame: [0.62, 0.06, 0.012], eject: [1.32, 0.085], led: [0.6, 0.085] }
 
 /** How far the closed lid peeks open while it is hovered at the desk. */
 export const PEEK = 7 * DEG

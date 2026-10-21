@@ -13,7 +13,6 @@ import {
   cameraPose,
   stepKey,
   stepSnow,
-  ledPower,
   ledDrive,
   screenLightTarget,
   tagAngle,
@@ -136,11 +135,10 @@ describe('scene/sceneMath', () => {
     expect(b.y).toBeCloseTo(0.19, 12)
   })
 
-  it('7. ledPower: standby blinks between 0xFFAA22 and 0x221100 every 600 ms; on=0x2BE070; off=0', () => {
-    expect(ledPower('standby', 0)).toBe(0xffaa22)
-    expect(ledPower('standby', 700)).toBe(0x221100)
-    expect(ledPower('on', 0)).toBe(0x2be070)
-    expect(ledPower('off', 0)).toBe(0)
+  // R4-3 (D6): the MagSafe LED replaces the old power LED (ledPower is gone).
+  it('R4-3: ledPower is gone; the MagSafe LED is ledMagSafe', () => {
+    expect(SM).not.toHaveProperty('ledPower')
+    expect(typeof SM.ledMagSafe).toBe('function')
   })
 
   it('7. ledDrive: 0 when idle; 0x220800 at t=0 when busy; 0xFF5533 at t=80', () => {
@@ -581,5 +579,91 @@ describe('scene/sceneMath R4-2 key travel and keyboard backlight', () => {
             expect(v).toBeGreaterThanOrEqual(0)
             expect(v).toBeLessThanOrEqual(1)
           }
+  })
+})
+
+// Round 4 Phase R4-3 TEST LIST (plan-r4 §2 D1, D4, D5, D6). Times are in ms for the LED (as ledDrive)
+// and in seconds for the sheen sweep and the lid; the new functions are read through the namespace.
+describe('scene/sceneMath R4-3 MagSafe LED, lid overshoot, sheen and deck glow', () => {
+  const GREEN = 0x3ddc84
+  const AMBER = 0xff9f1c
+  const DIM_AMBER = 0x3a2406
+  const bright = (hex) => ((hex >> 16) & 255) / 255 // the red channel, a fraction of the amber's 0xff
+
+  it('ledMagSafe: on and boot are the green 0x3ddc84 at any time, reduced or not', () => {
+    for (const t of [0, 1000, 2500]) {
+      expect(SM.ledMagSafe('on', t, false)).toBe(GREEN)
+      expect(SM.ledMagSafe('boot', t, true)).toBe(GREEN)
+    }
+  })
+
+  it('ledMagSafe: off is the dim amber 0x3a2406 (it is "charging"), at any time', () => {
+    for (const t of [0, 2000, 3999]) expect(SM.ledMagSafe('off', t, false)).toBe(DIM_AMBER)
+  })
+
+  it('ledMagSafe: standby breathes amber 0xff9f1c between 0.35 and 1 brightness over a 4 s period, and reaches both ends', () => {
+    const samples = []
+    for (let t = 0; t <= 4000; t += 50) samples.push(bright(SM.ledMagSafe('standby', t, false)))
+    expect(Math.min(...samples)).toBeGreaterThanOrEqual(0.35 - 0.01)
+    expect(Math.max(...samples)).toBeLessThanOrEqual(1 + 1e-9)
+    expect(Math.min(...samples)).toBeLessThanOrEqual(0.36)
+    expect(Math.max(...samples)).toBeGreaterThanOrEqual(0.99)
+  })
+
+  it('ledMagSafe: standby repeats every 4000 ms', () => {
+    for (const t of [0, 700, 1900, 3300]) {
+      expect(bright(SM.ledMagSafe('standby', t + 4000, false))).toBeCloseTo(bright(SM.ledMagSafe('standby', t, false)), 2)
+    }
+  })
+
+  it('ledMagSafe: with reduced motion, standby is a steady amber 0xff9f1c at every time', () => {
+    for (const t of [0, 1000, 2000, 3000]) expect(SM.ledMagSafe('standby', t, true)).toBe(AMBER)
+  })
+
+  it('lidOpenAngle(0) is π/2 (closed) and lidOpenAngle(1) is exactly −10° (open)', () => {
+    expect(SM.lidOpenAngle(0, false)).toBeCloseTo(Math.PI / 2, 12)
+    expect(SM.lidOpenAngle(1, false)).toBeCloseTo(-10 * DEG, 12)
+  })
+
+  it('lidOpenAngle overshoots past −10° and settles back: its minimum is between −13° and −10.5°', () => {
+    let min = Infinity
+    for (let le = 0; le <= 1.0001; le += 0.001) min = Math.min(min, SM.lidOpenAngle(le, false))
+    expect(min).toBeLessThan(-10.5 * DEG)
+    expect(min).toBeGreaterThanOrEqual(-13 * DEG)
+  })
+
+  it('lidOpenAngle with reduced motion is plain hingeAngle(le): no overshoot', () => {
+    for (const le of [0, 0.2, 0.5, 0.73, 0.9, 1]) expect(SM.lidOpenAngle(le, true)).toBeCloseTo(hingeAngle(le), 12)
+  })
+
+  it('easeOutBack(0) = 0 and easeOutBack(1) = 1, and it passes 1 before the end (the overshoot)', () => {
+    expect(SM.easeOutBack(0)).toBeCloseTo(0, 12)
+    expect(SM.easeOutBack(1)).toBeCloseTo(1, 12)
+    let peak = -Infinity
+    for (let x = 0; x <= 1.0001; x += 0.001) peak = Math.max(peak, SM.easeOutBack(x))
+    expect(peak).toBeGreaterThan(1)
+  })
+
+  it('sheenOffset runs from at most −1 at t 0 to at least 1 at the 0.9 s sweep, and never goes back', () => {
+    expect(SM.sheenOffset(0)).toBeLessThanOrEqual(-1)
+    expect(SM.sheenOffset(0.9)).toBeGreaterThanOrEqual(1)
+    let prev = -Infinity
+    for (let i = 0; i <= 90; i++) {
+      const v = SM.sheenOffset((0.9 * i) / 90)
+      expect(v).toBeGreaterThanOrEqual(prev - 1e-12)
+      prev = v
+    }
+  })
+
+  it('deckGlowAlpha is 0.32 times the screen level, and 0 with no light', () => {
+    expect(SM.deckGlowAlpha(0)).toBe(0)
+    expect(SM.deckGlowAlpha(1)).toBeCloseTo(0.32, 12)
+    expect(SM.deckGlowAlpha(1.1)).toBeCloseTo(0.352, 12)
+  })
+
+  it('deckGlowAlpha scales with the lid: half the lid open gives half the glow of the open lid (the screen level already carries le)', () => {
+    const full = SM.deckGlowAlpha(SM.screenLightTarget('on', 1))
+    expect(SM.deckGlowAlpha(SM.screenLightTarget('on', 0.5))).toBeCloseTo(full / 2, 12)
+    expect(SM.deckGlowAlpha(SM.screenLightTarget('on', 0))).toBe(0)
   })
 })

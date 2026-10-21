@@ -1,11 +1,30 @@
-// The MacBook Air's meshes and its env map (plan-r4 M2–M17, M22, M23). ESLint keeps three/* imports
+// The MacBook Air's meshes and its env map (plan-r4 M2–M23, D4, D5). ESLint keeps three/* imports
 // in createScene.js (the lazy chunk), so three arrives by injection: T = { THREE, BufferGeometryUtils },
 // where THREE holds only the classes and constants used here (passing the whole namespace as a value
 // would defeat tree-shaking). That also lets laptopBuild.test.js drive this with a plain proxy fake.
 // Every number comes from laptop.js; the textures are the painters in textures.js.
-import { BASE, LID, HINGE, SCREEN, KEYBOARD, TRACKPAD, MATERIALS, ENV, J_PATH, extrudeSpec, keyboardLayout, keycapBuffers, capBuffers } from './laptop.js'
-import { drawKeyAtlas, drawKeyGlow, drawTouchId, drawNote, drawSticker } from './textures.js'
-import { HIT, SLOT } from './props.js'
+import {
+  BASE,
+  LID,
+  HINGE,
+  SCREEN,
+  KEYBOARD,
+  TRACKPAD,
+  SLOT,
+  PORTS,
+  CABLE,
+  DRIVE_LED,
+  MATERIALS,
+  ENV,
+  J_PATH,
+  extrudeSpec,
+  keyboardLayout,
+  keycapBuffers,
+  capBuffers,
+} from './laptop.js'
+import { drawKeyAtlas, drawKeyGlow, drawTouchId, drawNote, drawSticker, drawContactShadow, drawSheen, drawDeckGlow } from './textures.js'
+import { HIT } from './props.js'
+import { SHEEN } from './sceneMath.js'
 
 const PI = Math.PI
 
@@ -92,8 +111,10 @@ function roundRect(path, w, h, r, cx = 0, cy = 0) {
  * ctx = { mk, hued, canvasTex, hitBox, env, base } are createScene's helpers, and `env` is
  * buildEnv's result or null. Only the two aluminium bodies cast shadows; the static small parts are
  * merged into one shade and one dark mesh, the 77 caps are one mesh (M8), and the hover-glow hues
- * follow M22. Returns the groups and meshes the scene drives: { base, hinge, anchor, kbHot, pbtn,
- * note, keys, leds, mats, envMats, texts, sheen, deckGlow }. It needs no dispose of its own: all it
+ * follow M22. The braided cable and the contact shadow are in rig coordinates, so they are built
+ * with no parent: mk's default, the rig. Returns the groups and meshes the scene drives: { base,
+ * hinge, anchor, kbHot, pbtn, note, keys, leds: {drive, magsafe}, mats, envMats, texts, sheen,
+ * deckGlow, cable, contact }; the sheen and the deck glow are built hidden (the frame shows them). It needs no dispose of its own: all it
  * builds is in the scene graph or a ctx.canvasTex, which createScene releases. The mirror and the
  * screen light stay in createScene, which owns the OS state they show.
  */
@@ -144,38 +165,56 @@ export function buildLaptop(T, ctx) {
   const baseGeo = extrude(baseShape, bs.depth, BASE.bevel)
     .rotateX(-PI / 2)
     .translate(0, BASE.lift + BASE.bevel, 0)
-  mk(baseGeo, aluBase, 0, 0, 0, base)
+  // The MagSafe plug (M18): a small rounded aluminium block standing out of the left face, merged
+  // into the base body (the same material, one draw).
+  const { magsafe } = PORTS.left
+  const PLUG_BEVEL = 0.006
+  const ps = extrudeSpec(magsafe.out, magsafe.len, magsafe.h, 0.012, PLUG_BEVEL)
+  const plugGeo = extrude(roundRect(new THREE.Shape(), ps.w, ps.d, ps.r), ps.depth, PLUG_BEVEL)
+    .rotateX(-PI / 2)
+    .translate(-BASE.w / 2 - magsafe.out / 2, PORTS.y - magsafe.h / 2 + PLUG_BEVEL, magsafe.z)
+  mk(merged([baseGeo, plugGeo]), aluBase, 0, 0, 0, base)
 
-  // The dark parts: the well floor, the trackpad seam, four rubber feet, and a placeholder floppy
-  // mouth on the front face at the floppy lane's height (R4-3 moves the slot to the right side); its
-  // top reaches into the front edge's bevel, so it reads as a cut. Front-face parts stand 1.2–2 mm
-  // (0.0012–0.002) proud of the face, so they never z-fight it.
+  // The side faces (M18, M20): a part on the right face (+x) or the left (−x), centred at (y, z),
+  // stands `proud` off it so it never z-fights the face.
+  const onRight = (geo, y, z, proud) => geo.rotateY(PI / 2).translate(BASE.w / 2 + proud, y, z)
+  const onLeft = (geo, y, z, proud) => geo.rotateY(-PI / 2).translate(-BASE.w / 2 - proud, y, z)
+
+  // The dark parts: the well floor, the trackpad seam, the four rubber feet (M21), the floppy mouth
+  // inside its lip on the right face (M20), the headphone jack behind it, and the two USB-C mouths
+  // on the left (M18). Side-face parts stand 1.2–2 mm (0.0012–0.002) proud of the face.
   const front = BASE.d / 2
+  const { jack } = PORTS.right
   const darkParts = [
     flatDown(new THREE.PlaneGeometry(well.w + 2 * BASE.bevel, well.d + 2 * BASE.bevel), 0, well.floor, well.z),
     flatDown(roundShapeGeo(THREE, TRACKPAD.w + 0.008, TRACKPAD.d + 0.008, TRACKPAD.r + 0.004), TRACKPAD.x, BASE.deckY + 0.0008, TRACKPAD.z),
-    new THREE.BoxGeometry(SLOT.w, 0.03, 0.03).translate(SLOT.x, SLOT.y, front - 0.015 + 0.002),
+    onRight(roundShapeGeo(THREE, SLOT.len, SLOT.h, 0.008), SLOT.y, SLOT.z, 0.002),
+    onRight(new THREE.CircleGeometry(jack.r, 16), PORTS.y, jack.z, 0.0012),
+    ...PORTS.left.usbc.map((u) => onLeft(roundShapeGeo(THREE, u.len, u.h, u.h / 2 - 0.002), PORTS.y, u.z, 0.0012)),
   ]
   for (const [fx, fz] of [[-1.25, -0.85], [1.25, -0.85], [-1.25, 0.85], [1.25, 0.85]])
     darkParts.push(new THREE.CylinderGeometry(0.07, 0.07, BASE.lift, 16).translate(fx, BASE.lift / 2, fz))
   part(merged(darkParts), dark, 0, 0, 0, base)
 
   // The shade parts: the hinge barrel (M16), the thumb scoop under the front edge (M17), and the
-  // floppy slot's lip and eject button.
+  // floppy slot's lip, SLOT.lip larger than the mouth all round (M20).
   const { barrel } = HINGE
   const scoop = new THREE.CircleGeometry(0.18, 24, PI, PI).scale(1, 0.024 / 0.18, 1)
   const shadeParts = [
     new THREE.CylinderGeometry(barrel.r, barrel.r, barrel.length, 20).rotateZ(PI / 2).translate(...barrel.pos),
     scoop.translate(0, BASE.deckY - BASE.bevel, front + 0.0015),
-    new THREE.BoxGeometry(SLOT.w + 0.04, 0.033, 0.024).translate(SLOT.x, SLOT.y - 0.0025, front - 0.012 + 0.0012),
-    new THREE.BoxGeometry(0.06, 0.018, 0.008).translate(SLOT.eject[0], SLOT.eject[1] - 0.005, front + 0.002),
+    onRight(roundShapeGeo(THREE, SLOT.len + 2 * SLOT.lip, SLOT.h + 2 * SLOT.lip, 0.014), SLOT.y, SLOT.z, 0.0012),
   ]
   part(merged(shadeParts), shade, 0, 0, 0, base)
 
-  // The drive LED next to the slot: its emissive is the frame's (ownEmissive, M22).
+  // The drive LED on the front face (M19) and the MagSafe LED on the plug's top outer end (M18).
+  // The drive LED's emissive is the frame's (ownEmissive, M22); the MagSafe LED is unlit
+  // (toneMapped off, so it stays lit in a dark room) and the frame writes its colour (D6).
   const ledM = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.4, emissive: 0x000000 })
   ledM.userData.ownEmissive = true
-  const driveLED = part(new THREE.BoxGeometry(0.05, 0.012, 0.006), ledM, SLOT.led[0], SLOT.led[1] - 0.005, front + 0.003, base)
+  const driveLED = part(roundShapeGeo(THREE, 0.05, 0.012, 0.006), ledM, DRIVE_LED.x, DRIVE_LED.y, front + 0.0015, base)
+  const magM = new THREE.MeshBasicMaterial({ color: 0x3a2406, toneMapped: false })
+  const magsafeLED = part(flatDown(roundShapeGeo(THREE, 0.024, 0.05, 0.008), 0, 0, 0), magM, -BASE.w / 2 - magsafe.out + 0.03, PORTS.y + magsafe.h / 2 + 0.0008, magsafe.z, base)
 
   // The Force Touch trackpad: one glass plane over the dark seam (M12), 2 mm over the deck and 1.2 mm
   // over the seam, which keeps them apart in the depth buffer from the far phone camera too.
@@ -253,6 +292,46 @@ export function buildLaptop(T, ctx) {
   const stickerM = part(new THREE.PlaneGeometry(0.5, 0.125), stickerMat, -0.85, 0.42, back - 0.001, hinge)
   stickerM.rotation.set(0, PI, PI - 0.06)
 
+  // Effects, built hidden: the frame shows them only while they are lit (D4, D5), so a resting frame
+  // draws neither. Both are additive, unlit and do not write depth.
+  const fx = (map, extra) => {
+    const m = new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, ...extra })
+    m.map = map
+    return m
+  }
+  // The lid sheen (D5): a band swept across the lid back by its texture offset. The shape's UVs are
+  // its own coordinates (0…w, 0…h), so repeat scales them to 0…1 and the offset slides the clamped
+  // band (transparent at its edges) from one side to the other. It covers the lid back inside the bevel.
+  const sw = LID.w - 2 * LID.bevel
+  const sh = LID.h - 2 * LID.bevel
+  const band = canvasTex(256, 64, drawSheen)
+  band.t.wrapS = band.t.wrapT = THREE.ClampToEdgeWrapping
+  band.t.repeat.set(1 / sw, 1 / sh)
+  const sheenGeo = new THREE.ShapeGeometry(roundRect(new THREE.Shape(), sw, sh, LID.r - LID.bevel, sw / 2, sh / 2), 6).translate(-sw / 2, -sh / 2, 0)
+  const sheen = part(sheenGeo, fx(band.t, { opacity: SHEEN.opacity }), 0, LID.h / 2, back - 0.0016, hinge)
+  sheen.rotation.set(0, PI, PI)
+  sheen.visible = false
+  // The screen's glow on the deck (D4), in front of the hinge over the keyboard, tinted the screen
+  // light's colour; the frame sets its opacity.
+  const glowTex = canvasTex(512, 180, drawDeckGlow)
+  const deckGlow = part(flatDown(new THREE.PlaneGeometry(2.8, 1), 0, 0, 0), fx(glowTex.t, { color: 0x7cc4ff, opacity: 0 }), 0, BASE.deckY + 0.004, -0.55, base)
+  deckGlow.visible = false
+
+  // ---------- in the rig: the braided MagSafe cable (M18) and the contact shadow (M21) ----------
+  const cableM = new THREE.MeshStandardMaterial({ color: MATERIALS.cable.color, roughness: MATERIALS.cable.roughness, metalness: 0 })
+  const curve = new THREE.CatmullRomCurve3(CABLE.points.map((p) => new THREE.Vector3(...p)))
+  const cable = mk(new THREE.TubeGeometry(curve, 64, CABLE.r, 6, false), cableM, 0, 0, 0)
+  cable.castShadow = false
+  const shadowTex = canvasTex(256, 192, drawContactShadow)
+  const contact = mk(
+    flatDown(new THREE.PlaneGeometry(3.4, 2.5), 0, 0, 0),
+    new THREE.MeshBasicMaterial({ map: shadowTex.t, transparent: true, depthWrite: false, opacity: 0.5 }),
+    BASE.pos[0],
+    0.0015,
+    BASE.pos[2],
+  )
+  contact.castShadow = contact.receiveShadow = false
+
   return {
     base,
     hinge,
@@ -261,14 +340,15 @@ export function buildLaptop(T, ctx) {
     pbtn,
     note: noteM,
     keys: { attr: caps.pos, position: kb.position, ids: kb.ids, ranges: kb.ranges, mat: keyM },
-    leds: { drive: driveLED },
+    leds: { drive: driveLED, magsafe: magsafeLED },
     mats: { aluBase, aluLid, shade, dark, glass, bezel, j: jMat, keys: keyM },
     envMats,
     // The canvases drawn in web fonts, for the scene's font gate.
     texts: [note, sticker],
-    // R4-3: the lid sheen sweep and the screen's glow on the deck.
-    sheen: null,
-    deckGlow: null,
+    sheen,
+    deckGlow,
+    cable,
+    contact,
   }
 }
 
