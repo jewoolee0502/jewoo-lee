@@ -1125,6 +1125,9 @@ function initScene(){
   [[-3.3,-1.45],[3.3,-1.45],[-3.3,1.45],[3.3,1.45]].forEach(([x,z])=>mk(B(.16,2.3,.16),M(0x3A2818),x,-1.37,z));
 
   // ---------- the laptop ----------
+  // Superseded (round 4, 2026-10): the laptop numbers below are this prototype's 90s laptop. The
+  // shipped MacBook Air is defined in src/scene/laptop.js (data) and src/scene/laptopBuild.js
+  // (meshes); see design/notes/plan-r4.md. Do not copy dimensions from here.
   const CASE=0xCDD3DA,ACC=0x4AA6EE;
   const base=new THREE.Group();base.position.set(0,0,.35);rig.add(base);
   mk(B(3.0,.16,2.1),M(CASE,{roughness:.55}),0,.08,0,base);

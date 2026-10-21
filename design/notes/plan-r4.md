@@ -465,3 +465,65 @@ Measured on a build of `460ffcc` with a temporary `info()` hook (the same one R4
 The desk count is stable (the same after 0.8 s at rest). The §2 target "scene `render.calls` at the desk ≤ 0.6 × baseline" is therefore **≤ 68 calls** at the desk.
 
 **After R4-1 (measured, not estimated).** The R4-1 working tree was built (`npm run build`) and probed the same way: `vite preview`, the same headless Chrome 155 with swiftshader, `/?stats` (the real `SceneMount` hook, no temporary code), 1440 × 900 at DPR 1, `renderer.info.render` read through `__jayScene.info()` four rAFs after `scrollTo` at the same scroll fractions as the baseline (0, 0.5 and 0.96 of the dive). Result: 114 calls / 3,942 triangles at the desk, 106 / 3,846 mid-dive and 20 / 204 late in the dive. R4-1 adds no meshes, so the desk count is unchanged; the small mid- and late-dive differences are most likely frustum culling, because the camera ends further back from a wider screen (`camDistance`). This was not investigated further. The phone viewport was not re-measured after R4-1.
+
+## Appendix: Results (R4-4, after the polish pass)
+
+Measured on a build of the R4-4 working tree (HEAD `3983f5c` plus the R4-4 changes), `vite preview`, headless Chrome (`--headless=new --use-angle=swiftshader --enable-unsafe-swiftshader`) over CDP, `/?stats`, `renderer.info.render` through `__jayScene.info()` two rAFs after the pose settles. Mid-dive poses were held by suppressing `scrollend` and re-sending `scroll` events, so the idle settle did not move them. `calls` include the moon shadow pass. No screenshots were kept.
+
+**Draw calls and triangles (scene)**
+
+| Viewport | Desk (z 0) | z 0.3 | z 0.5 | z 0.8 | z 0.98 |
+|---|---|---|---|---|---|
+| 1440 × 900, DPR 1 | **66** calls, 8,763 tris | 66 / 8,714 | 63 / 8,614 | 25 / 5,784 | 23 / 5,552 |
+| 1280 × 720, DPR 1 | 65 / 8,712 | | | | |
+| 390 × 844, DPR 3, mobile | 65 / 8,712 | 66 / 8,714 | 66 / 8,714 | 31 / 5,770 | 28 / 5,672 |
+| 844 × 390, DPR 3, mobile | 65 / 8,712 | | | | |
+
+Against the baseline (114 / 107 / 22 at 1440): desk 66 ≤ 68 (met, −42 %); mid-dive 63 ≤ 64 (met at 1440; the phone's 66 is just over its 65); late dive 23 against a target of 13 (**not met**: the late dive is the lid, the screen and the room around it, and was 20–22 before R4 too). Triangles went up (3.9k → 8.8k at the desk) because the body is now rounded extrudes, a 77-cap keyboard and a tube cable; this is well inside budget.
+
+**Laptop budget** (counted with the real three r128 by running `buildLaptop` in Node, with no env, proxies excluded): 16 visible meshes at rest, plus the mirror in createScene = 17 (budget 20); **5,506 triangles** (budget 15k), the largest being the merged dark/shade parts (1,868), the keycaps (924) and the cable (768). Exactly two meshes cast shadows (the base and lid aluminium).
+
+**PMREM build** (`performance.getEntriesByName('scene:buildEnv')`, new in R4-4; a rebuild replaces the single entry and the start mark is cleared): 380–430 ms at 1440 × 900 across seven fresh launches, 52–144 ms at the other viewports. **This figure includes the first-use compile of PMREM's shaders** on a software rasteriser. To separate the two, the served bundle was patched (CDP `Fetch`, not the source) to call `fromScene` twice in the same page: the second, warm call took **0.6–0.7 ms** across three launches. That is the JavaScript side only (the GPU work is asynchronous), so it is a lower bound, not the GPU cost. The 30 ms target is therefore not judged here: **measure on a headed GPU Chrome.** FPS was not measured (swiftshader gives about 20 fps, which means nothing).
+
+**Luminance check (R4-4 step 2)**: HEAD `3983f5c` (before R4-4) built in a temporary worktree and the R4-4 tree, each served by `vite preview` and probed the same way at 1440 × 900, DPR 1. Values are the mean Rec. 709 luminance of the sRGB pixels (0–1) and their standard deviation, averaged over 10 frames read from the WebGL canvas. Desk values were read 4 s after load (after the first-show sheen); z 0.5 values with the pose held.
+
+| Region (page px) | HEAD mean / std | R4-4 mean / std | Ratio |
+|---|---|---|---|
+| Laptop at the desk (452, 525, 441 × 130) | 0.612 / 0.139 | 0.652 / 0.152 | **1.07** (target ≥ 0.8) |
+| Lid back (470, 530, 400 × 90) | 0.645 / 0.094 | 0.705 / 0.094 | 1.09 |
+| Base front and rim (455, 628, 435 × 27) | 0.458 / 0.100 | 0.460 / 0.103 | 1.00 |
+| The J (668, 562, 40 × 22) | 0.640 / 0.039 | 0.757 / 0.124 | 1.18 (the J now stands out from the lid) |
+| Palm rest left of the trackpad, z 0.5 (180, 840, 280 × 50) | 0.600 / 0.019 | 0.625 / 0.025 | 1.04 |
+| Palm rest right of the trackpad, z 0.5 (870, 840, 270 × 50) | 0.934 / 0.103 | 0.942 / 0.094 | 1.01 |
+
+The glint panel lifts the lid back by about 9 % (its rough aluminium sees a little of the panel) and leaves the base rim and the deck within 1–4 %. Side-by-side crops of the z 0.5 deck show no blotch or new highlight, so nothing was retuned.
+
+**What R4-4 tuned**
+- **The lid J read faint from the desk.** A roughness-0.06 mirror reflects one direction of the env, and from every desk camera that direction landed on the dim back-wall panel (luminance 0.40). A soft warm-white **glint panel** (0xf4ede4 × 0.9, 2.2 × 3.4) with a dimmer halo (0x9a9590, 3.6 × 4.4) now sits on the env's back wall exactly where the closed lid centre mirrors at rest (15–19° up) and during the hover peek (1–5° up), for the wide and the phone cameras. `laptop.test` ray-casts this. That test is a geometric check only: it proves the mirror direction lands on a bright panel, not how the pixels look, which the screenshots and the luminance table cover. The glint sits at z −5.88 and the halo at −5.92, so neither is coplanar with the blue window panel (−5.9) that both overlap. Because the J is a near-perfect mirror and the lid aluminium is rough (0.42), the panel lights the J and barely changes the lid.
+- **The J is a bevelled extrude** (`J_EXTRUDE`: depth 0.0004, chamfer 0.01 × 0.0015) instead of a flat `ShapeGeometry`. Its chamfer mirrors a different part of the room than its face, so the polished J has a crisp edge, with a darker lower edge, rather than reading as a flat print. It stands 0.0014 off the lid, so it is not a raised sticker. The sheen moved out to 0.003 so it still sweeps over the J.
+- **J no-env fallback** (PMREM failure): metalness 0.1, roughness 0.25 instead of 0.5 / 0.3. A metal J with no env read as a grey ghost; it now reads as a light glossy J.
+- **Sheen opacity 0.28 → 0.45.** At 0.28 the additive band added about 40/255 to an already light lid and did not show in any frame. At 0.45 it reads as a soft diagonal highlight sweep and does not blow out.
+- `buildEnv` is wrapped in `performance.mark` / `measure` (`scene:buildEnv`); a throwing user-timing API is ignored.
+- **Declined:** the optional D4 deck-glow tint (`meanColor`) and D9 `typePeek`. Neither was needed for the owner's goal, and each adds per-frame or per-redraw work for little visual gain.
+
+**§6 checklist (1440 × 900 unless noted)**
+
+| # | Item | Result |
+|---|---|---|
+| 1 | Desk, closed (1440, 1280, 390, 844 × 390) | Pass. Slim silver slab with soft edges and a lip line; the J is upright, bright and glossy; the note and sticker on the lid; the MagSafe plug and cable; the contact shadow; props in place; the phone frame holds the desk. At 844 × 390 the HUD buttons overlap the polaroid (HUD layout from r3, not the laptop). |
+| 2 | Hover peek and sheen | Pass. The lid peeks, the J stays bright, and the sheen sweeps (seen frame by frame in the page through pixel reads). |
+| 3 | Mid-dive z 0.3 / 0.5 / 0.8 | Pass. The lid near its overshoot; the backlit keyboard has readable legends, the inverted T, the Touch ID and the big trackpad; the thin bezel, the camera dot and the rounded top screen corners. |
+| 4 | Open (z 1) | Pass. The flat OS is 1082 × 676 logical (scale 1.331), radius 0, and the last 3D frame (z 0.997) matches the first flat frame to about a pixel at the edge. About, Projects, Terminal and BugHunt all open inside the OS; icons in 6 rows; menubar intact. Phone: the compact OS, windows inside. |
+| 5 | Floppy RESUME insert, then GAMES | Pass. RESUME seats in the right-side slot, sticking out, and opens Resume.pdf; GAMES ejects RESUME back to the pile, seats itself and opens BugHunt. Swiftshader runs at about 20 fps, so the in-flight frames are too sparse to judge the path. |
+| 6 | Typing at z 0.5 | Pass. The A and ↑ caps change pixels in the first frame after keydown and spring back within about 3 frames; an unpressed cap does not change. (A real ArrowUp also scrolls the page, as before.) |
+| 7 | Phone 390 × 844 and 844 × 390 | Pass (see 1, 3 and 4). |
+| 8 | Reduced motion | Pass. No peek on hover and no sweep; z 0.3 shows the plain hinge angle (no overshoot); the screen is lit when open. |
+| 9 | Lamp off | Pass. The laptop and the J dim with the env; the room looks as before. |
+| 10 | Drag yaw ±0.4 | Pass. Dragging left shows the right side with the slot (and the floppy mouth); dragging right shows the left side with the plug and cable. The sign is the reverse of the wording in §6 item 10; the behaviour is r3's `dragYaw`. |
+| 11 | No WebGL (`--disable-webgl --disable-3d-apis`) | Pass. The "3D is unavailable" bar and the flat OS at 1144 × 676 logical (1440 × 851 below the bar); no console errors. |
+| 12 | PMREM fallback (`fromScene` patched to throw) | Pass. The laptop is silver, not black, and the J reads. |
+| — | Console | Clean apart from the preview-only `/_vercel/insights` 404 and swiftshader "GPU stall due to ReadPixels" notes from the screenshots. No `THREE.` warnings. |
+
+**Not testable headless:** FPS on a real GPU (§2 and §6 targets) and the PMREM time on a real GPU.
+
+**Not covered here:** the plan-r3 §6 scroll-model regression (items 1–10 at 1440 × 900 and 390 × 844) is being rerun separately by the browser pass.

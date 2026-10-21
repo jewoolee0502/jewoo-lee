@@ -1,5 +1,9 @@
 # Round 4 exploration: a MacBook Air laptop
 
+> **Implemented, see `design/notes/plan-r4.md`.** The laptop numbers in this note (and in
+> `design/revamp-lab.html`) are superseded by `src/scene/laptop.js`, the single source of truth for
+> the MacBook Air geometry, materials and env; `src/scene/laptopBuild.js` builds the meshes.
+
 Owner's request (2026-10-20): revamp the 3D laptop to look like a MacBook Air / Pro, more realistic and
 more fun to look at.
 
