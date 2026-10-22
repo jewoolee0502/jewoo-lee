@@ -1,0 +1,67 @@
+/* The résumé view (plan-r3 V1; views.css switches the views). Blueprint blocks verbatim from design/revamp-lab.html L241–256, L266–269;
+   the .r-* additions use the same tokens (tokens.css). */
+section.block{padding-block:60px 8px}
+.sec-head{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:baseline;justify-content:space-between;margin-bottom:22px}
+.sec-head h2{font-size:clamp(28px,3.6vw,40px);font-weight:700;letter-spacing:-.01em}
+.sec-head p{color:var(--muted);max-width:60ch}
+.ach-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ach{display:flex;gap:12px;align-items:center;background:var(--paper);border:1.5px solid var(--line);padding:12px 14px;min-width:0}
+.ach img{width:34px;height:34px;image-rendering:pixelated;flex:none}
+.ach b{display:block;font:12px var(--f-px);letter-spacing:.02em}
+.ach span{font-size:14px;color:var(--muted)}
+.ach b .ach-t{font:inherit;color:inherit}
+.ach.lock img{filter:grayscale(1);opacity:.4}
+.ach.got{border-color:var(--gold);box-shadow:4px 4px 0 var(--gold)}
+.ach-count{font:13px var(--f-px);color:var(--gold)}
+.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.col{background:var(--paper);border:1px solid var(--line);padding:20px}
+.col h3{font-size:20px;margin-bottom:10px}
+.col ul{margin:0;padding-left:18px;font-size:15px}
+.col li+li{margin-top:6px}
+footer{padding-block:56px 64px;color:var(--muted);font-size:13.5px}
+@media (max-width:900px){.ach-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.ach-grid,.cols{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- phase 8 additions ---------- */
+/* Until the stage mounts, reserve its track (stage.css .track) so the prerendered résumé does not jump down (CLS).
+   The laptop view hides the résumé once main.jsx runs, and the résumé view hides #app with this block. */
+#app:empty{height:var(--track-h);background:var(--scene)}
+#resume{display:block}
+#resume-title:focus:not(:focus-visible){outline:none}
+.r-head{padding-block:72px 8px}
+.r-head h1{font-size:clamp(40px,6vw,68px);font-weight:800;letter-spacing:-.02em;margin-top:10px}
+.r-tagline{color:var(--muted);font-size:17px;margin-top:10px;max-width:60ch}
+.r-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.r-btn{display:inline-flex;align-items:center;font:12px var(--f-px);letter-spacing:.02em;padding:10px 12px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);text-decoration:none;cursor:pointer;box-shadow:3px 3px 0 var(--line)}
+.r-btn:hover{background:var(--ink);color:var(--paper)}
+.r-btn.r-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:var(--shadow)}
+.r-btn.r-primary:hover{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.r-greet{font-family:var(--f-display);font-size:20px;font-weight:700;margin-bottom:8px}
+.col p+p{margin-top:8px}
+.r-facts{display:grid;gap:8px;margin:0 0 18px}
+.r-facts div{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:baseline}
+.r-facts dt{font:600 11px/1.6 var(--f-mono);letter-spacing:.12em;color:var(--muted)}
+.r-facts dd{margin:0}
+.r-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:8px;vertical-align:1px}
+.r-roles{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.r-roles .col{border-left:4px solid var(--accent)}
+.r-roles h3{margin-bottom:2px}
+.r-dates{font:600 12px/1.4 var(--f-mono);color:var(--muted);margin-bottom:6px}
+.r-company{font-weight:600;color:var(--accent);margin-bottom:6px}
+.r-projects{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.r-project{display:flex;flex-direction:column;gap:10px;min-width:0}
+.r-project img{display:block;width:100%;height:auto;aspect-ratio:420/263;object-fit:cover;object-position:top;border:1px solid var(--line);background:var(--bg)}
+.r-project h3{margin:0}
+.r-project > p{font-size:15px;color:var(--muted)}
+.col ul.r-tags{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px;font:12px/1.4 var(--f-mono)}
+.col ul.r-tags li{margin:0;padding:2px 7px;border:1px solid var(--line);background:var(--bg)}
+.r-links{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:auto;font-weight:600}
+.r-skills{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.r-skills li span{color:var(--muted)}
+.r-contact{display:grid;gap:12px}
+.r-contact .r-links,.r-contact .r-actions{margin-top:0}
+.ach-grid{list-style:none;margin:0;padding:0}
+.r-note{color:var(--muted);margin-top:14px;font-size:15px}
+.r-foot a{color:inherit}
+@media (max-width:900px){.r-projects{grid-template-columns:repeat(2,minmax(0,1fr))}.r-skills{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.r-projects,.r-skills{grid-template-columns:minmax(0,1fr)}}

@@ -1,32 +1,36 @@
 <!doctype html>
-<html lang="en" class="scrollbar-thin
-scrollbar-track-zinc-800 scrollbar-thumb-zinc-500">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Jewoo Lee - Portfolio</title>
-
-    <!-- 
-    - Favicon 
-    -->
-    <link rel="shortcut icon" href="/images/favicon.svg" type="image/svg+xml" />
-
-    <!-- 
-    - Google font link
-    -->
+    <!-- plan-r3 V10: a résumé link shows the résumé view from the first paint. Ids = RESUME_IDS (src/stage/views.js). -->
+    <script>/^#(resume|about|experience|projects|skills|contact|trophies)$/.test(location.hash)&&document.documentElement.setAttribute('data-view','resume')</script>
+    <title>Jewoo (Jay) Lee · Full-stack developer</title>
+    <meta name="description" content="Jewoo (Jay) Lee is a full-stack developer from McGill Computer Engineering in Montréal. Step into JAY-OS, a 3D 90s laptop portfolio, or read the résumé." />
+    <meta name="theme-color" content="#141C2E" />
+    <!-- The SITE_URL placeholder is the build-time VITE_SITE_URL (default: the Vercel URL), see vite.config.js. -->
+    <link rel="canonical" href="%SITE_URL%/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Jewoo (Jay) Lee · Full-stack developer" />
+    <meta property="og:description" content="Step into JAY-OS, a 3D 90s laptop portfolio, or read the résumé of Jewoo (Jay) Lee, a full-stack developer in Montréal." />
+    <meta property="og:url" content="%SITE_URL%/" />
+    <meta property="og:site_name" content="Jewoo (Jay) Lee" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Jewoo (Jay) Lee · Full-stack developer" />
+    <meta name="twitter:description" content="Step into JAY-OS, a 3D 90s laptop portfolio, or read the résumé." />
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-
-    <!-- 
-    - Material symbols rounded
-    -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0" />
-
-
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Silkscreen&family=VT323&family=Caveat:wght@600&family=EB+Garamond:wght@500&display=swap">
+    <!-- Without JS the stage never mounts: drop its reserved track so the résumé shows at once. The
+         bundled résumé stylesheet loads after this and sets `#app:empty` to the track height, so this
+         selector out-specifies it rather than relying on source order. -->
+    <noscript><style>html body #app:empty{height:0}</style></noscript>
   </head>
-  <body>
-    <div id="root"></div>
+  <body id="top">
+    <a class="skip" href="#resume">Skip to résumé</a>
+    <div id="app"></div>
+    <div id="resume-root"><!--resume-outlet--></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

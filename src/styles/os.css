@@ -1,0 +1,96 @@
+/* JAY-OS shell styles, verbatim from design/revamp-lab.html L86–167. */
+/* ---------- JAY-OS (lives on the 3D monitor) ---------- */
+.os{position:relative;width:1040px;height:676px;overflow:hidden;background:#04070A;color:#122030;font:16px/1.55 var(--f-body);user-select:none;-webkit-user-select:none;pointer-events:auto}
+.os.flat{width:100%;height:100%}
+/* plan-r4 §3: the lid screen's top corners round (SCREEN.cornerPx, as drawMirror masks them) and square off with the vignette (--vig on the holder), so the widen and the flat swap show none. */
+.os:not(.flat){border-radius:calc(var(--vig,1)*10px) calc(var(--vig,1)*10px) 0 0}
+.os .layer{position:absolute;inset:0;display:none}
+.os[data-state="standby"] .l-standby,.os[data-state="boot"] .l-boot,.os[data-state="on"] .l-desk,.os[data-state="off"] .l-off{display:block}
+.os::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:9000;background:radial-gradient(ellipse at center,transparent 70%,rgba(0,0,0,.3) 100%);opacity:var(--vig,1)}
+.os.live::after{opacity:0;transition:opacity .35s ease}
+.os.flat::after{display:none}
+@media (prefers-reduced-motion:reduce){.os::after{transition:none}.os.live::after{transition:none}}
+.glass{position:absolute;inset:0;z-index:9500;cursor:zoom-in;background:transparent;border:0;padding:0}
+.stage.zoomed .glass,.os.flat .glass{display:none}
+
+.l-standby{background:radial-gradient(ellipse at center,#0b1a28,#030508 70%);color:#7FD4FF;text-align:center}
+.l-standby .inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.sb-logo{font:64px var(--f-px);letter-spacing:.04em;text-shadow:0 0 18px rgba(127,212,255,.6)}
+.sb-blink{font:34px var(--f-vt);animation:blink 1.1s steps(2,start) infinite}
+@keyframes blink{50%{opacity:0}}
+.l-boot{background:#030508;color:#C9D6E3;padding:28px 34px;font:24px/1.25 var(--f-vt)}
+.l-boot pre{margin:0;font:inherit;white-space:pre-wrap}
+.l-boot .ok{color:#7FE0A8}.l-boot .warn{color:#FFB36B}
+.splash{position:absolute;inset:0;background:#030508;display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.l-boot.splashing .splash{display:flex}
+.splash .logo{font:72px var(--f-px);color:#4AA6EE;text-shadow:0 0 22px rgba(74,166,238,.6)}
+.splash .bar{width:300px;max-width:80%;height:16px;border:2px solid #4AA6EE;padding:2px}
+.splash .bar i{display:block;height:100%;width:0;background:#4AA6EE;transition:width .8s steps(12)}
+.l-off{background:#000;color:#FF9A4D;font:32px/1.3 var(--f-vt);text-align:center}
+.l-off .inner{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;padding:20px}
+.l-off small{font-size:22px;color:#7a6a5a}
+.os.collapsing .l-desk{display:block;animation:crtOff .6s forwards}
+@keyframes crtOff{0%{transform:none;filter:brightness(1)}55%{transform:scale(1,.006);filter:brightness(4)}100%{transform:scale(0,.006);filter:brightness(6)}}
+
+.l-desk{background-color:#3D98DD;background-image:radial-gradient(rgba(255,255,255,.16) 1px,transparent 1.3px);background-size:7px 7px}
+.wallpaper{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+.os.disco .l-desk{animation:disco .5s linear infinite}
+@keyframes disco{from{filter:hue-rotate(0)}to{filter:hue-rotate(360deg)}}
+.wallmark{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;font:14px var(--f-px);color:rgba(255,255,255,.55);text-align:center;line-height:1.4;pointer-events:none}
+.menubar{position:absolute;left:0;right:0;top:0;height:32px;background:#F4F7FA;border-bottom:2px solid #122030;display:flex;align-items:center;gap:2px;padding:0 8px;font:13px var(--f-px);z-index:7000;white-space:nowrap}
+.menubar button{font:inherit;background:none;border:0;padding:5px 9px;color:#122030;cursor:pointer;white-space:nowrap}
+.menubar button:hover,.menubar button.on{background:#122030;color:#fff}
+.menubar .sp{flex:1}
+.menu-pop{position:absolute;top:32px;left:8px;background:#F4F7FA;border:2px solid #122030;box-shadow:5px 5px 0 rgba(18,32,48,.45);z-index:7100;min-width:220px;padding:4px 0}
+.menu-pop button{display:block;width:100%;text-align:left;font:13px var(--f-px);padding:8px 14px;background:none;border:0;color:#122030;cursor:pointer}
+.menu-pop button:hover{background:#122030;color:#fff}
+.menu-pop hr{border:0;border-top:2px dotted #9aa8b6;margin:4px 0}
+.icons{position:absolute;top:46px;bottom:14px;display:grid;grid-auto-flow:column;grid-template-rows:repeat(auto-fill,100px);grid-auto-columns:100px;gap:2px}
+.icons.l{left:16px}
+.icons.r{right:16px;direction:rtl}
+.ic{direction:ltr;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;background:none;border:0;cursor:pointer;padding:6px 2px;color:#fff;font:12px/1.25 var(--f-px);text-align:center}
+.ic img{width:52px;height:52px;image-rendering:pixelated;filter:drop-shadow(3px 3px 0 rgba(18,32,48,.45));transition:transform .12s}
+.ic span{padding:1px 4px;text-shadow:1px 1px 0 #122030;background:rgba(18,32,48,.55)}
+.ic:hover img{transform:translateY(-3px) rotate(-3deg)}
+.ic:hover span,.ic:focus-visible span{background:#122030;text-shadow:none}
+.ic:active img{transform:scale(.92)}
+.wins{position:absolute;inset:0;pointer-events:none}
+.win{pointer-events:auto;position:absolute;display:flex;flex-direction:column;background:#FBFCFD;border:2px solid #122030;box-shadow:7px 7px 0 rgba(18,32,48,.42);min-width:220px}
+.win.opening{animation:winIn .2s ease-out}
+@keyframes winIn{from{transform:scale(.9) translateY(10px);opacity:0}}
+.win.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.tb{flex:none;height:34px;display:flex;align-items:center;gap:8px;padding:0 6px 0 12px;background:var(--wc,#4AA6EE);border-bottom:2px solid #122030;cursor:grab;font:13px var(--f-px);color:#122030;touch-action:none}
+.win:not(.focused) .tb{background:#D5DDE5}
+.tb-t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-x{flex:none;width:24px;height:24px;border:2px solid #122030;background:#fff;font:700 13px var(--f-mono);cursor:pointer;display:grid;place-items:center;padding:0;color:#122030}
+.tb-x:hover{background:#E8452E;color:#fff}
+.wb{flex:1;overflow:auto;padding:18px;user-select:text;-webkit-user-select:text;min-height:0;color:#122030}
+/* plan-r3 V15: on a mouse or trackpad, a wheel burst at a window edge must not chain into the page and close the laptop; touch keeps native chaining. */
+@media (hover:hover) and (pointer:fine){.wb{overscroll-behavior-y:contain}}
+.wb h2{font:800 28px/1.1 var(--f-display);margin:0 0 8px;color:#122030}
+.wb h3{font:700 18px var(--f-display);margin:0}
+.wb p{margin:0 0 10px}
+.wb ul{margin:6px 0 10px;padding-left:20px}
+.wb .muted{color:#566476}
+.wb .tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.wb .tags span{font:600 12px var(--f-mono);background:#122030;color:#fff;padding:3px 8px}
+.wb .btn{display:inline-block;font:13px var(--f-px);padding:9px 14px;border:2px solid #122030;background:#FFD15C;color:#122030;text-decoration:none;box-shadow:3px 3px 0 #122030;cursor:pointer}
+.wb .btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #122030}
+.wb .btn:disabled{opacity:.6;cursor:default}
+.draft{display:inline-block;font:600 11px var(--f-mono);color:#9A5B00;background:#FFF1D6;border:1px dashed #C98A1B;padding:1px 6px;margin-left:8px;vertical-align:middle}
+.os.compact .win{left:6px!important;top:38px!important;width:calc(100% - 12px)!important;height:calc(100% - 44px)!important;box-shadow:none}
+.os.compact .icons{grid-template-rows:repeat(auto-fill,92px);grid-auto-columns:minmax(84px,max-content)}
+.os.compact .ic img{width:44px;height:44px}
+.os.compact .menubar{padding:0 4px;gap:0;font-size:12px}
+.os.compact .menubar button{padding:5px 5px}
+.os.compact .mb-sel,.os.compact .wallmark,.os.compact #mb-snd,.os.fallback #mb-snd{display:none}
+.os.compact .about,.os.compact .inv{grid-template-columns:minmax(0,1fr)}
+.os.compact .pol{max-width:180px}
+.os.compact .log summary{grid-template-columns:minmax(0,1fr)}
+.os.compact .log details p{margin-left:0}
+.os.compact.live:not(.fallback) .win{/* plan-r2 §7 U13: inside on a compact layout, windows and icons end 12px above the "Read the résumé" pill (36px tall, bottom max(16px, safe-area inset)); the window starts at 38px. */height:calc(100% - 86px - max(16px,env(safe-area-inset-bottom,0px)))!important}
+.os.compact.live:not(.fallback) .icons{bottom:calc(48px + max(16px,env(safe-area-inset-bottom,0px)))}
+
+/* Addition (not in the prototype): the desk ignores clicks during the shutdown collapse. */
+.os.collapsing .l-desk{pointer-events:none}

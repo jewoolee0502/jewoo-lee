@@ -1,0 +1,72 @@
+/* JAY-OS app content styles, verbatim from design/revamp-lab.html L169–239. */
+/* app contents */
+.about{display:grid;grid-template-columns:170px minmax(0,1fr);gap:22px;align-items:start}
+.pol{margin:0;background:#fff;padding:10px 10px 34px;box-shadow:3px 3px 0 #122030;border:1px solid #c9d2db;transform:rotate(-3deg);position:relative}
+.pol img{display:block;width:100%;aspect-ratio:56/72;object-fit:cover;object-position:top;image-rendering:pixelated}
+.pol figcaption{position:absolute;left:0;right:0;bottom:6px;text-align:center;font:600 20px "Caveat",cursive;color:#33414f}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:12px 0;font-size:15px}
+.facts dt{font:12px var(--f-px);color:#566476;padding-top:3px}
+.facts dd{margin:0}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#1F8455;margin-right:6px}
+.clocks{display:flex;gap:10px;flex-wrap:wrap}
+.clock{border:2px solid #122030;padding:6px 10px;font:22px var(--f-vt);line-height:1}
+.clock small{display:block;font:10px var(--f-px);color:#566476}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.pcard{background:#fff;border:2px solid #122030;padding:0;cursor:pointer;text-align:left;box-shadow:3px 3px 0 #122030;transition:transform .12s,box-shadow .12s;font:inherit;color:#122030}
+.pcard:hover{transform:translate(-2px,-2px) rotate(-1deg);box-shadow:6px 6px 0 #122030}
+.pcard img{display:block;width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;object-position:top;border-bottom:2px solid #122030}
+.pcard.bin-item{/* plan-r2 §7 U14: the Recycle Bin item, a row with a small thumbnail. */display:flex;align-items:center;gap:12px;width:100%}
+.pcard.bin-item img{flex:none;width:110px;height:auto;border-bottom:0;border-right:2px solid #122030}
+.pcard span{display:block;padding:8px 10px;font:12px/1.3 var(--f-px)}
+.shot-link{display:block;cursor:pointer;margin-bottom:14px}
+.shot{display:block;width:100%;height:auto;max-height:440px;object-fit:contain;background:#E9EEF3;border:2px solid #122030}
+.log{font:14px var(--f-mono)}
+.log details{border-bottom:1px dashed #b7c2cd;padding:10px 0}
+.log summary{cursor:pointer;list-style:none;display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px}
+.log summary::-webkit-details-marker{display:none}
+.log summary .when{color:#1677C9}
+.log summary b{font-family:var(--f-body);font-size:16px}
+.log summary em{display:block;font-style:normal;color:#566476;font-family:var(--f-body);font-size:14px}
+.log details p{margin:8px 0 0 160px;font:15px/1.55 var(--f-body)}
+.inv{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}
+.slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.slot{aspect-ratio:1;border:2px solid #122030;background:#E9EEF3;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:10px/1.1 var(--f-px);color:#122030;padding:4px;text-align:center;box-shadow:inset -3px -3px 0 rgba(18,32,48,.15)}
+.slot b{display:grid;place-items:center;width:34px;height:34px;background:var(--sc);color:#fff;font:14px var(--f-px);border:2px solid #122030}
+.slot:hover,.slot.on{background:#FFF6D8}
+.inv-d{border:2px dashed #9aa8b6;padding:12px;font-size:15px}
+.inv-d h3{margin-bottom:4px}
+.rar{font:11px var(--f-px)}
+.term{height:100%;background:#06110A;color:#7CFFA0;font:21px/1.25 var(--f-vt);padding:12px 14px;display:flex;flex-direction:column;text-shadow:0 0 6px rgba(124,255,160,.45);cursor:text}
+.t-out{flex:1;overflow:auto;white-space:pre-wrap;word-break:break-word}
+/* plan-r3 V15: on a mouse or trackpad, a wheel burst at the terminal edge must not chain into the page and close the laptop; touch keeps native chaining. */
+@media (hover:hover) and (pointer:fine){.t-out{overscroll-behavior-y:contain}}
+.t-out .c{color:#FFB86B}.t-out .d{color:#4f9e66}.t-out .w{color:#FF8A7A}.t-out .b{color:#7FD4FF}
+.t-out pre{margin:0;font:inherit;line-height:1.05}
+.t-line{display:flex;gap:8px;align-items:baseline}
+.t-ps{color:#FFB86B;flex:none}
+.t-in{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#E6FFEE;font:inherit;caret-color:#7CFFA0;padding:0}
+.t-in:focus,.t-in:focus-visible{outline:0}
+.win[data-app="term"] .wb{padding:0}
+.game-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;font:13px var(--f-px)}
+.snake-cv{display:block;border:2px solid #122030;image-rendering:pixelated;touch-action:none;max-width:100%}
+.dpad{display:grid;grid-template-columns:repeat(3,44px);gap:4px;margin-top:10px}
+.dpad button{height:40px;font:14px var(--f-px);border:2px solid #122030;background:#fff;cursor:pointer;color:#122030}
+.bug-layer{position:absolute;inset:32px 0 0 0;z-index:6500;pointer-events:none;overflow:hidden}
+.bugx{position:absolute;left:0;top:0;width:44px;height:44px;margin:-22px 0 0 -22px;border:0;background:none;padding:0;cursor:crosshair;pointer-events:auto}
+.bugx img{width:100%;height:100%;image-rendering:pixelated}
+.bugx.splat{pointer-events:none;animation:splat .4s forwards}
+@keyframes splat{to{opacity:0;filter:brightness(2)}}
+.form label{display:block;font:11px var(--f-px);color:#566476;margin-top:10px}
+.form input,.form textarea{width:100%;font:15px var(--f-body);border:2px solid #122030;padding:8px;background:#fff;color:#122030}
+.form textarea{height:90px;resize:none}
+.links{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px}
+.achl{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.achl li{display:flex;gap:12px;align-items:center;border:2px solid #122030;padding:8px 10px;background:#fff}
+.achl li.lock{opacity:.55;background:#EEF2F6;border-style:dashed}
+.achl li img{width:30px;height:30px;image-rendering:pixelated}
+.achl b{display:block;font:12px var(--f-px)}
+.achl span{font-size:14px;color:#566476}
+.fx{position:absolute;inset:0;z-index:8000;pointer-events:none}
+.seg{display:inline-flex;border:2px solid #122030}
+.seg button{font:12px var(--f-px);border:0;padding:6px 10px;background:#fff;color:#122030;cursor:pointer}
+.seg button.on{background:#122030;color:#fff}
